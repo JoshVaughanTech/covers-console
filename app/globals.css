@@ -1,0 +1,355 @@
+/* ============================================================
+   FairShift — Design System Foundations (Tailwind v4)
+   Colors + Typography tokens (base + semantic)
+   Powered by idara
+   Ported from colors_and_type.css. Fonts are wired via
+   next/font in app/layout.tsx (--font-jakarta / --font-jb-mono).
+   ============================================================ */
+@import "tailwindcss";
+
+/* ---- Expose FairShift tokens to Tailwind's utility engine ----
+   `@theme inline` lets utilities (bg-fs-teal, text-fg-2, …) resolve
+   to the raw CSS variables declared in :root below, so both the
+   ported inline-style components (var(--fs-teal)) and Tailwind
+   utilities share one source of truth. */
+@theme inline {
+  --color-fs-teal: var(--fs-teal);
+  --color-fs-teal-600: var(--fs-teal-600);
+  --color-fs-teal-700: var(--fs-teal-700);
+  --color-fs-teal-tint: var(--fs-teal-tint);
+  --color-fs-teal-tint-2: var(--fs-teal-tint-2);
+  --color-idara-green: var(--idara-green);
+  --color-idara-tint: var(--idara-tint);
+
+  --color-ink-900: var(--ink-900);
+  --color-ink-800: var(--ink-800);
+  --color-ink-700: var(--ink-700);
+
+  --color-fg-1: var(--fg-1);
+  --color-fg-2: var(--fg-2);
+  --color-fg-3: var(--fg-3);
+  --color-fg-4: var(--fg-4);
+  --color-bg: var(--bg);
+  --color-bg-2: var(--bg-2);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-border: var(--border);
+  --color-border-2: var(--border-2);
+
+  --color-success: var(--success);
+  --color-success-fg: var(--success-fg);
+  --color-success-bg: var(--success-bg);
+  --color-warning: var(--warning);
+  --color-warning-fg: var(--warning-fg);
+  --color-warning-bg: var(--warning-bg);
+  --color-danger: var(--danger);
+  --color-danger-fg: var(--danger-fg);
+  --color-danger-bg: var(--danger-bg);
+  --color-info: var(--info);
+  --color-info-fg: var(--info-fg);
+  --color-info-bg: var(--info-bg);
+
+  --color-series-teal: var(--series-teal);
+  --color-series-amber: var(--series-amber);
+  --color-series-red: var(--series-red);
+  --color-series-blue: var(--series-blue);
+  --color-series-violet: var(--series-violet);
+
+  --radius-xs: var(--r-xs);
+  --radius-sm: var(--r-sm);
+  --radius-md: var(--r-md);
+  --radius-lg: var(--r-lg);
+  --radius-xl: var(--r-xl);
+
+  --shadow-xs: var(--shadow-xs);
+  --shadow-sm: var(--shadow-sm);
+  --shadow-md: var(--shadow-md);
+  --shadow-lg: var(--shadow-lg);
+  --shadow-card: var(--shadow-card);
+
+  --font-display: var(--font-display);
+  --font-body: var(--font-body);
+  --font-mono: var(--font-mono);
+}
+
+:root {
+  /* ---------- BRAND ---------- */
+  --fs-teal: #0d8b82;
+  --fs-teal-600: #0a6f68;
+  --fs-teal-700: #075a54;
+  --fs-teal-tint: #e6f4f2;
+  --fs-teal-tint-2: #d2ebe7;
+  --idara-green: #12998c;
+  --idara-tint: #e4f3f0;
+
+  /* ---------- INK / NAVY (sidebars, chrome) ---------- */
+  --ink-900: #0a1a28;
+  --ink-800: #15263b;
+  --ink-700: #1f3346;
+
+  /* ---------- NEUTRALS ---------- */
+  --fg-1: #0e1c2b;
+  --fg-2: #475569;
+  --fg-3: #64748b;
+  --fg-4: #94a3b8;
+  --bg: #f6f8f9;
+  --bg-2: #eef2f4;
+  --surface: #ffffff;
+  --surface-2: #fbfcfd;
+  --border: #e6eaef;
+  --border-2: #d6dde4;
+
+  /* ---------- SEMANTIC / STATUS ---------- */
+  --success: #1b9e6f;
+  --success-fg: #157a57;
+  --success-bg: #e5f5ee;
+  --warning: #f0922b;
+  --warning-fg: #b45309;
+  --warning-bg: #fdf0e1;
+  --danger: #e5484d;
+  --danger-fg: #c0353a;
+  --danger-bg: #fdecec;
+  --info: #2e78d6;
+  --info-fg: #1e5fb0;
+  --info-bg: #e8f1fc;
+
+  /* ---------- DATA VIZ — teal heatmap scale ---------- */
+  --viz-0: #ecf6f4;
+  --viz-1: #cdeae4;
+  --viz-2: #a3dad0;
+  --viz-3: #6cc6b8;
+  --viz-4: #2fa897;
+  --viz-5: #0d8b82;
+  --viz-6: #075a54;
+  /* categorical (chart series) */
+  --series-teal: #0d8b82;
+  --series-amber: #f0922b;
+  --series-red: #e5484d;
+  --series-blue: #2e78d6;
+  --series-violet: #7c6be0;
+
+  /* ---------- RADII ---------- */
+  --r-xs: 6px;
+  --r-sm: 8px;
+  --r-md: 12px;
+  --r-lg: 16px;
+  --r-xl: 20px;
+  --r-pill: 999px;
+
+  /* ---------- SHADOWS / ELEVATION ---------- */
+  --shadow-xs: 0 1px 2px rgba(13, 30, 48, 0.06);
+  --shadow-sm: 0 1px 3px rgba(13, 30, 48, 0.08), 0 1px 2px rgba(13, 30, 48, 0.04);
+  --shadow-md: 0 4px 12px rgba(13, 30, 48, 0.07), 0 2px 4px rgba(13, 30, 48, 0.04);
+  --shadow-lg: 0 12px 28px rgba(13, 30, 48, 0.1), 0 4px 8px rgba(13, 30, 48, 0.05);
+  --shadow-card: 0 1px 2px rgba(13, 30, 48, 0.04), 0 6px 18px rgba(13, 30, 48, 0.06);
+  --ring-focus: 0 0 0 3px rgba(13, 139, 130, 0.22);
+
+  /* ---------- SPACING (4px base) ---------- */
+  --sp-1: 4px;
+  --sp-2: 8px;
+  --sp-3: 12px;
+  --sp-4: 16px;
+  --sp-5: 20px;
+  --sp-6: 24px;
+  --sp-8: 32px;
+  --sp-10: 40px;
+  --sp-12: 48px;
+  --sp-16: 64px;
+
+  /* ---------- TYPE FAMILIES ---------- */
+  /* --font-jakarta / --font-jb-mono are injected by next/font (layout.tsx) */
+  --font-display: var(--font-jakarta), system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-body: var(--font-jakarta), system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: var(--font-jb-mono), ui-monospace, "SF Mono", Menlo, monospace;
+
+  /* ---------- TYPE SCALE (semantic) ---------- */
+  --display-size: 56px;
+  --display-weight: 800;
+  --display-lh: 1.04;
+  --display-ls: -0.02em;
+  --h1-size: 40px;
+  --h1-weight: 800;
+  --h1-lh: 1.08;
+  --h1-ls: -0.02em;
+  --h2-size: 30px;
+  --h2-weight: 700;
+  --h2-lh: 1.15;
+  --h2-ls: -0.015em;
+  --h3-size: 22px;
+  --h3-weight: 700;
+  --h3-lh: 1.25;
+  --h3-ls: -0.01em;
+  --h4-size: 18px;
+  --h4-weight: 600;
+  --h4-lh: 1.35;
+  --h4-ls: -0.005em;
+  --body-lg-size: 17px;
+  --body-lg-lh: 1.55;
+  --body-size: 15px;
+  --body-lh: 1.55;
+  --small-size: 13px;
+  --small-lh: 1.45;
+  --caption-size: 12px;
+  --caption-lh: 1.4;
+  --eyebrow-size: 12px;
+  --eyebrow-ls: 0.08em;
+}
+
+/* ============================================================
+   BASE / RESET (layered after Tailwind preflight)
+   ============================================================ */
+* {
+  box-sizing: border-box;
+}
+html,
+body {
+  margin: 0;
+  height: 100%;
+}
+body {
+  font-family: var(--font-body);
+  color: var(--fg-1);
+  background: var(--bg);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ============================================================
+   SEMANTIC ELEMENT STYLES
+   ============================================================ */
+.fs-display {
+  font-family: var(--font-display);
+  font-size: var(--display-size);
+  font-weight: var(--display-weight);
+  line-height: var(--display-lh);
+  letter-spacing: var(--display-ls);
+  color: var(--fg-1);
+}
+h1,
+.fs-h1 {
+  font-family: var(--font-display);
+  font-size: var(--h1-size);
+  font-weight: var(--h1-weight);
+  line-height: var(--h1-lh);
+  letter-spacing: var(--h1-ls);
+  color: var(--fg-1);
+}
+h2,
+.fs-h2 {
+  font-family: var(--font-display);
+  font-size: var(--h2-size);
+  font-weight: var(--h2-weight);
+  line-height: var(--h2-lh);
+  letter-spacing: var(--h2-ls);
+  color: var(--fg-1);
+}
+h3,
+.fs-h3 {
+  font-family: var(--font-display);
+  font-size: var(--h3-size);
+  font-weight: var(--h3-weight);
+  line-height: var(--h3-lh);
+  letter-spacing: var(--h3-ls);
+  color: var(--fg-1);
+}
+h4,
+.fs-h4 {
+  font-family: var(--font-display);
+  font-size: var(--h4-size);
+  font-weight: var(--h4-weight);
+  line-height: var(--h4-lh);
+  letter-spacing: var(--h4-ls);
+  color: var(--fg-1);
+}
+.fs-body-lg {
+  font-family: var(--font-body);
+  font-size: var(--body-lg-size);
+  line-height: var(--body-lg-lh);
+  color: var(--fg-2);
+}
+p,
+.fs-body {
+  font-family: var(--font-body);
+  font-size: var(--body-size);
+  line-height: var(--body-lh);
+  color: var(--fg-2);
+}
+.fs-small {
+  font-family: var(--font-body);
+  font-size: var(--small-size);
+  line-height: var(--small-lh);
+  color: var(--fg-3);
+}
+.fs-caption {
+  font-family: var(--font-body);
+  font-size: var(--caption-size);
+  line-height: var(--caption-lh);
+  color: var(--fg-4);
+}
+.fs-eyebrow {
+  font-family: var(--font-body);
+  font-size: var(--eyebrow-size);
+  font-weight: 700;
+  letter-spacing: var(--eyebrow-ls);
+  text-transform: uppercase;
+  color: var(--fs-teal);
+}
+code,
+.fs-mono {
+  font-family: var(--font-mono);
+  font-size: 13px;
+}
+
+/* numeric / tabular figures for tables & metrics */
+.fs-tnum {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+}
+
+/* ============================================================
+   APP CHROME UTILITIES (ported from console index.html)
+   ============================================================ */
+.hov-row {
+  transition: background 0.12s;
+}
+.hov-row:hover {
+  background: var(--surface-2);
+}
+
+.fs-nav-item {
+  background: transparent;
+  color: #9fb0be;
+}
+.fs-nav-item:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: #d6e0e7;
+}
+.fs-nav-item.on {
+  background: var(--fs-teal);
+  color: #fff;
+}
+.fs-nav-item.on:hover {
+  background: var(--fs-teal);
+  color: #fff;
+}
+
+::-webkit-scrollbar {
+  width: 11px;
+  height: 11px;
+}
+::-webkit-scrollbar-thumb {
+  background: #cbd5dd;
+  border-radius: 999px;
+  border: 3px solid var(--bg);
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    transition-duration: 0.001ms !important;
+  }
+}
