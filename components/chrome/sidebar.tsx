@@ -38,7 +38,6 @@ export function Sidebar() {
           letterSpacing: "-.01em",
         }}
       >
-        {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src="/assets/fairshift-icon-t.png"
           alt="FairShift"
@@ -73,7 +72,6 @@ export function Sidebar() {
               <span style={{ flex: 1 }}>{n.label}</span>
               {n.idara && (
                 <span style={{ width: 16, height: 16, display: "inline-flex" }}>
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src="/assets/idara-icon-t.png"
                     alt="idara"
