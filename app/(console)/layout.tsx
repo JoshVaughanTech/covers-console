@@ -5,6 +5,9 @@ import { usePathname } from "next/navigation";
 import { Sidebar } from "@/components/chrome/sidebar";
 import { Topbar } from "@/components/chrome/topbar";
 import { DATE_LABELS } from "@/components/chrome/nav";
+import { ShellProvider } from "@/lib/store/shell";
+import { IdaraProvider } from "@/lib/idara";
+import { ToastProvider, ConfirmProvider } from "@/components/ui";
 
 /* ============================================================
    Console shell — fixed navy sidebar + white topbar + scrollable
@@ -24,14 +27,29 @@ export default function ConsoleLayout({ children }: { children: React.ReactNode 
   }, [pathname]);
 
   return (
-    <div style={{ display: "flex", height: "100vh", overflow: "hidden", background: "var(--bg)" }}>
-      <Sidebar />
-      <div style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0 }}>
-        <Topbar dateLabel={dateLabel} />
-        <main ref={scrollRef} style={{ flex: 1, overflowY: "auto", padding: "24px 28px" }}>
-          {children}
-        </main>
-      </div>
-    </div>
+    <ShellProvider>
+      <IdaraProvider>
+      <ToastProvider>
+        <ConfirmProvider>
+          <div
+            style={{
+              display: "flex",
+              height: "100vh",
+              overflow: "hidden",
+              background: "var(--bg)",
+            }}
+          >
+            <Sidebar />
+            <div style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0 }}>
+              <Topbar dateLabel={dateLabel} />
+              <main ref={scrollRef} style={{ flex: 1, overflowY: "auto", padding: "24px 28px" }}>
+                {children}
+              </main>
+            </div>
+          </div>
+        </ConfirmProvider>
+      </ToastProvider>
+      </IdaraProvider>
+    </ShellProvider>
   );
 }

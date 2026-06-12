@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Icon } from "@/components/ui/icon";
 import { Avatar } from "@/components/ui/avatar";
+import { Menu, useToast } from "@/components/ui";
 import { NAV } from "./nav";
 
 /* ============================================================
@@ -13,6 +14,7 @@ import { NAV } from "./nav";
 
 export function Sidebar() {
   const pathname = usePathname();
+  const toast = useToast();
   return (
     <aside
       style={{
@@ -85,20 +87,53 @@ export function Sidebar() {
       </nav>
       <div
         style={{
-          display: "flex",
-          alignItems: "center",
-          gap: 10,
-          padding: "10px",
           marginTop: 8,
           borderTop: "1px solid rgba(255,255,255,.08)",
+          paddingTop: 8,
         }}
       >
-        <Avatar name="Emma Taylor" size={34} />
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ color: "#fff", fontSize: 13.5, fontWeight: 600 }}>Emma Taylor</div>
-          <div style={{ color: "#7C8B98", fontSize: 11.5 }}>Operations Manager</div>
-        </div>
-        <Icon name="chevron-down" size={15} color="#7C8B98" />
+        <Menu
+          align="left"
+          items={[
+            { label: "View profile", icon: "user", href: "/people" },
+            { label: "Settings", icon: "settings", href: "/settings" },
+            {
+              label: "Sign out",
+              icon: "log-out",
+              tone: "danger",
+              onClick: () => toast("Signed out", { tone: "neutral", icon: "log-out" }),
+            },
+          ]}
+        >
+          <button
+            type="button"
+            aria-label="Account menu"
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 10,
+              width: 208,
+              padding: "10px",
+              border: 0,
+              background: "transparent",
+              cursor: "pointer",
+              borderRadius: 9,
+              textAlign: "left",
+              font: "inherit",
+            }}
+          >
+            <Avatar name="Emma Taylor" size={34} />
+            <span style={{ flex: 1, minWidth: 0 }}>
+              <span style={{ display: "block", color: "#fff", fontSize: 13.5, fontWeight: 600 }}>
+                Emma Taylor
+              </span>
+              <span style={{ display: "block", color: "#7C8B98", fontSize: 11.5 }}>
+                Operations Manager
+              </span>
+            </span>
+            <Icon name="chevron-down" size={15} color="#7C8B98" />
+          </button>
+        </Menu>
       </div>
     </aside>
   );
