@@ -3,7 +3,13 @@
 import { useMemo, useState } from "react";
 import { Card, Badge, Button, Icon, Avatar, Tabs, useToast } from "@/components/ui";
 import type { Tone } from "@/lib/status";
-import { useIdara, verifyChain, type AuditEvent } from "@/lib/idara";
+import {
+  useIdara,
+  verifyChain,
+  shortHash,
+  HASH_ALGORITHM,
+  type AuditEvent,
+} from "@/lib/idara";
 import { PageHead } from "@/components/screen/page-head";
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
@@ -72,7 +78,7 @@ export default function AuditPage() {
   const runVerify = () => {
     const r = verifyChain(auditLog);
     if (r.ok) {
-      toast(`Chain verified — ${auditLog.length} events intact, no tampering`, {
+      toast(`${HASH_ALGORITHM} chain verified — ${auditLog.length} events intact, no tampering`, {
         tone: "success",
         icon: "shield-check",
       });
@@ -162,7 +168,7 @@ export default function AuditPage() {
           </div>
           <div style={{ fontSize: 12, color: "var(--fg-3)" }}>
             {chain.ok
-              ? `All ${auditLog.length} events link to the previous hash. Any edit or deletion would break the chain.`
+              ? `All ${auditLog.length} events link to the previous ${HASH_ALGORITHM} hash. Any edit, reorder or deletion would break the chain.`
               : "An event has been altered or removed — the recomputed hash no longer matches."}
           </div>
         </div>
@@ -238,9 +244,16 @@ export default function AuditPage() {
                       <div className="fs-mono" style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 10, paddingTop: 9, borderTop: "1px dashed var(--border)", fontSize: 11, color: "var(--fg-4)", flexWrap: "wrap" }}>
                         <span style={{ fontWeight: 700, color: "var(--fg-3)" }}>#{e.seq}</span>
                         <Icon name="hash" size={11} />
-                        <span style={{ color: "var(--fs-teal-700)" }}>{e.hash}</span>
+                        <span
+                          title={`${HASH_ALGORITHM} — ${e.hash}`}
+                          style={{ color: "var(--fs-teal-700)" }}
+                        >
+                          {shortHash(e.hash)}
+                        </span>
                         <Icon name="link" size={11} />
-                        <span title="previous event hash">prev {e.prevHash}</span>
+                        <span title={`previous event hash — ${e.prevHash}`}>
+                          prev {shortHash(e.prevHash)}
+                        </span>
                       </div>
                     </div>
                   </div>

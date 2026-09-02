@@ -66,51 +66,51 @@ const fairnessColor = (v: number) =>
   v >= 85 ? "var(--success)" : v >= 70 ? "var(--warning)" : "var(--danger)";
 
 const SEED: Person[] = [
-  { id: 1, name: "Darie Roberts", role: "Carpenter", team: "Framing Crew", location: "Melbourne Site", status: "Active", type: "Full-time", phone: "0412 884 201", cred: "success", fairness: 92, onShift: true },
-  { id: 2, name: "Leanne Vidal", role: "Electrician", team: "Electrical", location: "Melbourne Site", status: "Active", type: "Full-time", phone: "0413 220 778", cred: "warning", fairness: 81, onShift: true },
-  { id: 3, name: "Mitch Egan", role: "Concreter", team: "Civil Crew", location: "Port Melbourne", status: "Active", type: "Casual", phone: "0408 551 119", cred: "success", fairness: 88, onShift: true },
-  { id: 4, name: "Tahlia Johnson", role: "Labourer", team: "Framing Crew", location: "Melbourne Site", status: "On Leave", type: "Casual", phone: "0420 117 663", cred: "warning", fairness: 74, onShift: false },
-  { id: 5, name: "Aaron Patel", role: "Carpenter", team: "Framing Crew", location: "Melbourne Site", status: "Active", type: "Full-time", phone: "0411 905 482", cred: "success", fairness: 90, onShift: true },
-  { id: 6, name: "Sophie Nguyen", role: "Site Supervisor", team: "Management", location: "Port Melbourne", status: "Active", type: "Full-time", phone: "0414 332 901", cred: "success", fairness: 95, onShift: true },
-  { id: 7, name: "Jake Morrison", role: "Carpenter", team: "Fitout Crew", location: "Melbourne Site", status: "Active", type: "Full-time", phone: "0417 660 224", cred: "danger", fairness: 66, onShift: true },
-  { id: 8, name: "Hassan Ali", role: "Steel Fixer", team: "Civil Crew", location: "Melbourne Site", status: "Active", type: "Casual", phone: "0402 778 116", cred: "warning", fairness: 79, onShift: true },
-  { id: 9, name: "Josh Williams", role: "Plumber", team: "Hydraulics", location: "Geelong Site", status: "Active", type: "Contractor", phone: "0419 445 027", cred: "success", fairness: 86, onShift: false },
-  { id: 10, name: "Michael Tan", role: "Electrician", team: "Electrical", location: "Geelong Site", status: "Active", type: "Full-time", phone: "0421 003 558", cred: "success", fairness: 84, onShift: true },
-  { id: 11, name: "Priya Sharma", role: "Project Coordinator", team: "Management", location: "Melbourne Site", status: "Active", type: "Full-time", phone: "0413 887 440", cred: "success", fairness: 93, onShift: true },
-  { id: 12, name: "Liam O'Brien", role: "Labourer", team: "Civil Crew", location: "Port Melbourne", status: "Inactive", type: "Casual", phone: "0406 220 119", cred: "danger", fairness: 58, onShift: false },
-  { id: 13, name: "Chloe Davis", role: "Painter", team: "Fitout Crew", location: "Melbourne Site", status: "Active", type: "Part-time", phone: "0418 552 904", cred: "warning", fairness: 77, onShift: true },
-  { id: 14, name: "Noah Wilson", role: "Carpenter", team: "Framing Crew", location: "Geelong Site", status: "On Leave", type: "Full-time", phone: "0412 119 887", cred: "success", fairness: 89, onShift: false },
-  { id: 15, name: "Emma Brooks", role: "Safety Officer", team: "Management", location: "Melbourne Site", status: "Active", type: "Full-time", phone: "0415 660 332", cred: "success", fairness: 96, onShift: true },
-  { id: 16, name: "Ryan Murphy", role: "Concreter", team: "Civil Crew", location: "Port Melbourne", status: "Active", type: "Casual", phone: "0407 884 551", cred: "warning", fairness: 72, onShift: true },
-  { id: 17, name: "Olivia Chen", role: "Electrician", team: "Electrical", location: "Melbourne Site", status: "Active", type: "Full-time", phone: "0419 220 663", cred: "success", fairness: 87, onShift: true },
-  { id: 18, name: "Daniel Kelly", role: "Plumber", team: "Hydraulics", location: "Geelong Site", status: "Inactive", type: "Contractor", phone: "0402 551 224", cred: "danger", fairness: 61, onShift: false },
-  { id: 19, name: "Grace Taylor", role: "Labourer", team: "Fitout Crew", location: "Melbourne Site", status: "Active", type: "Casual", phone: "0414 905 117", cred: "success", fairness: 83, onShift: true },
-  { id: 20, name: "Ethan Clarke", role: "Site Supervisor", team: "Management", location: "Geelong Site", status: "Active", type: "Full-time", phone: "0411 332 778", cred: "success", fairness: 94, onShift: true },
-  { id: 21, name: "Isla Martin", role: "Carpenter", team: "Framing Crew", location: "Melbourne Site", status: "Active", type: "Part-time", phone: "0418 660 901", cred: "warning", fairness: 76, onShift: true },
-  { id: 22, name: "Lucas Reed", role: "Steel Fixer", team: "Civil Crew", location: "Port Melbourne", status: "On Leave", type: "Casual", phone: "0406 778 440", cred: "success", fairness: 85, onShift: false },
-  { id: 23, name: "Ava Mitchell", role: "Painter", team: "Fitout Crew", location: "Melbourne Site", status: "Active", type: "Casual", phone: "0413 119 558", cred: "success", fairness: 82, onShift: true },
-  { id: 24, name: "Mason Hughes", role: "Labourer", team: "Framing Crew", location: "Geelong Site", status: "Active", type: "Casual", phone: "0417 220 119", cred: "danger", fairness: 64, onShift: false },
+  { id: 1, name: "Darie Roberts", role: "Bartender", team: "Bar Team", location: "Brightwater Hotel", status: "Active", type: "Full-time", phone: "0412 884 201", cred: "success", fairness: 92, onShift: true },
+  { id: 2, name: "Leanne Vidal", role: "Wait Staff", team: "Floor Team", location: "Brightwater Hotel", status: "Active", type: "Full-time", phone: "0413 220 778", cred: "warning", fairness: 81, onShift: true },
+  { id: 3, name: "Mitch Egan", role: "Gaming Attendant", team: "Gaming Team", location: "Northside Tavern", status: "Active", type: "Casual", phone: "0408 551 119", cred: "success", fairness: 88, onShift: true },
+  { id: 4, name: "Tahlia Johnson", role: "Barback", team: "Bar Team", location: "Brightwater Hotel", status: "On Leave", type: "Casual", phone: "0420 117 663", cred: "warning", fairness: 74, onShift: false },
+  { id: 5, name: "Aaron Patel", role: "Bartender", team: "Bar Team", location: "Brightwater Hotel", status: "Active", type: "Full-time", phone: "0411 905 482", cred: "success", fairness: 90, onShift: true },
+  { id: 6, name: "Sophie Nguyen", role: "Venue Manager", team: "Management", location: "Northside Tavern", status: "Active", type: "Full-time", phone: "0414 332 901", cred: "success", fairness: 95, onShift: true },
+  { id: 7, name: "Jake Morrison", role: "Bartender", team: "Kitchen Team", location: "Brightwater Hotel", status: "Active", type: "Full-time", phone: "0417 660 224", cred: "danger", fairness: 66, onShift: true },
+  { id: 8, name: "Hassan Ali", role: "Kitchen Hand", team: "Gaming Team", location: "Brightwater Hotel", status: "Active", type: "Casual", phone: "0402 778 116", cred: "warning", fairness: 79, onShift: true },
+  { id: 9, name: "Josh Williams", role: "Sous Chef", team: "Functions Team", location: "Quayside Bar & Kitchen", status: "Active", type: "Contractor", phone: "0419 445 027", cred: "success", fairness: 86, onShift: false },
+  { id: 10, name: "Michael Tan", role: "Wait Staff", team: "Floor Team", location: "Quayside Bar & Kitchen", status: "Active", type: "Full-time", phone: "0421 003 558", cred: "success", fairness: 84, onShift: true },
+  { id: 11, name: "Priya Sharma", role: "Functions Coordinator", team: "Management", location: "Brightwater Hotel", status: "Active", type: "Full-time", phone: "0413 887 440", cred: "success", fairness: 93, onShift: true },
+  { id: 12, name: "Liam O'Brien", role: "Barback", team: "Gaming Team", location: "Northside Tavern", status: "Inactive", type: "Casual", phone: "0406 220 119", cred: "danger", fairness: 58, onShift: false },
+  { id: 13, name: "Chloe Davis", role: "Barista", team: "Kitchen Team", location: "Brightwater Hotel", status: "Active", type: "Part-time", phone: "0418 552 904", cred: "warning", fairness: 77, onShift: true },
+  { id: 14, name: "Noah Wilson", role: "Bartender", team: "Bar Team", location: "Quayside Bar & Kitchen", status: "On Leave", type: "Full-time", phone: "0412 119 887", cred: "success", fairness: 89, onShift: false },
+  { id: 15, name: "Emma Brooks", role: "Compliance Officer", team: "Management", location: "Brightwater Hotel", status: "Active", type: "Full-time", phone: "0415 660 332", cred: "success", fairness: 96, onShift: true },
+  { id: 16, name: "Ryan Murphy", role: "Gaming Attendant", team: "Gaming Team", location: "Northside Tavern", status: "Active", type: "Casual", phone: "0407 884 551", cred: "warning", fairness: 72, onShift: true },
+  { id: 17, name: "Olivia Chen", role: "Wait Staff", team: "Floor Team", location: "Brightwater Hotel", status: "Active", type: "Full-time", phone: "0419 220 663", cred: "success", fairness: 87, onShift: true },
+  { id: 18, name: "Daniel Kelly", role: "Sous Chef", team: "Functions Team", location: "Quayside Bar & Kitchen", status: "Inactive", type: "Contractor", phone: "0402 551 224", cred: "danger", fairness: 61, onShift: false },
+  { id: 19, name: "Grace Taylor", role: "Barback", team: "Kitchen Team", location: "Brightwater Hotel", status: "Active", type: "Casual", phone: "0414 905 117", cred: "success", fairness: 83, onShift: true },
+  { id: 20, name: "Ethan Clarke", role: "Venue Manager", team: "Management", location: "Quayside Bar & Kitchen", status: "Active", type: "Full-time", phone: "0411 332 778", cred: "success", fairness: 94, onShift: true },
+  { id: 21, name: "Isla Martin", role: "Bartender", team: "Bar Team", location: "Brightwater Hotel", status: "Active", type: "Part-time", phone: "0418 660 901", cred: "warning", fairness: 76, onShift: true },
+  { id: 22, name: "Lucas Reed", role: "Kitchen Hand", team: "Gaming Team", location: "Northside Tavern", status: "On Leave", type: "Casual", phone: "0406 778 440", cred: "success", fairness: 85, onShift: false },
+  { id: 23, name: "Ava Mitchell", role: "Barista", team: "Kitchen Team", location: "Brightwater Hotel", status: "Active", type: "Casual", phone: "0413 119 558", cred: "success", fairness: 82, onShift: true },
+  { id: 24, name: "Mason Hughes", role: "Barback", team: "Bar Team", location: "Quayside Bar & Kitchen", status: "Active", type: "Casual", phone: "0417 220 119", cred: "danger", fairness: 64, onShift: false },
 ];
 
 const ROLE_OPTIONS = [
-  "Carpenter",
-  "Electrician",
-  "Plumber",
-  "Concreter",
-  "Labourer",
-  "Steel Fixer",
-  "Painter",
-  "Site Supervisor",
-  "Safety Officer",
-  "Project Coordinator",
+  "Bartender",
+  "Wait Staff",
+  "Sous Chef",
+  "Gaming Attendant",
+  "Barback",
+  "Kitchen Hand",
+  "Barista",
+  "Venue Manager",
+  "Compliance Officer",
+  "Functions Coordinator",
 ];
 
 const TYPE_OPTIONS: EmploymentType[] = ["Full-time", "Part-time", "Casual", "Contractor"];
 
 const RECENT_SHIFTS: [string, string, string][] = [
-  ["Mon 2 Jun", "Melbourne Site", "7:00am – 3:30pm"],
-  ["Fri 30 May", "Melbourne Site", "6:30am – 3:00pm"],
-  ["Thu 29 May", "Port Melbourne", "7:00am – 4:00pm"],
+  ["Mon 2 Jun", "Brightwater Hotel", "7:00am – 3:30pm"],
+  ["Fri 30 May", "Brightwater Hotel", "6:30am – 3:00pm"],
+  ["Thu 29 May", "Northside Tavern", "7:00am – 4:00pm"],
 ];
 
 const PAGE_SIZE = 8;
@@ -182,7 +182,7 @@ export default function PeoplePage() {
       name: fName.trim(),
       role: fRole,
       team: fTeam.trim() || "Unassigned",
-      location: fLocation.trim() || "Melbourne Site",
+      location: fLocation.trim() || "Brightwater Hotel",
       status: "Active",
       type: fType as EmploymentType,
       phone: "—",
@@ -501,7 +501,7 @@ export default function PeoplePage() {
                   </div>
                   <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
                     <Badge tone="success" icon="check">
-                      White Card
+                      RSA
                     </Badge>
                     <Badge
                       tone={selected.cred === "danger" ? "danger" : "success"}
@@ -513,10 +513,10 @@ export default function PeoplePage() {
                       tone={selected.cred === "success" ? "success" : "warning"}
                       icon={selected.cred === "success" ? "check" : "clock"}
                     >
-                      EWP Licence
+                      RSG
                     </Badge>
                     <Badge tone="success" icon="check">
-                      Site Induction
+                      Venue Induction
                     </Badge>
                   </div>
                 </div>
@@ -625,10 +625,10 @@ export default function PeoplePage() {
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
             <Field label="Team" hint="Optional">
-              <TextField value={fTeam} onChange={setFTeam} placeholder="e.g. Framing Crew" />
+              <TextField value={fTeam} onChange={setFTeam} placeholder="e.g. Bar Team" />
             </Field>
             <Field label="Location" hint="Optional">
-              <TextField value={fLocation} onChange={setFLocation} placeholder="e.g. Melbourne Site" />
+              <TextField value={fLocation} onChange={setFLocation} placeholder="e.g. Brightwater Hotel" />
             </Field>
           </div>
         </div>

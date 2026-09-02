@@ -54,12 +54,12 @@ interface ShellState {
 /* ---------- constants ---------- */
 
 const COMPANIES = [
-  "BrightBuild Co.",
-  "BrightLife Care",
-  "BrightGuard Co.",
-  "Brightside Constructions",
+  "Brightwater Hospitality",
+  "BrightHouse Venues",
+  "Bright Table Group",
+  "Brightside Events & Catering",
 ];
-const DEFAULT_COMPANY = "BrightBuild Co.";
+const DEFAULT_COMPANY = "Brightwater Hospitality";
 
 const COMPANY_KEY = "fairshift.company";
 const READ_KEY = "fairshift.notifications.read";
@@ -71,7 +71,7 @@ const SEED_NOTIFICATIONS: Notification[] = [
     icon: "shield-alert",
     tone: "danger",
     title: "Credential alert: 2 workers require action",
-    meta: "White Card · expiring within 7 days",
+    meta: "RSA · expiring within 7 days",
     time: "8m ago",
     read: false,
   },
@@ -88,7 +88,7 @@ const SEED_NOTIFICATIONS: Notification[] = [
     id: "n-job-room-created",
     icon: "message-square-plus",
     tone: "info",
-    title: "New job room “Brisbane Warehouse” created",
+    title: "New function room “Spring Carnival Marquee” created",
     meta: "by Sarah Lee",
     time: "1h ago",
     read: false,
@@ -116,7 +116,7 @@ const SEED_NOTIFICATIONS: Notification[] = [
     icon: "clock",
     tone: "warning",
     title: "Late arrival: Leanne Vidal (+18m)",
-    meta: "Melbourne Site",
+    meta: "Brightwater Hotel",
     time: "Yesterday",
     read: true,
   },

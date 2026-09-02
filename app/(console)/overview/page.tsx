@@ -80,29 +80,29 @@ export default function OverviewPage() {
   const toast = useToast();
 
   const metrics: Metric[] = [
-    { label: "Open Job Rooms", value: "7", status: "Active", statusTone: "var(--fg-3)", link: "View all jobs", href: "/jobs", icon: "briefcase", accent: null },
+    { label: "Open Function Rooms", value: "7", status: "Active", statusTone: "var(--fg-3)", link: "View all functions", href: "/jobs", icon: "briefcase", accent: null },
     { label: "Credential Alerts", value: "3", status: "Require attention", statusTone: "var(--fg-3)", link: "View alerts", href: "/credentials", icon: "shield-alert", accent: "var(--danger)" },
-    { label: "Project Tasks", value: "64", status: "In progress", statusTone: "var(--fg-3)", link: "View projects", href: "/projects", icon: "list-checks", accent: null },
+    { label: "Run Sheet Tasks", value: "64", status: "In progress", statusTone: "var(--fg-3)", link: "View run sheets", href: "/projects", icon: "list-checks", accent: null },
   ];
   const heat: [string, number[]][] = [
-    ["Brisbane", [1, 2, 3, 4, 5, 4, 3]],
-    ["Sydney", [2, 3, 4, 5, 6, 5, 3]],
-    ["Melbourne", [1, 2, 4, 6, 6, 4, 2]],
-    ["Perth", [0, 1, 2, 3, 4, 3, 2]],
-    ["Adelaide", [0, 1, 1, 2, 3, 2, 1]],
+    ["Brightwater Hotel", [2, 3, 4, 6, 6, 5, 3]],
+    ["Gaming Room", [1, 2, 3, 4, 6, 6, 4]],
+    ["Northside Tavern", [1, 2, 4, 5, 6, 5, 3]],
+    ["Quayside", [0, 1, 2, 3, 5, 4, 2]],
+    ["Off-premise", [0, 1, 1, 2, 4, 5, 2]],
   ];
   const viz = ["#ECF6F4", "#CDEAE4", "#A3DAD0", "#6CC6B8", "#2FA897", "#0D8B82", "#075A54"];
   const activity: Activity[] = [
     { icon: "log-in", tone: "success", text: <><b>James Carter</b> clocked in at 7:02am</>, meta: "Commercial Build – Level 3", t: "2m ago", href: "/attendance", toast: "Opening attendance for James Carter" },
-    { icon: "message-square-plus", tone: "info", text: <>New job room <b>&quot;Brisbane Warehouse&quot;</b> created by Sarah Lee</>, meta: "", t: "15m ago", href: "/jobs", toast: "Opening job room: Brisbane Warehouse" },
+    { icon: "message-square-plus", tone: "info", text: <>New function room <b>&quot;Spring Carnival Marquee&quot;</b> created by Sarah Lee</>, meta: "", t: "15m ago", href: "/jobs", toast: "Opening function room: Spring Carnival Marquee" },
     { icon: "shield-alert", tone: "danger", text: <>Credential alert: 2 workers require action</>, meta: "", t: "32m ago", href: "/credentials", toast: "Opening credential alerts" },
     { icon: "file-check-2", tone: "teal", text: <>Weekly fairness report is ready to view</>, meta: "", t: "1h ago", href: "/reports", toast: "Opening weekly fairness report" },
   ];
   const projects: [string, string, number, string][] = [
-    ["Riverside Apartments", "Construction", 72, "var(--success)"],
-    ["Harbour View Offices", "Fitout", 48, "var(--warning)"],
-    ["Airport Terminal Upgrade", "Refurbishment", 81, "var(--success)"],
-    ["Sunnybank Retail Precinct", "Construction", 36, "var(--danger)"],
+    ["Brightwater Hotel", "Venue", 72, "var(--success)"],
+    ["Northside Tavern", "Venue", 48, "var(--warning)"],
+    ["Werribee Park Wedding", "Catering", 81, "var(--success)"],
+    ["Docklands Corporate Lunch", "Catering", 36, "var(--danger)"],
   ];
   const fairness: [string, number][] = [
     ["Alex Nguyen", 96],
@@ -112,9 +112,9 @@ export default function OverviewPage() {
     ["Casey Brown", 90],
   ];
   const upcoming: [string, string, string[], number][] = [
-    ["Today · 9:00am – 5:00pm", "Commercial Build – Level 3", ["Ana Reed", "Ben Cole", "Cara Vu"], 6],
-    ["Tomorrow · 7:00am – 3:00pm", "Fitout – Tower B", ["Dan Fox", "Eve Ho"], 4],
-    ["Wed 15 May · 8:00am – 4:00pm", "Maintenance – Site Wide", ["Gus Ray", "Hana Lim"], 3],
+    ["Today · 4:00pm – 12:00am", "Brightwater Friday Live", ["Ana Reed", "Ben Cole", "Cara Vu"], 6],
+    ["Tomorrow · 11:00am – 7:00pm", "Northside Long Lunch", ["Dan Fox", "Eve Ho"], 4],
+    ["Wed 15 May · 10:00am – 6:00pm", "Werribee Wedding — bump-in", ["Gus Ray", "Hana Lim"], 3],
   ];
 
   /* Fairness Trend — period toggle holding multiple datasets in state. */
@@ -252,7 +252,7 @@ export default function OverviewPage() {
           </div>
         </Card>
         <Card>
-          <CardHead title="Project Overview" right={<LinkBtn href="/projects">View all</LinkBtn>} />
+          <CardHead title="Venues & Functions" right={<LinkBtn href="/projects">View all</LinkBtn>} />
           <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
             {projects.map(([n, t, v, c], i) => (
               <div key={i}>

@@ -47,21 +47,21 @@ export default function ProjectsPage() {
   /* ---- Task board state (4 columns of cards) ---- */
   const [board, setBoard] = useState<Record<ColName, BoardCard[]>>({
     "To Do": [
-      { id: "t1", title: "Install camera – Level 2", sub: "Zone A – Corridor", prio: "High", due: "May 20", names: ["Darie Roberts"] },
-      { id: "t2", title: "Pull network cables", sub: "Level 3 – East Wing", prio: "Medium", due: "May 21", names: ["Ben Cole"] },
-      { id: "t3", title: "Configure NVR", sub: "Server Room", prio: "Low", due: "May 22", names: ["Ana Reed"] },
+      { id: "t1", title: "Confirm final guest numbers", sub: "Client — Nguyen & Cole", prio: "High", due: "May 20", names: ["Priya Sharma"] },
+      { id: "t2", title: "Place beverage order", sub: "Cellar — bar stock", prio: "Medium", due: "May 21", names: ["Ben Cole"] },
+      { id: "t3", title: "Print menus & place cards", sub: "Front of house", prio: "Low", due: "May 22", names: ["Ana Reed"] },
     ],
     "In Progress": [
-      { id: "t4", title: "Install cameras – ICU", sub: "Level 4", prio: "High", due: "May 18", names: ["Cara Vu", "Dan Fox"], extra: 2 },
-      { id: "t5", title: "Cable containment", sub: "Level 1 – Carpark", prio: "Medium", due: "May 18", names: ["Eve Ho"] },
+      { id: "t4", title: "Confirm dietary requirements", sub: "38 guests flagged", prio: "High", due: "May 18", names: ["Cara Vu", "Dan Fox"], extra: 2 },
+      { id: "t5", title: "Marquee bar setup", sub: "Garden lawn", prio: "Medium", due: "May 18", names: ["Eve Ho"] },
     ],
     Review: [
-      { id: "t6", title: "Test camera feeds", sub: "Level 2", prio: "Medium", due: "May 17", names: ["Gus Ray", "Ben Cole"], extra: 1 },
+      { id: "t6", title: "Allergen sign-off — plated main", sub: "Kitchen", prio: "Medium", due: "May 17", names: ["Gus Ray", "Ben Cole"], extra: 1 },
     ],
     Completed: [
-      { id: "t7", title: "Site survey", sub: "Completed on May 12", prio: null, due: null, names: [] },
-      { id: "t8", title: "Rack installation", sub: "Completed on May 13", prio: null, due: null, names: [] },
-      { id: "t9", title: "Switch configuration", sub: "Completed on May 14", prio: null, due: null, names: [] },
+      { id: "t7", title: "Site inspection — Werribee Park", sub: "Completed on May 12", prio: null, due: null, names: [] },
+      { id: "t8", title: "Menu tasting with client", sub: "Completed on May 13", prio: null, due: null, names: [] },
+      { id: "t9", title: "Staff briefing & rosters issued", sub: "Completed on May 14", prio: null, due: null, names: [] },
     ],
   });
 
@@ -77,30 +77,30 @@ export default function ProjectsPage() {
   const prio: Record<"High" | "Medium" | "Low", Tone> = { High: "danger", Medium: "warning", Low: "neutral" };
 
   const timeline: [string, string, boolean | "active"][] = [
-    ["Project Kick-off", "May 1", true],
-    ["Site Survey", "May 5", true],
-    ["Design & Planning", "May 10", true],
-    ["Installation", "May 12 – May 28", "active"],
-    ["Testing & Commissioning", "May 29 – Jun 2", false],
-    ["Handover", "Jun 3", false],
+    ["Enquiry & Quote", "May 1", true],
+    ["Site Inspection", "May 5", true],
+    ["Menu Tasting", "May 10", true],
+    ["Prep & Staffing", "May 12 – May 28", "active"],
+    ["Event Day — Service", "May 30", false],
+    ["Bump-out & Debrief", "May 31", false],
   ];
   const docs: [string, string][] = [
-    ["CCTV Layout – Level 4.dwg", "DWG · May 15, 2024 · v2.1"],
-    ["Network Diagram – Rev B.pdf", "PDF · May 14, 2024 · v1.3"],
-    ["Equipment Schedule.xlsx", "XLSX · May 13, 2024 · v1.0"],
-    ["Installation Guide – Cameras.pdf", "PDF · May 12, 2024 · v1.0"],
+    ["Run Sheet – Werribee Wedding.pdf", "PDF · May 15, 2024 · v2.1"],
+    ["Floor Plan & Table Layout.pdf", "PDF · May 14, 2024 · v1.3"],
+    ["Dietary Requirements Schedule.xlsx", "XLSX · May 13, 2024 · v1.0"],
+    ["Beverage Order – Confirmed.pdf", "PDF · May 12, 2024 · v1.0"],
   ];
   const team: [string, string, string][] = [
-    ["Darie Roberts", "CCTV Installation", "32 hrs"],
-    ["Shane Walker", "Cabling & Network", "28 hrs"],
-    ["Lucy Bennett", "Quality & Testing", "24 hrs"],
-    ["Ava Chen", "Project Engineer", "20 hrs"],
+    ["Priya Sharma", "Functions Coordinator", "32 hrs"],
+    ["Hassan Ali", "Head Chef", "28 hrs"],
+    ["Darie Roberts", "Bar Lead", "24 hrs"],
+    ["Sophie Nguyen", "Venue Manager", "20 hrs"],
   ];
   const activity: [string, string, string, string, Tone][] = [
-    ["Darie Roberts", "completed Install camera – ICU Room 402", "10:24 AM", "check-circle-2", "success"],
-    ["Shane Walker", "uploaded 4 photos", "09:58 AM", "image", "info"],
-    ["Lucy Bennett", "raised an issue: Camera angle misalignment", "09:32 AM", "triangle-alert", "warning"],
-    ["Ava Chen", "updated task: Test camera feeds", "09:15 AM", "edit-3", "teal"],
+    ["Hassan Ali", "completed Allergen sign-off — plated main", "10:24 AM", "check-circle-2", "success"],
+    ["Priya Sharma", "uploaded the final dietary schedule", "09:58 AM", "image", "info"],
+    ["Darie Roberts", "raised an issue: Sparkling order short by 2 cases", "09:32 AM", "triangle-alert", "warning"],
+    ["Sophie Nguyen", "updated task: Marquee bar setup", "09:15 AM", "edit-3", "teal"],
   ];
 
   const assigneeOptions = useMemo(
@@ -174,10 +174,10 @@ export default function ProjectsPage() {
   /* ---- Verified sign-off modal ---- */
   const [signoffOpen, setSignoffOpen] = useState(false);
   const signoffs: [string, string, string, string][] = [
-    ["Install camera – ICU Room 402", "Level 4 – Zone B", "Darie Roberts", "May 16, 2024"],
-    ["Network rack termination", "Server Room", "Shane Walker", "May 15, 2024"],
-    ["Cable test – East Wing", "Level 3", "Lucy Bennett", "May 15, 2024"],
-    ["Power supply commissioning", "Level 1 – Carpark", "Ava Chen", "May 14, 2024"],
+    ["Allergen sign-off — plated main", "Kitchen — 38 flagged guests", "Hassan Ali", "May 16, 2024"],
+    ["Marquee bar setup", "Garden lawn", "Darie Roberts", "May 15, 2024"],
+    ["Final dietary schedule", "Front of house", "Priya Sharma", "May 15, 2024"],
+    ["Beverage order reconciliation", "Cellar", "Sophie Nguyen", "May 14, 2024"],
   ];
 
   const tabIsBoard = tab === "Tasks";
@@ -255,11 +255,11 @@ export default function ProjectsPage() {
       <div style={{ display: "flex", alignItems: "flex-start", gap: 16, marginBottom: 18 }}>
         <div style={{ flex: 1 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <h2 style={{ margin: 0, fontSize: 24 }}>Hospital CCTV Upgrade</h2>
+            <h2 style={{ margin: 0, fontSize: 24 }}>Werribee Park Wedding — Run Sheet</h2>
             <Badge tone="success" dot>Active</Badge>
             <Icon name="star" size={17} color="var(--warning)" />
           </div>
-          <p style={{ margin: "4px 0 0", fontSize: 14 }}>Secure. Reliable. Always On.</p>
+          <p style={{ margin: "4px 0 0", fontSize: 14 }}>180 guests · Saturday service · Nguyen &amp; Cole</p>
           <div style={{ display: "flex", gap: 18, marginTop: 12, fontSize: 13 }}>
             {TABS.map((t) => {
               const active = t === tab;
@@ -305,7 +305,7 @@ export default function ProjectsPage() {
             <Card pad={16}><div style={{ display: "flex", justifyContent: "space-between" }}><span style={{ fontSize: 12.5, color: "var(--fg-3)", fontWeight: 600 }}>Open Issues</span><Icon name="shield-alert" size={16} color="var(--danger)" /></div><div className="fs-tnum" style={{ fontSize: 30, fontWeight: 800, margin: "4px 0 2px" }}>8</div><div style={{ fontSize: 11, color: "var(--fg-4)" }}>High: 2 · Medium: 6</div><div style={{ fontSize: 11, color: "var(--danger-fg)", marginTop: 4 }}>↓ 2 vs last 7 days</div></Card>
             <Card pad={16}><div style={{ display: "flex", justifyContent: "space-between" }}><span style={{ fontSize: 12.5, color: "var(--fg-3)", fontWeight: 600 }}>Labour Hours</span><Icon name="clock" size={16} color="var(--fs-teal)" /></div><div className="fs-tnum" style={{ fontSize: 30, fontWeight: 800, margin: "4px 0 2px" }}>1,248<span style={{ fontSize: 14, color: "var(--fg-4)" }}> hrs</span></div><div style={{ fontSize: 11, color: "var(--success-fg)", marginTop: 4 }}>↑ 9% vs last 7 days</div></Card>
             <Card pad={16}><div style={{ display: "flex", justifyContent: "space-between" }}><span style={{ fontSize: 12.5, color: "var(--fg-3)", fontWeight: 600 }}>Verified Sign-offs</span><Icon name="badge-check" size={16} color="var(--success)" /></div><div className="fs-tnum" style={{ fontSize: 30, fontWeight: 800, margin: "4px 0 2px" }}>36</div><div style={{ fontSize: 11, color: "var(--fg-4)" }}>This week</div><div style={{ fontSize: 11, color: "var(--success-fg)", marginTop: 4 }}>↑ 18% vs last 7 days</div></Card>
-            <Card pad={16}><div style={{ fontSize: 12.5, color: "var(--fg-3)", fontWeight: 600, marginBottom: 6 }}>Project Progress</div><div style={{ display: "flex", alignItems: "center", gap: 12 }}><Ring value={68} label="68%" size={66} color="var(--success)" /><div><div style={{ fontSize: 12.5, fontWeight: 700, color: "var(--fg-1)" }}>On track</div><div style={{ fontSize: 11, color: "var(--success-fg)", marginTop: 2 }}>↑ 6% vs last 7 days</div></div></div></Card>
+            <Card pad={16}><div style={{ fontSize: 12.5, color: "var(--fg-3)", fontWeight: 600, marginBottom: 6 }}>Function Progress</div><div style={{ display: "flex", alignItems: "center", gap: 12 }}><Ring value={68} label="68%" size={66} color="var(--success)" /><div><div style={{ fontSize: 12.5, fontWeight: 700, color: "var(--fg-1)" }}>On track</div><div style={{ fontSize: 11, color: "var(--success-fg)", marginTop: 2 }}>↑ 6% vs last 7 days</div></div></div></Card>
           </div>
 
           {/* main row */}
@@ -317,7 +317,7 @@ export default function ProjectsPage() {
             </Card>
             {/* timeline */}
             <Card pad={16}>
-              <CardHead title="Project Timeline" right={<LinkBtn onClick={() => setTab("Timeline")}>View</LinkBtn>} />
+              <CardHead title="Event Timeline" right={<LinkBtn onClick={() => setTab("Timeline")}>View</LinkBtn>} />
               {renderTimeline(timeline)}
             </Card>
             {/* verified sign-off */}
@@ -330,7 +330,7 @@ export default function ProjectsPage() {
           {/* bottom row */}
           <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 16 }}>
             <Card pad={16}>
-              <CardHead title="Documents & Drawings" right={<LinkBtn onClick={() => setTab("Documents")}>View all</LinkBtn>} />
+              <CardHead title="Run Sheet & Documents" right={<LinkBtn onClick={() => setTab("Documents")}>View all</LinkBtn>} />
               {docs.map((d, i) => (
                 <button
                   key={i}
@@ -344,8 +344,8 @@ export default function ProjectsPage() {
               ))}
             </Card>
             <Card pad={16}><CardHead title="Team Allocation" right={<LinkBtn onClick={() => setTab("Team")}>View full team</LinkBtn>} />{team.map((t, i) => (<div key={i} style={{ display: "flex", alignItems: "center", gap: 9, padding: "8px 0", borderTop: i ? "1px solid var(--border)" : 0 }}><Avatar name={t[0]} size={28} /><div style={{ flex: 1 }}><div style={{ fontSize: 12, fontWeight: 600, color: "var(--fg-1)" }}>{t[0]}</div><div style={{ fontSize: 10, color: "var(--fg-4)" }}>{t[1]}</div></div><span className="fs-tnum" style={{ fontSize: 11.5, fontWeight: 700, color: "var(--fg-2)" }}>{t[2]}</span></div>))}<div style={{ fontSize: 11, color: "var(--fg-4)", marginTop: 8 }}>+1 team members</div></Card>
-            <Card pad={16}><CardHead title="Live Site Activity" /> {activity.map((a, i) => { const [bg, fg] = STATUS[a[4]]; return (<div key={i} style={{ display: "flex", gap: 9, padding: "8px 0", borderTop: i ? "1px solid var(--border)" : 0 }}><span style={{ width: 26, height: 26, borderRadius: 7, background: bg, display: "inline-flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><Icon name={a[3]} size={13} color={fg} /></span><div style={{ flex: 1 }}><div style={{ fontSize: 11, color: "var(--fg-2)", lineHeight: 1.35 }}><b style={{ color: "var(--fg-1)" }}>{a[0]}</b> {a[1]}</div><div style={{ fontSize: 10, color: "var(--fg-4)" }}>{a[2]}</div></div></div>); })}</Card>
-            <Card pad={16}><div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 12 }}><h4 style={{ margin: 0, fontSize: 14, flex: 1 }}>Compliance Summary</h4><img src="/assets/idara-icon-t.png" alt="idara" style={{ width: 14, height: 14 }} /></div><div style={{ display: "flex", alignItems: "center", gap: 12 }}><Ring value={96} label="96%" size={70} color="var(--success)" /><div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 7 }}>{([["Inductions", 100], ["Competencies", 94], ["SWMS", 98], ["PPE Compliance", 95]] as [string, number][]).map(([l, v]) => (<div key={l}><div style={{ display: "flex", justifyContent: "space-between", fontSize: 10.5, marginBottom: 2 }}><span style={{ color: "var(--fg-3)" }}>{l}</span><span className="fs-tnum" style={{ fontWeight: 700, color: "var(--fg-1)" }}>{v}%</span></div><Bar value={v} color="var(--success)" height={3} /></div>))}</div></div></Card>
+            <Card pad={16}><CardHead title="Live Service Activity" /> {activity.map((a, i) => { const [bg, fg] = STATUS[a[4]]; return (<div key={i} style={{ display: "flex", gap: 9, padding: "8px 0", borderTop: i ? "1px solid var(--border)" : 0 }}><span style={{ width: 26, height: 26, borderRadius: 7, background: bg, display: "inline-flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><Icon name={a[3]} size={13} color={fg} /></span><div style={{ flex: 1 }}><div style={{ fontSize: 11, color: "var(--fg-2)", lineHeight: 1.35 }}><b style={{ color: "var(--fg-1)" }}>{a[0]}</b> {a[1]}</div><div style={{ fontSize: 10, color: "var(--fg-4)" }}>{a[2]}</div></div></div>); })}</Card>
+            <Card pad={16}><div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 12 }}><h4 style={{ margin: 0, fontSize: 14, flex: 1 }}>Compliance Summary</h4><img src="/assets/idara-icon-t.png" alt="idara" style={{ width: 14, height: 14 }} /></div><div style={{ display: "flex", alignItems: "center", gap: 12 }}><Ring value={96} label="96%" size={70} color="var(--success)" /><div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 7 }}>{([["Inductions", 100], ["Competencies", 94], ["Allergen Briefing", 98], ["PPE Compliance", 95]] as [string, number][]).map(([l, v]) => (<div key={l}><div style={{ display: "flex", justifyContent: "space-between", fontSize: 10.5, marginBottom: 2 }}><span style={{ color: "var(--fg-3)" }}>{l}</span><span className="fs-tnum" style={{ fontWeight: 700, color: "var(--fg-1)" }}>{v}%</span></div><Bar value={v} color="var(--success)" height={3} /></div>))}</div></div></Card>
           </div>
         </>
       )}
@@ -364,7 +364,7 @@ export default function ProjectsPage() {
       {/* ===================== TIMELINE ===================== */}
       {tab === "Timeline" && (
         <Card pad={18}>
-          <CardHead title="Project Timeline" />
+          <CardHead title="Event Timeline" />
           <div style={{ maxWidth: 460 }}>{renderTimeline(timeline)}</div>
         </Card>
       )}
@@ -372,7 +372,7 @@ export default function ProjectsPage() {
       {/* ===================== DOCUMENTS ===================== */}
       {tab === "Documents" && (
         <Card pad={18}>
-          <CardHead title="Documents & Drawings" right={<Button size="sm" variant="sec" icon="upload" onClick={() => toast("Upload coming soon", { tone: "info", icon: "upload" })}>Upload</Button>} />
+          <CardHead title="Run Sheet & Documents" right={<Button size="sm" variant="sec" icon="upload" onClick={() => toast("Upload coming soon", { tone: "info", icon: "upload" })}>Upload</Button>} />
           <div style={{ display: "grid", gridTemplateColumns: "repeat(2,1fr)", gap: 10 }}>
             {docs.map((d, i) => (
               <button
@@ -413,7 +413,7 @@ export default function ProjectsPage() {
           <EmptyState
             icon="shield-alert"
             title="8 open issues"
-            sub="2 high and 6 medium priority issues are being tracked for this project. The full issue tracker view is coming soon."
+            sub="2 high and 6 medium priority issues are being tracked for this function. The full issue tracker view is coming soon."
             action={<Button size="sm" icon="plus" onClick={() => toast("New issue form coming soon", { tone: "info", icon: "shield-alert" })}>Raise issue</Button>}
           />
         </Card>
@@ -422,8 +422,8 @@ export default function ProjectsPage() {
         <Card pad={18}>
           <EmptyState
             icon="chart-column"
-            title="Project reports"
-            sub="Generate progress, labour and compliance reports for the Hospital CCTV Upgrade. Report builder is coming soon."
+            title="Function reports"
+            sub="Generate service, labour and compliance reports for the Werribee Park Wedding. Report builder is coming soon."
             action={<Button size="sm" icon="download" onClick={() => toast("Generating report…", { tone: "info", icon: "download" })}>Generate report</Button>}
           />
         </Card>
@@ -432,8 +432,8 @@ export default function ProjectsPage() {
         <Card pad={18}>
           <EmptyState
             icon="settings"
-            title="Project settings"
-            sub="Configure visibility, members, integrations and sign-off rules for this project. Settings are coming soon."
+            title="Function settings"
+            sub="Configure visibility, members, integrations and sign-off rules for this function. Settings are coming soon."
             action={<Button size="sm" variant="sec" icon="settings" onClick={() => toast("Settings coming soon", { tone: "info", icon: "settings" })}>Configure</Button>}
           />
         </Card>
@@ -454,10 +454,10 @@ export default function ProjectsPage() {
       >
         <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
           <Field label="Task title">
-            <TextField value={fTitle} onChange={setFTitle} placeholder="e.g. Install camera – Level 5" />
+            <TextField value={fTitle} onChange={setFTitle} placeholder="e.g. Confirm cake delivery window" />
           </Field>
           <Field label="Location / detail">
-            <TextField value={fSub} onChange={setFSub} placeholder="e.g. Zone B – Corridor" />
+            <TextField value={fSub} onChange={setFSub} placeholder="e.g. Kitchen – plated service" />
           </Field>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
             <Field label="Priority">
@@ -526,13 +526,13 @@ function renderSignoffCard() {
     <div style={{ border: "1px solid var(--success-bg)", borderRadius: 12, overflow: "hidden" }}>
       <div style={{ background: "var(--success-bg)", padding: "8px 12px", display: "flex", alignItems: "center", gap: 7 }}><Icon name="check-circle-2" size={14} color="var(--success-fg)" /><span style={{ fontSize: 11.5, fontWeight: 700, color: "var(--success-fg)", flex: 1 }}>Task Completed</span><Badge tone="success">Completed</Badge></div>
       <div style={{ padding: 12 }}>
-        <div style={{ fontSize: 13, fontWeight: 700, color: "var(--fg-1)" }}>Install camera – ICU Room 402</div>
-        <div style={{ fontSize: 11, color: "var(--fg-4)", marginBottom: 10 }}>Level 4 – Zone B</div>
-        <div style={{ fontSize: 10.5, fontWeight: 700, color: "var(--fg-4)", textTransform: "uppercase", letterSpacing: ".04em", marginBottom: 6 }}>Technician</div>
+        <div style={{ fontSize: 13, fontWeight: 700, color: "var(--fg-1)" }}>Allergen sign-off — plated main</div>
+        <div style={{ fontSize: 11, color: "var(--fg-4)", marginBottom: 10 }}>Kitchen — 38 flagged guests</div>
+        <div style={{ fontSize: 10.5, fontWeight: 700, color: "var(--fg-4)", textTransform: "uppercase", letterSpacing: ".04em", marginBottom: 6 }}>Completed by</div>
         <div style={{ display: "flex", alignItems: "center", gap: 9, marginBottom: 10 }}><Avatar name="Darie Roberts" size={28} /><div style={{ flex: 1 }}><div style={{ fontSize: 12, fontWeight: 700, color: "var(--fg-1)" }}>Darie Roberts</div><div style={{ fontSize: 10, color: "var(--success-fg)", display: "flex", alignItems: "center", gap: 3 }}><img src="/assets/idara-icon-t.png" alt="idara" style={{ width: 10, height: 10 }} />ID: 9647 · Idara Verified</div></div><span style={{ fontSize: 10, color: "var(--fg-4)" }}>10:24 AM</span></div>
         <div style={{ fontSize: 10.5, fontWeight: 700, color: "var(--fg-4)", textTransform: "uppercase", letterSpacing: ".04em", marginBottom: 6 }}>Evidence</div>
         <div style={{ display: "flex", gap: 6, marginBottom: 10 }}>{["#D9E2E8", "#C7D6DE", "#DDE6EB"].map((c, i) => <span key={i} style={{ width: 42, height: 32, borderRadius: 6, background: c, display: "inline-flex", alignItems: "center", justifyContent: "center" }}><Icon name="image" size={13} color="var(--fg-4)" /></span>)}<span style={{ width: 42, height: 32, borderRadius: 6, background: "var(--bg-2)", display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 700, color: "var(--fg-3)" }}>+3</span></div>
-        {([["Supervisor Approval", "Lucy Bennett", "May 16, 2024 · 10:45 AM"], ["Client Approval", "Michael Harris", "May 16, 2024 · 11:02 AM"]] as [string, string, string][]).map((a, i) => (
+        {([["Head Chef Approval", "Hassan Ali", "May 16, 2024 · 10:45 AM"], ["Client Approval", "Michael Harris", "May 16, 2024 · 11:02 AM"]] as [string, string, string][]).map((a, i) => (
           <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, padding: "7px 0", borderTop: "1px solid var(--border)" }}><Avatar name={a[1]} size={22} /><div style={{ flex: 1 }}><div style={{ fontSize: 10, color: "var(--fg-4)" }}>{a[0]}</div><div style={{ fontSize: 11.5, fontWeight: 600, color: "var(--fg-1)" }}>{a[1]}</div></div><Badge tone="success">Approved</Badge></div>
         ))}
         <div style={{ display: "flex", alignItems: "center", gap: 5, justifyContent: "center", marginTop: 10, fontSize: 10.5, color: "var(--fg-4)" }}><img src="/assets/idara-icon-t.png" alt="idara" style={{ width: 12, height: 12, opacity: 0.6 }} />Verified by idara</div>

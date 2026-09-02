@@ -5,7 +5,12 @@ credential verification). Built from the FairShift design system handoff as a re
 **Next.js 15 + TypeScript + Tailwind v4** application (the handoff prototypes were React-via-Babel
 references; this is the production recreation).
 
-> One platform. Every workforce need. — connecting **roster → attendance → labour cost → projects →
+Built for **hospitality**: multi-venue pub and hotel groups, and the off-premise
+catering they run alongside. Venues and events are the same thing to the engine —
+a place with its own eligibility rules — so a bar shift and a wedding marquee are
+checked by the same call.
+
+> One platform. Every workforce need. — connecting **roster → attendance → labour cost → functions →
 > communications** with verified identity baked in.
 
 ## Stack
@@ -22,19 +27,24 @@ references; this is the production recreation).
 npm install
 npm run dev      # http://localhost:3000  → redirects to /overview
 npm run build    # production build
+npm test         # Idara Core test suite (vitest)
 ```
 
 ## Routes (console modules)
 
-| Route | Screen | Status |
-|---|---|---|
-| `/overview` | Operations dashboard (fairness, live attendance, heatmap, activity) | ✅ recreated |
-| `/schedule` | AI-powered scheduling (roster grid, AI preview, suggestions) | ✅ recreated |
-| `/attendance` | Time & Attendance (live status, variance table, job profitability) | ✅ recreated |
-| `/credentials` | Credentials & Eligibility — *Idara Verify* | ✅ recreated |
-| `/comms` | Communications (job rooms, chat, acknowledgements) | ✅ recreated |
-| `/projects` | Projects (task board, timeline, verified sign-off) | ✅ recreated |
-| `/jobs`, `/people`, `/reports`, `/settings` | — | placeholder |
+| Route | Screen |
+|---|---|
+| `/overview` | Operations dashboard (fairness, live attendance, heatmap, activity) |
+| `/schedule` | AI-powered rostering (shift grid, AI preview, **Idara publish gate**) |
+| `/jobs` | Functions & Events (venue functions + off-premise catering engagements) |
+| `/attendance` | Time & Attendance (live status, variance table, function profitability) |
+| `/projects` | Run Sheets (event task board, timeline, verified sign-off) |
+| `/people` | People (staff directory, credentials-at-a-glance, profiles) |
+| `/comms` | Communications (function rooms, chat, acknowledgements) |
+| `/credentials` | Credentials & Eligibility — *Idara Verify* (RSA, RSG, food safety) |
+| `/audit` | Audit Log — hash-chained decision trail *(Idara)* |
+| `/reports` | Reports (labour cost, fairness, compliance) |
+| `/settings` | Settings (org, venues, credential rules, notifications) |
 
 `/` redirects to `/overview`.
 
@@ -46,17 +56,61 @@ app/
   layout.tsx             # root: fonts (next/font), <html>/<body>
   page.tsx               # redirect → /overview
   (console)/
-    layout.tsx           # app shell: Sidebar + Topbar + scrollable workspace
-    overview/ schedule/ attendance/ credentials/ comms/ projects/   # screens
-    jobs/ people/ reports/ settings/                                # placeholders
+    layout.tsx           # app shell: Sidebar + Topbar + IdaraProvider + workspace
+    overview/ schedule/ jobs/ attendance/ projects/ people/
+    comms/ credentials/ audit/ reports/ settings/                   # screens
 components/
-  ui/                    # Icon, Button, Badge, Card, Avatar/Stack, Ring, Bar, Spark, MetricCard, Check
+  ui/                    # Icon, Button, Badge, Card, Avatar, Ring, Bar, Spark, MetricCard,
+                         # Modal, Confirm, Toast, Tabs, Menu, Field, Switch, Pagination, …
   chrome/                # Sidebar, Topbar, nav model
   screen/                # PageHead, CardHead, LinkBtn, Placeholder
 lib/
   status.ts              # STATUS tone map (success/warning/danger/info/teal/neutral)
+  idara/                 # Idara Core — the trust layer (see below)
+  store/shell.tsx        # app-shell context: company, notifications, global search
+  data/search.ts         # static search index
+tests/                   # vitest suite over Idara Core
+docs/                    # identity architecture + the Experiment 1 mandate test
 public/assets/           # FairShift + idara logos & marks
 ```
+
+## Idara Core (`lib/idara/`)
+
+The trust layer underneath every module. Screens never make eligibility calls
+themselves — they ask the engine, and consequential answers land in the audit log.
+
+| File | Role |
+|---|---|
+| `types.ts` | Domain model: `Identity`, `Credential`, `Site`, `Decision`, `AuditEvent`. Vertical-agnostic. |
+| `engine.ts` | **`decide(person, action, site, at)` → allow/deny + reasons.** The primitive. Pure and synchronous. |
+| `verifier.ts` | The `CredentialVerifier` seam — the single place "is this credential real and current?" is answered. |
+| `audit.ts` | Append-only, SHA-256 hash-chained log; `verifyChain()` reports the first broken link. |
+| `hash.ts` | SHA-256 + canonical (key-sorted) JSON, so hashes survive a serialisation round-trip. |
+| `hospitality.ts` | The hospitality credential taxonomy. Swapping verticals = swapping this file. |
+| `seed.ts` | Demo dataset — deliberately mixed: eligible, expiring, and blocked staff. |
+| `provider.tsx` | React binding: `useIdara()`, the publish gate, credential revocation. |
+
+Roster eligibility, verified clock-in, function-room access and verified sign-off are all
+the same `decide()` call with a different `action`.
+
+**The publish gate** is the load-bearing demo: `/schedule` → *Publish Roster* runs the
+engine over every rostered staff member, and a roster containing someone non-compliant
+**cannot be published**. The blocked attempt is itself written to the audit log, with a
+per-person receipt naming the failed requirement — visible at `/audit`.
+
+In the seeded week that means three blocks for three different reasons: an **expired
+RSA**, a **missing venue induction**, and an **RSA revoked by the regulator** — plus a
+bartender cleared for the floor but not the **gaming room**, because RSG is licensed
+separately. A functions coordinator clears the venue *and* both catering operations on
+one RSA and three separate inductions — the portability argument in miniature.
+
+### Tests
+
+`npm test` — 85 tests over the engine, verifier, hash chain and seed dataset.
+Notably `tests/demo.test.ts` pins the demo's *narrative*: if a seeded credential date
+is edited and a blocked staff member quietly becomes eligible, the suite fails before
+the demo does. `tests/hash.test.ts` checks the SHA-256 implementation against published
+NIST vectors and against `node:crypto` across the message-padding boundaries.
 
 ## Design system
 
@@ -74,7 +128,25 @@ source of truth.
 
 - **Font** Plus Jakarta Sans is the nearest match — swap if a real brand font surfaces.
 - **Icons** Lucide stand in for the real set.
-- **Avatars** are initials-on-tint placeholders — swap for real worker photos.
+- **Avatars** are initials-on-tint placeholders — swap for real staff photos.
 - **Logos** were cropped from raster artwork — request SVG originals for production.
 - Screen data is **mock/seed data** lifted from the reference designs. Wire to real APIs
   (auth, scheduling, time-tracking, messaging, idara verification) for production.
+
+## Where this sits in the plan
+
+Two documents in `docs/` set the direction, and they gate each other:
+
+- **[`experiment-1-mandate-test.md`](docs/experiment-1-mandate-test.md)** — the next move.
+  8 discovery conversations testing whether a hospitality operator — a pub group, a
+  caterer, or a staffing agency — will *mandate* Idara and pay per head. It costs ~2–3
+  weeks and **zero new code**: it runs on the Schedule + Audit demo already in this
+  repo, and carries a pre-committed GREEN/YELLOW/RED decision rule.
+- **[`idara-identity-architecture.md`](docs/idara-identity-architecture.md)** — the SSI
+  network this console is the first relying party for. Phase 1 (AA wallet, `did:web`
+  issuer, SD-JWT VCs, "Sign in with Idara") is **gated behind that test passing.**
+
+The key architectural claim: the eligibility brain in `lib/idara/` doesn't change when
+the network arrives — only the source of truth under it does, from "a record we hold" to
+"a cryptographically verified, user-consented presentation." `CredentialVerifier` is the
+seam where that swap happens; `tests/verifier.test.ts` pins the contract it must honour.

@@ -5,22 +5,31 @@
    previous event's hash, so any tampering breaks the chain —
    this is the "show me the receipts" proof layer.
 
-   NOTE: digest() below is a fast non-cryptographic placeholder.
-   Production swaps in SHA-256 (crypto.subtle) — the chain shape
-   and verifyChain() stay identical.
+   The digest is SHA-256 over a canonical (key-sorted) encoding
+   of the event body; see hash.ts. Editing, reordering or removing
+   any event invalidates every hash from that point on, and
+   verifyChain() reports the first break.
    ============================================================ */
 
+import { sha256Hex, canonicalJson } from "./hash";
 import type { AuditEvent, AuditEventType, DID, ISODate } from "./types";
 
-export const GENESIS_HASH = "00000000";
+/** Name of the digest, surfaced in the UI so the claim is checkable. */
+export const HASH_ALGORITHM = "SHA-256";
 
-function digest(input: string): string {
-  // djb2 — placeholder for SHA-256.
-  let h = 5381;
-  for (let i = 0; i < input.length; i++) {
-    h = ((h << 5) + h + input.charCodeAt(i)) >>> 0;
-  }
-  return h.toString(16).padStart(8, "0");
+/** The chain's anchor — a 64-hex-char zero root, matching digest width. */
+export const GENESIS_HASH = "0".repeat(64);
+
+/** Body of an event, without its own hash: exactly what gets digested. */
+type AuditEventBody = Omit<AuditEvent, "hash">;
+
+function digest(prevHash: string, body: AuditEventBody): string {
+  return sha256Hex(prevHash + canonicalJson(body));
+}
+
+/** First 12 chars — enough to read in a table, full value on hover. */
+export function shortHash(hash: string): string {
+  return hash.slice(0, 12);
 }
 
 export interface NewAuditEvent {
@@ -37,7 +46,7 @@ export function appendEvent(log: AuditEvent[], ev: NewAuditEvent): AuditEvent[] 
   const prev = log[log.length - 1];
   const prevHash = prev ? prev.hash : GENESIS_HASH;
   const seq = prev ? prev.seq + 1 : 0;
-  const body = {
+  const body: AuditEventBody = {
     seq,
     id: `evt-${seq}`,
     type: ev.type,
@@ -48,8 +57,7 @@ export function appendEvent(log: AuditEvent[], ev: NewAuditEvent): AuditEvent[] 
     data: ev.data ?? {},
     prevHash,
   };
-  const hash = digest(prevHash + JSON.stringify(body));
-  return [...log, { ...body, hash }];
+  return [...log, { ...body, hash: digest(prevHash, body) }];
 }
 
 /** Recompute the chain and report the first broken link (or null). */
@@ -57,8 +65,7 @@ export function verifyChain(log: AuditEvent[]): { ok: boolean; brokenAt: number 
   let prevHash = GENESIS_HASH;
   for (const e of log) {
     const { hash, ...body } = e;
-    const expected = digest(prevHash + JSON.stringify(body));
-    if (e.prevHash !== prevHash || hash !== expected) {
+    if (e.prevHash !== prevHash || hash !== digest(prevHash, body)) {
       return { ok: false, brokenAt: e.seq };
     }
     prevHash = hash;

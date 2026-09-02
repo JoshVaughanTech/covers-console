@@ -13,9 +13,9 @@ export interface NavItem {
 export const NAV: NavItem[] = [
   { id: "overview", label: "Overview", icon: "layout-grid", href: "/overview" },
   { id: "schedule", label: "Schedule", icon: "calendar-days", href: "/schedule" },
-  { id: "jobs", label: "Jobs", icon: "briefcase", href: "/jobs" },
+  { id: "jobs", label: "Functions", icon: "party-popper", href: "/jobs" },
   { id: "attendance", label: "Time & Attendance", icon: "clock", href: "/attendance" },
-  { id: "projects", label: "Projects", icon: "folder-kanban", href: "/projects" },
+  { id: "projects", label: "Run Sheets", icon: "clipboard-list", href: "/projects" },
   { id: "people", label: "People", icon: "users", href: "/people" },
   { id: "comms", label: "Communications", icon: "message-square", href: "/comms" },
   { id: "credentials", label: "Credentials", icon: "badge-check", href: "/credentials", idara: true },

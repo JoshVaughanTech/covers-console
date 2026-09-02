@@ -92,7 +92,7 @@ export function Topbar({ dateLabel }: TopbarProps) {
         <SearchInput
           value={query}
           onChange={setQuery}
-          placeholder="Search people, jobs, sites…"
+          placeholder="Search people, functions, venues…"
         />
         {query.trim() && (
           <div

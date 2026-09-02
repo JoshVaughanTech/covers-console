@@ -69,18 +69,18 @@ const DATA: Record<Range, RangeData> = {
       company: [83, 84, 84, 85, 86, 87, 88],
     },
     labour: [
-      { site: "Brisbane", actual: 52, budget: 50 },
-      { site: "Sydney", actual: 48, budget: 52 },
-      { site: "Melbourne", actual: 44, budget: 42 },
-      { site: "Perth", actual: 26, budget: 30 },
-      { site: "Adelaide", actual: 14, budget: 16 },
+      { site: "Brightwater Hotel", actual: 52, budget: 50 },
+      { site: "Northside Tavern", actual: 48, budget: 52 },
+      { site: "Quayside", actual: 44, budget: 42 },
+      { site: "Gaming Room", actual: 26, budget: 30 },
+      { site: "Off-premise", actual: 14, budget: 16 },
     ],
     overtime: [
-      { site: "Brisbane", hours: 42 },
-      { site: "Sydney", hours: 31 },
-      { site: "Melbourne", hours: 28 },
-      { site: "Perth", hours: 15 },
-      { site: "Adelaide", hours: 10 },
+      { site: "Brightwater Hotel", hours: 42 },
+      { site: "Northside Tavern", hours: 31 },
+      { site: "Quayside", hours: 28 },
+      { site: "Gaming Room", hours: 15 },
+      { site: "Off-premise", hours: 10 },
     ],
   },
   "30 days": {
@@ -97,18 +97,18 @@ const DATA: Record<Range, RangeData> = {
       company: [80, 82, 84, 85],
     },
     labour: [
-      { site: "Brisbane", actual: 208, budget: 200 },
-      { site: "Sydney", actual: 192, budget: 208 },
-      { site: "Melbourne", actual: 176, budget: 168 },
-      { site: "Perth", actual: 104, budget: 120 },
-      { site: "Adelaide", actual: 62, budget: 64 },
+      { site: "Brightwater Hotel", actual: 208, budget: 200 },
+      { site: "Northside Tavern", actual: 192, budget: 208 },
+      { site: "Quayside", actual: 176, budget: 168 },
+      { site: "Gaming Room", actual: 104, budget: 120 },
+      { site: "Off-premise", actual: 62, budget: 64 },
     ],
     overtime: [
-      { site: "Brisbane", hours: 168 },
-      { site: "Sydney", hours: 124 },
-      { site: "Melbourne", hours: 112 },
-      { site: "Perth", hours: 64 },
-      { site: "Adelaide", hours: 46 },
+      { site: "Brightwater Hotel", hours: 168 },
+      { site: "Northside Tavern", hours: 124 },
+      { site: "Quayside", hours: 112 },
+      { site: "Gaming Room", hours: 64 },
+      { site: "Off-premise", hours: 46 },
     ],
   },
   Quarter: {
@@ -125,18 +125,18 @@ const DATA: Record<Range, RangeData> = {
       company: [79, 82, 84],
     },
     labour: [
-      { site: "Brisbane", actual: 624, budget: 600 },
-      { site: "Sydney", actual: 576, budget: 624 },
-      { site: "Melbourne", actual: 528, budget: 504 },
-      { site: "Perth", actual: 312, budget: 360 },
-      { site: "Adelaide", actual: 186, budget: 192 },
+      { site: "Brightwater Hotel", actual: 624, budget: 600 },
+      { site: "Northside Tavern", actual: 576, budget: 624 },
+      { site: "Quayside", actual: 528, budget: 504 },
+      { site: "Gaming Room", actual: 312, budget: 360 },
+      { site: "Off-premise", actual: 186, budget: 192 },
     ],
     overtime: [
-      { site: "Brisbane", hours: 504 },
-      { site: "Sydney", hours: 372 },
-      { site: "Melbourne", hours: 336 },
-      { site: "Perth", hours: 192 },
-      { site: "Adelaide", hours: 136 },
+      { site: "Brightwater Hotel", hours: 504 },
+      { site: "Northside Tavern", hours: 372 },
+      { site: "Quayside", hours: 336 },
+      { site: "Gaming Room", hours: 192 },
+      { site: "Off-premise", hours: 136 },
     ],
   },
   YTD: {
@@ -153,26 +153,26 @@ const DATA: Record<Range, RangeData> = {
       company: [78, 83],
     },
     labour: [
-      { site: "Brisbane", actual: 1248, budget: 1200 },
-      { site: "Sydney", actual: 1152, budget: 1248 },
-      { site: "Melbourne", actual: 1056, budget: 1008 },
-      { site: "Perth", actual: 624, budget: 720 },
-      { site: "Adelaide", actual: 372, budget: 384 },
+      { site: "Brightwater Hotel", actual: 1248, budget: 1200 },
+      { site: "Northside Tavern", actual: 1152, budget: 1248 },
+      { site: "Quayside", actual: 1056, budget: 1008 },
+      { site: "Gaming Room", actual: 624, budget: 720 },
+      { site: "Off-premise", actual: 372, budget: 384 },
     ],
     overtime: [
-      { site: "Brisbane", hours: 1024 },
-      { site: "Sydney", hours: 748 },
-      { site: "Melbourne", hours: 676 },
-      { site: "Perth", hours: 388 },
-      { site: "Adelaide", hours: 284 },
+      { site: "Brightwater Hotel", hours: 1024 },
+      { site: "Northside Tavern", hours: 748 },
+      { site: "Quayside", hours: 676 },
+      { site: "Gaming Room", hours: 388 },
+      { site: "Off-premise", hours: 284 },
     ],
   },
 };
 
-type FairnessSeries = "Team" | "Site" | "Company";
+type FairnessSeries = "Team" | "Venue" | "Company";
 const SERIES_COLOR: Record<FairnessSeries, string> = {
   Team: "var(--series-teal)",
-  Site: "var(--series-blue)",
+  Venue: "var(--series-blue)",
   Company: "var(--series-violet)",
 };
 
@@ -189,7 +189,7 @@ const INITIAL_SAVED: SavedReport[] = [
   { id: 2, name: "Labour Cost vs Budget — May", type: "Labour Cost", generated: "31 May 2026", format: "XLSX" },
   { id: 3, name: "Attendance Breakdown Q2", type: "Attendance", generated: "28 May 2026", format: "PDF" },
   { id: 4, name: "Compliance & Credentials Audit", type: "Compliance", generated: "24 May 2026", format: "CSV" },
-  { id: 5, name: "Overtime by Site — April", type: "Overtime", generated: "30 Apr 2026", format: "XLSX" },
+  { id: 5, name: "Overtime by Venue — April", type: "Overtime", generated: "30 Apr 2026", format: "XLSX" },
 ];
 
 const REPORT_TYPES = ["Fairness", "Labour Cost", "Attendance", "Compliance", "Overtime"];
@@ -202,7 +202,7 @@ export default function ReportsPage() {
 
   /* Fairness chart series toggle (interactive, state-backed) */
   const [series, setSeries] = useState<FairnessSeries>("Team");
-  const fairnessData = series === "Team" ? data.fairness.team : series === "Site" ? data.fairness.site : data.fairness.company;
+  const fairnessData = series === "Team" ? data.fairness.team : series === "Venue" ? data.fairness.site : data.fairness.company;
 
   /* Generate Report modal */
   const [genOpen, setGenOpen] = useState(false);
@@ -219,10 +219,10 @@ export default function ReportsPage() {
 
   /* Compliance dataset (static — credential coverage snapshot) */
   const credentials: [string, number, string][] = [
-    ["White Card", 98, "var(--success)"],
+    ["RSA", 98, "var(--success)"],
     ["First Aid", 86, "var(--success)"],
-    ["Working at Heights", 72, "var(--warning)"],
-    ["EWP Licence", 61, "var(--warning)"],
+    ["Allergen Management", 72, "var(--warning)"],
+    ["RSG", 61, "var(--warning)"],
     ["Confined Space", 44, "var(--danger)"],
   ];
   const complianceScore = Math.round(credentials.reduce((a, c) => a + c[1], 0) / credentials.length);
@@ -296,7 +296,7 @@ export default function ReportsPage() {
         <Card>
           <CardHead
             title="Fairness Trend"
-            right={<Tabs tabs={["Team", "Site", "Company"]} value={series} onChange={(v) => setSeries(v as FairnessSeries)} />}
+            right={<Tabs tabs={["Team", "Venue", "Company"]} value={series} onChange={(v) => setSeries(v as FairnessSeries)} />}
           />
           <div style={{ position: "relative", height: 150 }}>
             <Spark data={fairnessData} color={SERIES_COLOR[series]} width={440} height={140} />
@@ -401,7 +401,7 @@ export default function ReportsPage() {
         </Card>
 
         <Card>
-          <CardHead title="Overtime by Site" right={<span className="fs-tnum" style={{ fontSize: 12, fontWeight: 700, color: "var(--fg-3)" }}>{overtimeTotal}h total</span>} />
+          <CardHead title="Overtime by Venue" right={<span className="fs-tnum" style={{ fontSize: 12, fontWeight: 700, color: "var(--fg-3)" }}>{overtimeTotal}h total</span>} />
           <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
             {data.overtime.map((o) => (
               <div key={o.site}>

@@ -29,14 +29,14 @@ interface Job {
 const FILTERS = ["All", "On time", "Late", "Absent", "On break"];
 
 const INITIAL_ROWS: Row[] = [
-  { person: "Darie Roberts", role: "Carpenter", rostered: "7:00am – 3:30pm", clockIn: "7:02am", variance: "+2m", varianceTone: "success", location: "Melbourne Site", status: "On time", statusTone: "success" },
-  { person: "Leanne Vidal", role: "Electrician", rostered: "7:00am – 3:30pm", clockIn: "7:18am", variance: "+18m", varianceTone: "warning", location: "Melbourne Site", status: "Late", statusTone: "warning" },
-  { person: "Mitch Egan", role: "Concreter", rostered: "6:30am – 3:00pm", clockIn: "6:28am", variance: "–2m", varianceTone: "success", location: "Melbourne Site", status: "On time", statusTone: "success" },
-  { person: "Tahlia Johnson", role: "Labourer", rostered: "7:00am – 3:30pm", clockIn: "—", variance: "—", varianceTone: null, location: "Melbourne Site", status: "Absent", statusTone: "danger" },
-  { person: "Aaron Patel", role: "Carpenter", rostered: "7:00am – 3:30pm", clockIn: "7:05am", variance: "+5m", varianceTone: "success", location: "Melbourne Site", status: "On time", statusTone: "success" },
-  { person: "Sophie Nguyen", role: "Supervisor", rostered: "7:00am – 3:30pm", clockIn: "7:00am", variance: "On time", varianceTone: "success", location: "Port Melbourne", status: "On time", statusTone: "success" },
-  { person: "Jake Morrison", role: "Carpenter", rostered: "7:00am – 3:30pm", clockIn: "On break", variance: "10:15am", varianceTone: "info", location: "Melbourne Site", status: "Break", statusTone: "info" },
-  { person: "Hassan Ali", role: "Steel Fixer", rostered: "7:00am – 3:30pm", clockIn: "7:11am", variance: "+11m", varianceTone: "warning", location: "Melbourne Site", status: "Late", statusTone: "warning" },
+  { person: "Leanne Vidal", role: "Duty Manager", rostered: "7:00am – 3:00pm", clockIn: "7:02am", variance: "+2m", varianceTone: "success", location: "Brightwater Hotel", status: "On time", statusTone: "success" },
+  { person: "Liam O'Brien", role: "Barback", rostered: "7:00am – 3:00pm", clockIn: "7:18am", variance: "+18m", varianceTone: "warning", location: "Brightwater Hotel", status: "Late", statusTone: "warning" },
+  { person: "Hassan Ali", role: "Head Chef", rostered: "6:30am – 3:00pm", clockIn: "6:28am", variance: "–2m", varianceTone: "success", location: "Brightwater Hotel", status: "On time", statusTone: "success" },
+  { person: "Tahlia Johnson", role: "Wait Staff", rostered: "11:00am – 7:00pm", clockIn: "—", variance: "—", varianceTone: null, location: "Brightwater Hotel", status: "Absent", statusTone: "danger" },
+  { person: "Priya Sharma", role: "Functions Coordinator", rostered: "11:00am – 7:00pm", clockIn: "11:05am", variance: "+5m", varianceTone: "success", location: "Brightwater Hotel", status: "On time", statusTone: "success" },
+  { person: "Sophie Nguyen", role: "Venue Manager", rostered: "11:00am – 7:00pm", clockIn: "11:00am", variance: "On time", varianceTone: "success", location: "Northside Tavern", status: "On time", statusTone: "success" },
+  { person: "Darie Roberts", role: "Bartender", rostered: "4:00pm – 12:00am", clockIn: "On break", variance: "8:15pm", varianceTone: "info", location: "Brightwater Hotel", status: "Break", statusTone: "info" },
+  { person: "Mitch Egan", role: "Gaming Attendant", rostered: "4:00pm – 12:00am", clockIn: "4:11pm", variance: "+11m", varianceTone: "warning", location: "Brightwater Gaming Room", status: "Late", statusTone: "warning" },
 ];
 
 const SPARKS: Record<string, number[]> = {
@@ -48,19 +48,19 @@ const SPARKS: Record<string, number[]> = {
 };
 
 const JOBS: Job[] = [
-  { job: "Commercial Build – Level 2", planned: "1,280", actual: "1,356", variance: "+76h", cost: "+$8,420", tone: "danger" },
-  { job: "Warehouse – Stage 1", planned: "960", actual: "912", variance: "–48h", cost: "–$5,210", tone: "success" },
-  { job: "Aged Care Facility", planned: "1,150", actual: "1,102", variance: "–48h", cost: "–$4,780", tone: "success" },
-  { job: "Retail Fitout – Store 34", planned: "640", actual: "678", variance: "+38h", cost: "+$3,150", tone: "danger" },
-  { job: "Civic Centre Upgrade", planned: "820", actual: "809", variance: "–11h", cost: "–$920", tone: "success" },
+  { job: "Brightwater Friday Live", planned: "1,280", actual: "1,356", variance: "+76h", cost: "+$8,420", tone: "danger" },
+  { job: "Northside Long Lunch", planned: "960", actual: "912", variance: "–48h", cost: "–$5,210", tone: "success" },
+  { job: "Werribee Park Wedding", planned: "1,150", actual: "1,102", variance: "–48h", cost: "–$4,780", tone: "success" },
+  { job: "Docklands Corporate Lunch", planned: "640", actual: "678", variance: "+38h", cost: "+$3,150", tone: "danger" },
+  { job: "Quayside Product Launch", planned: "820", actual: "809", variance: "–11h", cost: "–$920", tone: "success" },
 ];
 
 const JOB_DETAIL: Record<string, [string, string][]> = {
-  "Commercial Build – Level 2": [["Carpentry", "+34h"], ["Electrical", "+22h"], ["Overtime loading", "+12h"], ["Rework allowance", "+8h"]],
-  "Warehouse – Stage 1": [["Concreting", "–28h"], ["Steel fixing", "–14h"], ["Early completion", "–6h"]],
-  "Aged Care Facility": [["Fitout", "–26h"], ["Plumbing", "–12h"], ["Scheduling gains", "–10h"]],
-  "Retail Fitout – Store 34": [["Joinery", "+20h"], ["Variations", "+11h"], ["Overtime loading", "+7h"]],
-  "Civic Centre Upgrade": [["Landscaping", "–6h"], ["General labour", "–5h"]],
+  "Brightwater Friday Live": [["Bar staffing", "+34h"], ["Security", "+22h"], ["Late-night loading", "+12h"], ["Overtime", "+8h"]],
+  "Northside Long Lunch": [["Kitchen prep", "–28h"], ["Floor staff", "–14h"], ["Early finish", "–6h"]],
+  "Werribee Park Wedding": [["Travel & bump-in", "–26h"], ["Kitchen brigade", "–12h"], ["Scheduling gains", "–10h"]],
+  "Docklands Corporate Lunch": [["Wait staff", "+20h"], ["Menu variations", "+11h"], ["Overtime loading", "+7h"]],
+  "Quayside Product Launch": [["Canape service", "–6h"], ["General floor", "–5h"]],
 };
 
 const varianceColor = (tone: Tone | null) =>
@@ -151,7 +151,7 @@ export default function AttendancePage() {
 
   return (
     <div>
-      <PageHead title="Live Attendance" sub="Real-time attendance across people, sites and shifts." right={<Badge tone="success" dot>Live</Badge>} />
+      <PageHead title="Live Attendance" sub="Real-time attendance across people, venues and shifts." right={<Badge tone="success" dot>Live</Badge>} />
       <div style={{ display: "grid", gridTemplateColumns: "repeat(5,1fr)", gap: 16, marginBottom: 16 }}>
         {metrics.map((m) => (
           <Card key={m.label} pad={16} style={{ display: "flex", flexDirection: "column", gap: 3 }}>

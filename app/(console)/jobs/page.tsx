@@ -23,10 +23,10 @@ import type { Tone } from "@/lib/status";
 import { PageHead, CardHead } from "@/components/screen/page-head";
 
 /* ============================================================
-   Jobs — staffing engagements (a job groups the shifts/roles
-   for a client site over a date range). Interactive: status
-   tabs + search filter, paginated table, row -> detail modal,
-   and a New Job form modal. All state in useState.
+   Functions & Events — hospitality engagements (a function groups
+   the shifts/roles for a venue or off-premise site over a date
+   range). Interactive: status tabs + search filter, paginated
+   table, row -> detail modal, and a New Function form modal.
    ============================================================ */
 
 type JobStatus = "Active" | "Scheduled" | "On Hold" | "Completed";
@@ -57,24 +57,24 @@ const STATUS_OPTIONS = ["Active", "Scheduled", "On Hold", "Completed"] as const;
 
 const SEED_JOBS: Job[] = [
   {
-    id: "JOB-2041",
-    name: "Riverside Aged Care — Night Cover",
-    site: "Riverside Lodge, Parramatta",
-    client: "Riverside Health Group",
+    id: "FN-2041",
+    name: "Werribee Park Wedding — Saturday",
+    site: "Werribee Park Mansion",
+    client: "Private — Nguyen & Cole",
     status: "Active",
-    start: "May 01, 2026",
-    end: "Jul 31, 2026",
+    start: "May 16, 2026",
+    end: "May 17, 2026",
     filled: 18,
     required: 20,
     progress: 64,
     crew: ["Mia Anderson", "James Carter", "Sarah Bennett", "Alex Nguyen", "Priya Shah", "Tom Walker"],
-    requirements: ["Registered Nurse (AHPRA)", "First Aid certificate", "Night-shift availability", "Police check"],
+    requirements: ["RSA", "Allergen Management", "Food Safety Supervisor", "Event site briefing"],
   },
   {
-    id: "JOB-2038",
-    name: "Westfield Concierge Program",
-    site: "Westfield Bondi, Sydney",
-    client: "Scentre Group",
+    id: "FN-2038",
+    name: "Docklands Corporate Lunch Series",
+    site: "Meridian Tower, Docklands",
+    client: "Meridian Group",
     status: "Active",
     start: "Apr 12, 2026",
     end: "Oct 12, 2026",
@@ -82,13 +82,13 @@ const SEED_JOBS: Job[] = [
     required: 14,
     progress: 48,
     crew: ["Daniel Lee", "Grace Kim", "Olivia Brown", "Ethan Park"],
-    requirements: ["Customer service experience", "Grooming standards", "Weekend availability"],
+    requirements: ["RSA", "Food Handler Training", "Allergen Management", "Corporate presentation standards"],
   },
   {
-    id: "JOB-2035",
-    name: "Harbour Bridge Maintenance",
-    site: "Sydney Harbour Bridge",
-    client: "Transport for NSW",
+    id: "FN-2035",
+    name: "Brightwater Friday Live",
+    site: "Brightwater Hotel, Fitzroy",
+    client: "In-house",
     status: "Active",
     start: "Mar 03, 2026",
     end: "Aug 30, 2026",
@@ -96,13 +96,13 @@ const SEED_JOBS: Job[] = [
     required: 24,
     progress: 81,
     crew: ["Noah White", "Liam Scott", "Ava Turner", "Lucas Hall", "Chloe Green", "Mason Reed"],
-    requirements: ["White Card", "Working at heights ticket", "Trade qualification"],
+    requirements: ["RSA", "Late-night availability", "Crowd safety briefing"],
   },
   {
-    id: "JOB-2033",
-    name: "Royal Hospital Theatre Staffing",
-    site: "Royal North Shore Hospital",
-    client: "NSW Health",
+    id: "FN-2033",
+    name: "Northside Long Lunch",
+    site: "Northside Tavern, Brunswick",
+    client: "In-house",
     status: "Active",
     start: "Feb 18, 2026",
     end: "Dec 18, 2026",
@@ -110,125 +110,13 @@ const SEED_JOBS: Job[] = [
     required: 36,
     progress: 55,
     crew: ["Isabella Cruz", "Henry Ford", "Zoe Adams", "Jack Morris", "Ruby Hayes"],
-    requirements: ["Enrolled Nurse (AHPRA)", "Sterile technique", "Immunisation records", "Police check"],
+    requirements: ["RSA", "Food Safety Supervisor", "Food Handler Training", "Venue induction"],
   },
   {
-    id: "JOB-2052",
-    name: "Vivid Festival Event Crew",
-    site: "Circular Quay, Sydney",
-    client: "Destination NSW",
-    status: "Scheduled",
-    start: "Jul 10, 2026",
-    end: "Jul 28, 2026",
-    filled: 6,
-    required: 40,
-    progress: 12,
-    crew: ["Leo Bennett", "Maya Singh", "Owen Clark"],
-    requirements: ["RSA certificate", "Crowd control", "Evening availability", "Hi-vis PPE"],
-  },
-  {
-    id: "JOB-2050",
-    name: "Spring Warehouse Ramp-Up",
-    site: "Eastern Creek DC, Sydney",
-    client: "Linfox Logistics",
-    status: "Scheduled",
-    start: "Aug 04, 2026",
-    end: "Nov 04, 2026",
-    filled: 9,
-    required: 50,
-    progress: 18,
-    crew: ["Cody Banks", "Nina Patel", "Riley Cooper"],
-    requirements: ["Forklift licence (LF)", "Manual handling", "Shift-work availability"],
-  },
-  {
-    id: "JOB-2048",
-    name: "University Open Day Staffing",
-    site: "UTS Broadway Campus",
-    client: "University of Technology Sydney",
-    status: "Scheduled",
-    start: "Sep 06, 2026",
-    end: "Sep 07, 2026",
-    filled: 4,
-    required: 22,
-    progress: 9,
-    crew: ["Hannah Lowe", "Ben Foster"],
-    requirements: ["Working with Children Check", "Customer service", "Wayfinding briefing"],
-  },
-  {
-    id: "JOB-2026",
-    name: "Coastal Resort Housekeeping",
-    site: "Crowne Plaza, Coogee",
-    client: "IHG Hotels & Resorts",
-    status: "On Hold",
-    start: "Jan 15, 2026",
-    end: "Apr 15, 2026",
-    filled: 7,
-    required: 16,
-    progress: 35,
-    crew: ["Ella Brooks", "Marco Rossi", "Sophie Dean"],
-    requirements: ["Housekeeping experience", "Attention to detail", "Early-start availability"],
-  },
-  {
-    id: "JOB-2022",
-    name: "Corporate Tower Security",
-    site: "Barangaroo Tower 1",
-    client: "Lendlease",
-    status: "On Hold",
-    start: "Dec 01, 2025",
-    end: "Jun 01, 2026",
-    filled: 12,
-    required: 18,
-    progress: 58,
-    crew: ["Aaron Cole", "Tara Mills", "Victor Ng", "Jade Reilly"],
-    requirements: ["Security licence (1A/1C)", "Night-shift availability", "Police check"],
-  },
-  {
-    id: "JOB-2009",
-    name: "Summer Catering Pool",
-    site: "ICC Sydney, Darling Harbour",
-    client: "Sodexo Australia",
-    status: "Completed",
-    start: "Nov 01, 2025",
-    end: "Feb 28, 2026",
-    filled: 28,
-    required: 28,
-    progress: 100,
-    crew: ["Ivy Chan", "Hugo Marsh", "Lily Quinn", "Felix Wood", "Amara Osei"],
-    requirements: ["RSA certificate", "Food handling", "Banquet experience"],
-  },
-  {
-    id: "JOB-2004",
-    name: "Aged Care Holiday Relief",
-    site: "Sunnyfield Manor, Hornsby",
-    client: "Riverside Health Group",
-    status: "Completed",
-    start: "Dec 10, 2025",
-    end: "Jan 31, 2026",
-    filled: 15,
-    required: 15,
-    progress: 100,
-    crew: ["Dylan Ross", "Mila Vega", "Caleb Ortiz", "Hana Ito"],
-    requirements: ["Personal Care Attendant cert", "First Aid", "Police check"],
-  },
-  {
-    id: "JOB-1998",
-    name: "Retail Stocktake Blitz",
-    site: "DFO Homebush",
-    client: "Cotton On Group",
-    status: "Completed",
-    start: "Oct 02, 2025",
-    end: "Oct 20, 2025",
-    filled: 32,
-    required: 32,
-    progress: 100,
-    crew: ["Ryan Pace", "Kira Holt", "Devon Lyle", "Asha Roy"],
-    requirements: ["Stocktake experience", "Numeracy check", "Overnight availability"],
-  },
-  {
-    id: "JOB-2055",
-    name: "Airport Ground Handling",
-    site: "Sydney Kingsford Smith Airport",
-    client: "Dnata Australia",
+    id: "FN-2055",
+    name: "Brightwater Gaming Floor — Winter Roster",
+    site: "Brightwater Gaming Room, Fitzroy",
+    client: "In-house",
     status: "Active",
     start: "May 20, 2026",
     end: "Nov 20, 2026",
@@ -236,13 +124,55 @@ const SEED_JOBS: Job[] = [
     required: 30,
     progress: 42,
     crew: ["Eli Stone", "Naomi Frost", "Pablo Diaz", "Greta Lund", "Sam Okafor"],
-    requirements: ["ASIC clearance", "Manual handling", "Rotating roster availability", "Drug & alcohol screen"],
+    requirements: ["RSA", "RSG", "Venue induction", "Rotating roster availability"],
   },
   {
-    id: "JOB-2058",
-    name: "City Marathon Medical Tent",
-    site: "Hyde Park, Sydney",
-    client: "Athletics NSW",
+    id: "FN-2052",
+    name: "Spring Carnival Marquee",
+    site: "Flemington — Marquee C",
+    client: "Halcyon Labs",
+    status: "Scheduled",
+    start: "Nov 03, 2026",
+    end: "Nov 07, 2026",
+    filled: 6,
+    required: 40,
+    progress: 12,
+    crew: ["Leo Bennett", "Maya Singh", "Owen Clark"],
+    requirements: ["RSA", "Allergen Management", "Marquee service experience", "Evening availability"],
+  },
+  {
+    id: "FN-2050",
+    name: "Summer Festival Bar Pool",
+    site: "Alexandra Gardens, Melbourne",
+    client: "City Events Co.",
+    status: "Scheduled",
+    start: "Dec 04, 2026",
+    end: "Feb 04, 2027",
+    filled: 9,
+    required: 50,
+    progress: 18,
+    crew: ["Cody Banks", "Nina Patel", "Riley Cooper"],
+    requirements: ["RSA", "Crowd control briefing", "Outdoor bar experience", "Shift-work availability"],
+  },
+  {
+    id: "FN-2048",
+    name: "School Presentation Night",
+    site: "Brunswick Grammar Hall",
+    client: "Brunswick Grammar",
+    status: "Scheduled",
+    start: "Sep 06, 2026",
+    end: "Sep 07, 2026",
+    filled: 4,
+    required: 22,
+    progress: 9,
+    crew: ["Hannah Lowe", "Ben Foster"],
+    requirements: ["Working with Children Check", "Food Handler Training", "Allergen Management"],
+  },
+  {
+    id: "FN-2058",
+    name: "Quayside Product Launch",
+    site: "Quayside Bar & Kitchen, Docklands",
+    client: "Aperture Studios",
     status: "Scheduled",
     start: "Sep 13, 2026",
     end: "Sep 13, 2026",
@@ -250,7 +180,77 @@ const SEED_JOBS: Job[] = [
     required: 18,
     progress: 8,
     crew: ["Owen Pratt", "Lara Webb"],
-    requirements: ["Paramedic / RN", "Advanced First Aid", "Event medical briefing"],
+    requirements: ["RSA", "Canapé service", "Allergen Management", "Event site briefing"],
+  },
+  {
+    id: "FN-2026",
+    name: "Peninsula Conference Catering",
+    site: "Peninsula Resort, Sorrento",
+    client: "Peninsula Resorts",
+    status: "On Hold",
+    start: "Jan 15, 2026",
+    end: "Apr 15, 2026",
+    filled: 7,
+    required: 16,
+    progress: 35,
+    crew: ["Ella Brooks", "Marco Rossi", "Sophie Dean"],
+    requirements: ["Food Safety Supervisor", "Allergen Management", "Early-start availability"],
+  },
+  {
+    id: "FN-2022",
+    name: "Corporate Gala Dinner",
+    site: "Royal Exhibition Building",
+    client: "Ardent Partners",
+    status: "On Hold",
+    start: "Dec 01, 2025",
+    end: "Jun 01, 2026",
+    filled: 12,
+    required: 18,
+    progress: 58,
+    crew: ["Aaron Cole", "Tara Mills", "Victor Ng", "Jade Reilly"],
+    requirements: ["RSA", "Banquet experience", "Allergen Management", "Black-tie presentation"],
+  },
+  {
+    id: "FN-2009",
+    name: "Summer Function Pool",
+    site: "Brightwater Hotel, Fitzroy",
+    client: "In-house",
+    status: "Completed",
+    start: "Nov 01, 2025",
+    end: "Feb 28, 2026",
+    filled: 28,
+    required: 28,
+    progress: 100,
+    crew: ["Ivy Chan", "Hugo Marsh", "Lily Quinn", "Felix Wood", "Amara Osei"],
+    requirements: ["RSA", "Food Handler Training", "Banquet experience"],
+  },
+  {
+    id: "FN-2004",
+    name: "New Year's Eve Service",
+    site: "Quayside Bar & Kitchen, Docklands",
+    client: "In-house",
+    status: "Completed",
+    start: "Dec 31, 2025",
+    end: "Jan 01, 2026",
+    filled: 15,
+    required: 15,
+    progress: 100,
+    crew: ["Dylan Ross", "Mila Vega", "Caleb Ortiz", "Hana Ito"],
+    requirements: ["RSA", "Late-night availability", "Crowd safety briefing"],
+  },
+  {
+    id: "FN-1998",
+    name: "Winter Wine Dinner Series",
+    site: "Northside Tavern, Brunswick",
+    client: "In-house",
+    status: "Completed",
+    start: "Jun 02, 2025",
+    end: "Aug 25, 2025",
+    filled: 32,
+    required: 32,
+    progress: 100,
+    crew: ["Ryan Pace", "Kira Holt", "Devon Lyle", "Asha Roy"],
+    requirements: ["RSA", "Wine service knowledge", "Allergen Management"],
   },
 ];
 
@@ -369,17 +369,17 @@ export default function JobsPage() {
     setTab("All");
     setQuery("");
     setPage(1);
-    toast(`Job ${next.id} created`, { tone: "success", icon: "circle-check" });
+    toast(`Function ${next.id} created`, { tone: "success", icon: "circle-check" });
   }
 
   return (
     <div>
       <PageHead
-        title="Jobs"
-        sub="Staffing engagements across your client sites — coverage, crew, and progress at a glance."
+        title="Functions & Events"
+        sub="Functions and catering engagements across your venues and off-premise sites — coverage, staffing and progress at a glance."
         right={
           <Button size="sm" icon="plus" onClick={() => setCreateOpen(true)}>
-            New Job
+            New Function
           </Button>
         }
       />
@@ -387,7 +387,7 @@ export default function JobsPage() {
       {/* Metric row */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 16, marginBottom: 16 }}>
         <Card pad={18}>
-          <div style={{ fontSize: 13, color: "var(--fg-3)", fontWeight: 600 }}>Active Jobs</div>
+          <div style={{ fontSize: 13, color: "var(--fg-3)", fontWeight: 600 }}>Active Functions</div>
           <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginTop: 4 }}>
             <span className="fs-tnum" style={{ fontSize: 34, fontWeight: 800, letterSpacing: "-.02em", color: "var(--fg-1)" }}>
               {metrics.activeJobs}
@@ -416,7 +416,7 @@ export default function JobsPage() {
             <span className="fs-tnum" style={{ fontSize: 34, fontWeight: 800, letterSpacing: "-.02em", color: "var(--fg-1)" }}>
               {metrics.unfilledRoles}
             </span>
-            <span style={{ fontSize: 14, color: "var(--fg-3)", fontWeight: 600 }}>jobs</span>
+            <span style={{ fontSize: 14, color: "var(--fg-3)", fontWeight: 600 }}>functions</span>
           </div>
           <div style={{ fontSize: 11.5, color: "var(--fg-4)", marginTop: 4 }}>Below required headcount</div>
         </Card>
@@ -462,7 +462,7 @@ export default function JobsPage() {
                 setQuery(v);
                 resetToFirstPage();
               }}
-              placeholder="Search jobs, sites, clients…"
+              placeholder="Search functions, venues, clients…"
             />
           </div>
         </div>
@@ -471,7 +471,7 @@ export default function JobsPage() {
           <div style={{ padding: 32 }}>
             <EmptyState
               icon="briefcase"
-              title="No jobs match your filters"
+              title="No functions match your filters"
               sub="Try a different status tab or clear the search."
               action={
                 <Button
@@ -493,7 +493,7 @@ export default function JobsPage() {
           <table style={{ width: "100%", borderCollapse: "collapse" }}>
             <thead>
               <tr>
-                <th style={TH}>Job</th>
+                <th style={TH}>Function</th>
                 <th style={TH}>Client</th>
                 <th style={TH}>Status</th>
                 <th style={TH}>Dates</th>
@@ -577,7 +577,7 @@ export default function JobsPage() {
         )}
       </Card>
 
-      {/* Job detail modal */}
+      {/* Function detail modal */}
       <Modal
         open={active !== null}
         onClose={() => setActive(null)}
@@ -591,7 +591,7 @@ export default function JobsPage() {
               </Badge>
             </span>
           ) : (
-            "Job"
+            "Function"
           )
         }
         footer={
@@ -602,10 +602,10 @@ export default function JobsPage() {
                 size="sm"
                 icon="users"
                 onClick={() => {
-                  toast(`Assigning crew to ${active.id}…`, { tone: "teal", icon: "users" });
+                  toast(`Assigning staff to ${active.id}…`, { tone: "teal", icon: "users" });
                 }}
               >
-                Assign Crew
+                Assign Staff
               </Button>
               {active.status !== "Completed" ? (
                 <Button
@@ -670,7 +670,7 @@ export default function JobsPage() {
 
             <div>
               <CardHead
-                title="Crew"
+                title="Staff"
                 right={<span style={{ fontSize: 11.5, color: "var(--fg-4)" }}>{active.crew.length} assigned</span>}
               />
               {active.crew.length > 0 ? (
@@ -689,7 +689,7 @@ export default function JobsPage() {
               ) : (
                 <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12.5, color: "var(--fg-4)" }}>
                   <Avatar name="?" size={30} />
-                  No crew assigned yet — use Assign Crew to staff this job.
+                  No staff assigned yet — use Assign Staff to crew this function.
                 </div>
               )}
             </div>
@@ -727,33 +727,33 @@ export default function JobsPage() {
         )}
       </Modal>
 
-      {/* New Job modal */}
+      {/* New Function modal */}
       <Modal
         open={createOpen}
         onClose={() => setCreateOpen(false)}
-        title="New Job"
+        title="New Function"
         footer={
           <>
             <Button variant="sec" size="sm" onClick={() => setCreateOpen(false)}>
               Cancel
             </Button>
             <Button size="sm" icon="plus" onClick={createJob}>
-              Create Job
+              Create Function
             </Button>
           </>
         }
       >
         <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-          <Field label="Job name">
+          <Field label="Function name">
             <TextField
               value={draft.name}
               onChange={(v) => setDraft((d) => ({ ...d, name: v }))}
-              placeholder="e.g. Riverside Aged Care — Night Cover"
+              placeholder="e.g. Werribee Park Wedding — Saturday"
               icon="briefcase"
             />
           </Field>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
-            <Field label="Site / location">
+            <Field label="Venue / site">
               <TextField
                 value={draft.site}
                 onChange={(v) => setDraft((d) => ({ ...d, site: v }))}

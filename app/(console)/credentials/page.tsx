@@ -54,39 +54,39 @@ interface JobState {
 /* ---- Seed data ---- */
 const WORKERS: Worker[] = [
   { id: "w1", name: "Daniel Roberts", cardId: "9587 4632 7876", status: "Eligible", tone: "success", match: 100, issues: "—", fatigue: "Fit", access: "Approved" },
-  { id: "w2", name: "Sarah Thompson", cardId: "6738 2910 4421", status: "Warning", tone: "warning", match: 83, issues: "Site Induction missing", fatigue: "Fit", access: "Approved" },
-  { id: "w3", name: "Michael Chen", cardId: "2846 9011 7783", status: "Blocked", tone: "danger", match: 50, issues: "Security Licence expired", fatigue: "Fit", access: "—" },
-  { id: "w4", name: "Priya Nair", cardId: "5590 3312 6679", status: "Warning", tone: "warning", match: 67, issues: "Access Approval expiring · Site Induction missing", fatigue: "Fit", access: "Pending" },
+  { id: "w2", name: "Sarah Thompson", cardId: "6738 2910 4421", status: "Warning", tone: "warning", match: 83, issues: "Venue Induction missing", fatigue: "Fit", access: "Approved" },
+  { id: "w3", name: "Michael Chen", cardId: "2846 9011 7783", status: "Blocked", tone: "danger", match: 50, issues: "Food Handling expired", fatigue: "Fit", access: "—" },
+  { id: "w4", name: "Priya Nair", cardId: "5590 3312 6679", status: "Warning", tone: "warning", match: 67, issues: "RSG expiring · Venue Induction missing", fatigue: "Fit", access: "Pending" },
   { id: "w5", name: "James Walker", cardId: "1123 5566 8890", status: "Blocked", tone: "danger", match: 40, issues: "Fatigue risk – review", fatigue: "At Risk", access: "Approved" },
   { id: "w6", name: "Emily Davies", cardId: "4471 8820 1190", status: "Eligible", tone: "success", match: 96, issues: "—", fatigue: "Fit", access: "Approved" },
   { id: "w7", name: "Lucas Martin", cardId: "3389 7745 2210", status: "Eligible", tone: "success", match: 92, issues: "—", fatigue: "Fit", access: "Approved" },
   { id: "w8", name: "Aisha Khan", cardId: "7712 0093 5567", status: "Warning", tone: "warning", match: 71, issues: "First Aid expiring", fatigue: "Fit", access: "Pending" },
   { id: "w9", name: "Tom Nguyen", cardId: "6650 2218 9034", status: "Eligible", tone: "success", match: 98, issues: "—", fatigue: "Fit", access: "Approved" },
-  { id: "w10", name: "Grace O'Brien", cardId: "2204 5561 7789", status: "Blocked", tone: "danger", match: 45, issues: "White Card expired", fatigue: "Fit", access: "—" },
+  { id: "w10", name: "Grace O'Brien", cardId: "2204 5561 7789", status: "Blocked", tone: "danger", match: 45, issues: "RSA expired", fatigue: "Fit", access: "—" },
   { id: "w11", name: "Noah Patel", cardId: "8891 3320 4456", status: "Eligible", tone: "success", match: 94, issues: "—", fatigue: "Fit", access: "Approved" },
-  { id: "w12", name: "Olivia Reed", cardId: "1147 6690 2238", status: "Warning", tone: "warning", match: 78, issues: "Site Induction missing", fatigue: "At Risk", access: "Pending" },
+  { id: "w12", name: "Olivia Reed", cardId: "1147 6690 2238", status: "Warning", tone: "warning", match: 78, issues: "Venue Induction missing", fatigue: "At Risk", access: "Pending" },
   { id: "w13", name: "Ethan Brooks", cardId: "5523 1108 7790", status: "Eligible", tone: "success", match: 90, issues: "—", fatigue: "Fit", access: "Approved" },
-  { id: "w14", name: "Mia Foster", cardId: "9930 4471 2215", status: "Blocked", tone: "danger", match: 38, issues: "Access Approval revoked", fatigue: "At Risk", access: "—" },
+  { id: "w14", name: "Mia Foster", cardId: "9930 4471 2215", status: "Blocked", tone: "danger", match: 38, issues: "RSG revoked", fatigue: "At Risk", access: "—" },
 ];
 
 const REQS: [string, number, string, Tone][] = [
-  ["Security Licence", 32, "shield", "warning"],
+  ["Food Handling", 32, "utensils", "warning"],
   ["First Aid", 34, "plus-square", "warning"],
-  ["White Card", 36, "id-card", "success"],
-  ["Site Induction", 31, "clipboard-list", "warning"],
-  ["Access Approval", 28, "key-round", "danger"],
+  ["RSA", 36, "id-card", "success"],
+  ["Venue Induction", 31, "clipboard-list", "warning"],
+  ["RSG", 28, "dice-5", "danger"],
   ["Fatigue Status", 33, "battery-medium", "warning"],
 ];
 
 const LOG: [string, string, string, Tone][] = [
-  ["Credential verified", "Security Licence", "shield-check", "success"],
-  ["Access granted", "RNSH – Security", "key-round", "success"],
-  ["Shift acknowledged", "Hospital Security Coverage", "check-circle-2", "info"],
-  ["Site induction verified", "RNSH", "clipboard-check", "success"],
+  ["Credential verified", "Food Handling", "shield-check", "success"],
+  ["Gaming access granted", "Brightwater Gaming Room", "dice-5", "success"],
+  ["Shift acknowledged", "Brightwater Friday Live", "check-circle-2", "info"],
+  ["Venue induction verified", "Brightwater Hotel", "clipboard-check", "success"],
   ["Fatigue status updated", "Fit for Duty", "battery-medium", "success"],
-  ["Eligibility check run", "36 workers scanned", "scan-search", "info"],
+  ["Eligibility check run", "36 staff scanned", "scan-search", "info"],
   ["Credential expiring soon", "First Aid · Aisha Khan", "alarm-clock", "warning"],
-  ["Access revoked", "Mia Foster", "key-round", "danger"],
+  ["RSG revoked", "Mia Foster", "dice-5", "danger"],
 ];
 
 const PAGE_SIZE = 5;
@@ -94,11 +94,11 @@ const PAGE_SIZE = 5;
 /* ---- Per-worker credential derivation ---- */
 function credsFor(w: Worker): Cred[] {
   const base: Cred[] = [
-    { name: "Security Licence", line1: "NSW · 00012345", line2: "Expires 12 May 2026", icon: "shield", state: "Verified", verified: true },
+    { name: "Food Handling", line1: "VIC · FH-0012345", line2: "Expires 12 May 2026", icon: "utensils", state: "Verified", verified: true },
     { name: "First Aid (HLTAID011)", line1: "Expires 20 Oct 2025", line2: "", icon: "plus-square", state: "Verified", verified: true },
-    { name: "White Card (CPCCWHS1001)", line1: "Expires 14 Aug 2026", line2: "", icon: "id-card", state: "Verified", verified: true },
-    { name: "Site Induction", line1: "Lendlease – RNSH", line2: "Completed 2 May 2024", icon: "clipboard-list", state: "Verified", verified: true },
-    { name: "Access Approval", line1: "RNSH – Security", line2: "Expires 30 May 2025", icon: "key-round", state: "Approved", verified: true },
+    { name: "RSA (SITHFAB021)", line1: "Expires 14 Aug 2026", line2: "", icon: "wine", state: "Verified", verified: true },
+    { name: "Venue Induction", line1: "Brightwater Hotel – Fitzroy", line2: "Completed 2 May 2024", icon: "map-pin-check", state: "Verified", verified: true },
+    { name: "RSG", line1: "VGCCC · RSG-448120", line2: "Expires 30 May 2025", icon: "dice-5", state: "Approved", verified: true },
     { name: "Fatigue Status", line1: "Fit for Duty · As at today, 6:15am", line2: "", icon: "battery-medium", state: "Fit", verified: true },
   ];
   const out = base.map((c) => ({ ...c }));
@@ -111,15 +111,15 @@ function credsFor(w: Worker): Cred[] {
     }
   };
   if (w.fatigue === "At Risk") flag("Fatigue Status", "At Risk", "Review required · today, 6:15am");
-  if (w.access === "Pending") flag("Access Approval", "Pending");
-  if (w.access === "—") flag("Access Approval", "Not Granted");
+  if (w.access === "Pending") flag("RSG", "Pending");
+  if (w.access === "—") flag("RSG", "Not Granted");
 
-  if (w.issues.includes("Security Licence")) flag("Security Licence", "Expired", "Expired 4 Apr 2024");
-  if (w.issues.includes("White Card")) flag("White Card", "Expired", "");
+  if (w.issues.includes("Food Handling")) flag("Food Handling", "Expired", "Expired 4 Apr 2024");
+  if (w.issues.includes("RSA")) flag("RSA", "Expired", "");
   if (w.issues.includes("First Aid")) flag("First Aid", "Expiring", "");
-  if (w.issues.includes("Site Induction")) flag("Site Induction", "Missing", "Not completed");
-  if (w.issues.includes("Access Approval expiring")) flag("Access Approval", "Expiring");
-  if (w.issues.includes("Access Approval revoked")) flag("Access Approval", "Revoked", "Revoked 1 May 2024");
+  if (w.issues.includes("Venue Induction")) flag("Venue Induction", "Missing", "Not completed");
+  if (w.issues.includes("Access Approval expiring")) flag("RSG", "Expiring");
+  if (w.issues.includes("RSG revoked")) flag("RSG", "Revoked", "Revoked 1 May 2024");
   return out;
 }
 
@@ -133,10 +133,10 @@ export default function CredentialsPage() {
   const [checking, setChecking] = useState(false);
 
   const [job, setJob] = useState<JobState>({
-    name: "Hospital Security Coverage",
-    site: "Royal North Shore Hospital",
+    name: "Brightwater Friday Live",
+    site: "Brightwater Hotel, Fitzroy",
     date: "Thu, 16 May 2024",
-    time: "7:00am – 3:30pm (8.5h)",
+    time: "3:00pm – 12:00am (9h)",
   });
 
   const [editOpen, setEditOpen] = useState(false);
@@ -230,12 +230,12 @@ export default function CredentialsPage() {
               <div style={{ display: "flex", alignItems: "center", gap: 9 }}><span style={{ fontSize: 16, fontWeight: 700, color: "var(--fg-1)" }}>{job.name}</span><Badge tone="success" dot>Active</Badge></div>
               <div style={{ fontSize: 12.5, color: "var(--fg-3)", marginTop: 2 }}>{job.site} · {job.date} · {job.time}</div>
             </div>
-            <Button variant="sec" size="sm" onClick={openEdit}>Edit Job</Button>
+            <Button variant="sec" size="sm" onClick={openEdit}>Edit Shift</Button>
             <Button size="sm" icon={checking ? "loader" : "scan-search"} onClick={checkEligibility}>{checking ? "Checking…" : "Check Eligibility"}</Button>
           </Card>
           {/* job requirements */}
           <Card style={{ marginBottom: 16 }}>
-            <CardHead title="Job Requirements" right={<span style={{ fontSize: 11.5, color: "var(--fg-4)", display: "inline-flex", alignItems: "center", gap: 5 }}><Icon name="refresh-cw" size={13} />Last updated: 2 mins ago</span>} />
+            <CardHead title="Shift Requirements" right={<span style={{ fontSize: 11.5, color: "var(--fg-4)", display: "inline-flex", alignItems: "center", gap: 5 }}><Icon name="refresh-cw" size={13} />Last updated: 2 mins ago</span>} />
             <div style={{ display: "grid", gridTemplateColumns: "repeat(6,1fr)", gap: 10 }}>
               {REQS.map(([n, v, icon, tone], i) => {
                 const [, , dc] = STATUS[tone];
@@ -284,7 +284,7 @@ export default function CredentialsPage() {
             <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12.5 }}>
               <thead>
                 <tr>
-                  {["Worker", "Status", "Match", "Missing / Issues", "Fatigue", "Access"].map((h) => (
+                  {["Staff", "Status", "Match", "Missing / Issues", "Fatigue", "Gaming"].map((h) => (
                     <th key={h} style={{ textAlign: "left", padding: "9px 14px", fontSize: 10.5, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".04em", color: "var(--fg-4)" }}>{h}</th>
                   ))}
                 </tr>
@@ -334,7 +334,7 @@ export default function CredentialsPage() {
         {/* worker verification panel */}
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
           <Card>
-            <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 12 }}>Worker Verification</div>
+            <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 12 }}>Staff Verification</div>
             <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12 }}>
               <Avatar name={selected.name} size={46} />
               <div><div style={{ fontSize: 15, fontWeight: 700, color: "var(--fg-1)" }}>{selected.name}</div><div className="fs-tnum" style={{ fontSize: 11.5, color: "var(--fg-4)" }}>ID: {selected.cardId}</div></div>
@@ -385,11 +385,11 @@ export default function CredentialsPage() {
         </div>
       </div>
 
-      {/* ---- Edit Job modal ---- */}
+      {/* ---- Edit Shift modal ---- */}
       <Modal
         open={editOpen}
         onClose={() => setEditOpen(false)}
-        title="Edit Job"
+        title="Edit Shift"
         size="sm"
         footer={
           <>
@@ -407,12 +407,12 @@ export default function CredentialsPage() {
               value={draft.site}
               onChange={(v) => setDraft((d) => ({ ...d, site: v }))}
               options={[
-                { label: "Royal North Shore Hospital", value: "Royal North Shore Hospital" },
-                { label: "Westmead Hospital", value: "Westmead Hospital" },
-                { label: "St Vincent's Hospital", value: "St Vincent's Hospital" },
-                { label: "Concord Repatriation Hospital", value: "Concord Repatriation Hospital" },
+                { label: "Brightwater Hotel, Fitzroy", value: "Brightwater Hotel, Fitzroy" },
+                { label: "Brightwater Gaming Room, Fitzroy", value: "Brightwater Gaming Room, Fitzroy" },
+                { label: "Northside Tavern, Brunswick", value: "Northside Tavern, Brunswick" },
+                { label: "Werribee Park Wedding (off-premise)", value: "Werribee Park Wedding (off-premise)" },
               ]}
-              placeholder="Select a site"
+              placeholder="Select a venue or site"
             />
           </Field>
           <Field label="Date">
@@ -444,7 +444,7 @@ export default function CredentialsPage() {
           {[
             ["Match Score", `${selected.match}%`, "target"],
             ["Fatigue", selected.fatigue, "battery-medium"],
-            ["Site Access", selected.access, "key-round"],
+            ["Venue Access", selected.access, "key-round"],
           ].map(([label, value, icon]) => (
             <div key={label} style={{ border: "1px solid var(--border)", borderRadius: 11, padding: 12 }}>
               <Icon name={icon} size={16} color="var(--fs-teal)" />

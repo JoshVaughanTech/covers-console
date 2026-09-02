@@ -5,8 +5,13 @@
    eligibility calls themselves — they ask the engine, which
    verifies credentials and emits an audit event.
 
-   These types are deliberately vertical-agnostic; the construction
-   credential taxonomy lives in construction.ts.
+   These types are deliberately vertical-agnostic; the hospitality
+   credential taxonomy lives in hospitality.ts.
+
+   Note on `Site`: it covers both a fixed venue (a pub, a tavern) and
+   an off-premise catering operation (a wedding, a corporate lunch).
+   Both are places with their own eligibility rules, which is all the
+   engine needs them to be.
    ============================================================ */
 
 /** A Decentralised Identifier. v1 issues did:web; opaque at the type level. */
@@ -18,17 +23,18 @@ export type ISODate = string;
 /** Effective state of a credential (mirrors a Bitstring Status List entry). */
 export type CredentialStatus = "valid" | "expired" | "revoked" | "suspended";
 
-/** Construction credential taxonomy keys — metadata in construction.ts. */
+/** Hospitality credential taxonomy keys — metadata in hospitality.ts. */
 export type CredentialTypeId =
-  | "white_card"
-  | "high_risk_work"
-  | "ewp_licence"
-  | "working_at_heights"
+  | "rsa"
+  | "rsg"
+  | "food_safety_supervisor"
+  | "food_handling"
+  | "allergen_management"
   | "first_aid"
   | "site_induction"
-  | "swms_ack";
+  | "wwcc";
 
-/** A person known to Idara (worker, supervisor, contractor…). */
+/** A person known to Idara (bar staff, chef, duty manager, casual…). */
 export interface Identity {
   did: DID;
   name: string;
@@ -47,7 +53,7 @@ export interface Credential {
   subject: DID; // the worker the credential is about
   issuer: DID; // who attested it — a regulator, an RTO, or Idara itself
   issuedAt: ISODate;
-  expiresAt: ISODate | null; // null = non-expiring (e.g. White Card)
+  expiresAt: ISODate | null; // null = non-expiring
   status: CredentialStatus;
   /** type-specific claims: licence number, class, scoped site id, … */
   claims: Record<string, string>;

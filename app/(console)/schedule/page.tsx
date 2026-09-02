@@ -55,15 +55,15 @@ interface Scenario {
   coverage: number;
   overtime: string;
 }
-/* a rostered worker, keyed by the name Idara knows them by */
+/* a rostered staff member, keyed by the name Idara knows them by */
 interface CrewRow {
   name: string;
   shifts: string[];
   total: string;
 }
 
-/* the site this roster is being built for */
-const SITE_ID = "s-melbourne";
+/* the location this roster is being built for */
+const SITE_ID = "s-brightwater";
 
 export default function SchedulePage() {
   const toast = useToast();
@@ -77,11 +77,11 @@ export default function SchedulePage() {
   const days = ["Mon\n12", "Tue\n13", "Wed\n14", "Thu\n15", "Fri\n16", "Sat\n17", "Sun\n18"];
 
   const reqMap: Record<string, number> = {
-    Carpenter: 64,
-    Electrician: 40,
-    Concreter: 36,
-    Labourer: 48,
-    "Steel Fixer": 24,
+    Bar: 64,
+    "Wait Staff": 48,
+    Kitchen: 40,
+    Functions: 36,
+    Gaming: 24,
   };
 
   // status by fill ratio (unchanged logic — now reads from state)
@@ -93,12 +93,14 @@ export default function SchedulePage() {
   };
 
   /* ---- state-backed data ---- */
+  /* weekday cover holds; the gap opens Friday night onward — late
+     and weekend shifts are the chronic hospitality staffing problem. */
   const [roster, setRoster] = useState<RosterRow[]>([
-    { role: "Carpenter", req: "Req. 64h / day", vals: [66, 64, 62, 70, 69, 40, 0] },
-    { role: "Electrician", req: "Req. 40h / day", vals: [40, 38, 40, 42, 39, 24, 0] },
-    { role: "Concreter", req: "Req. 36h / day", vals: [36, 34, 36, 33, 36, 18, 0] },
-    { role: "Labourer", req: "Req. 48h / day", vals: [48, 46, 44, 47, 48, 32, 8] },
-    { role: "Steel Fixer", req: "Req. 24h / day", vals: [24, 22, 24, 24, 20, 12, 0] },
+    { role: "Bar", req: "Req. 64h / day", vals: [64, 62, 64, 66, 70, 52, 44] },
+    { role: "Wait Staff", req: "Req. 48h / day", vals: [48, 46, 44, 47, 48, 34, 28] },
+    { role: "Kitchen", req: "Req. 40h / day", vals: [40, 38, 40, 42, 39, 30, 26] },
+    { role: "Functions", req: "Req. 36h / day", vals: [36, 34, 36, 33, 36, 24, 18] },
+    { role: "Gaming", req: "Req. 24h / day", vals: [24, 22, 24, 24, 20, 14, 12] },
   ]);
 
   const fairness: FairnessRow[] = [
@@ -132,7 +134,7 @@ export default function SchedulePage() {
     },
     {
       id: 4,
-      title: "Consider worker shift preferences",
+      title: "Consider staff shift preferences",
       sub: "7 matches available · Higher acceptance likely",
       tone: "teal",
       metric: "fairness",
@@ -140,13 +142,13 @@ export default function SchedulePage() {
   ]);
 
   const [openShifts, setOpenShifts] = useState<OpenShift[]>([
-    { id: 1, role: "Carpenter", day: "Sun, May 18", time: "7a – 3p", tone: "danger" },
-    { id: 2, role: "Carpenter", day: "Sat, May 17", time: "3p – 11p", tone: "danger" },
-    { id: 3, role: "Labourer", day: "Sun, May 18", time: "6a – 2p", tone: "warning" },
-    { id: 4, role: "Electrician", day: "Sun, May 18", time: "7a – 3p", tone: "warning" },
-    { id: 5, role: "Steel Fixer", day: "Sun, May 18", time: "7a – 3p", tone: "warning" },
-    { id: 6, role: "Labourer", day: "Sat, May 17", time: "3p – 11p", tone: "info" },
-    { id: 7, role: "Concreter", day: "Sat, May 17", time: "6a – 2p", tone: "info" },
+    { id: 1, role: "Bar", day: "Sat, May 17", time: "4p – 12a", tone: "danger" },
+    { id: 2, role: "Bar", day: "Sun, May 18", time: "11a – 7p", tone: "danger" },
+    { id: 3, role: "Wait Staff", day: "Sat, May 17", time: "4p – 12a", tone: "warning" },
+    { id: 4, role: "Gaming", day: "Sat, May 17", time: "4p – 12a", tone: "warning" },
+    { id: 5, role: "Kitchen", day: "Sun, May 18", time: "7a – 3p", tone: "warning" },
+    { id: 6, role: "Wait Staff", day: "Sun, May 18", time: "11a – 7p", tone: "info" },
+    { id: 7, role: "Functions", day: "Sat, May 17", time: "11a – 7p", tone: "info" },
   ]);
 
   // headline metrics held in state so suggestions / scenarios can nudge them
@@ -158,20 +160,20 @@ export default function SchedulePage() {
 
   /* ---- the rostered crew (Idara-backed) ---- */
   const [crew, setCrew] = useState<CrewRow[]>([
-    { name: "Sophie Nguyen", shifts: ["7a – 3p", "7a – 3p", "7a – 3p", "7a – 3p", "7a – 3p", "—", "—"], total: "40h" },
-    { name: "Darie Roberts", shifts: ["7a – 3p", "7a – 3p", "7a – 3p", "7a – 3p", "—", "7a – 3p", "—"], total: "40h" },
-    { name: "Aaron Patel", shifts: ["6a – 2p", "6a – 2p", "6a – 2p", "6a – 2p", "6a – 2p", "—", "—"], total: "40h" },
-    { name: "Priya Sharma", shifts: ["7a – 3p", "7a – 3p", "7a – 3p", "7a – 3p", "—", "—", "—"], total: "32h" },
+    { name: "Sophie Nguyen", shifts: ["11a – 7p", "11a – 7p", "11a – 7p", "11a – 7p", "11a – 7p", "—", "—"], total: "40h" },
+    { name: "Darie Roberts", shifts: ["4p – 12a", "4p – 12a", "4p – 12a", "4p – 12a", "—", "4p – 12a", "—"], total: "40h" },
+    { name: "Aaron Patel", shifts: ["4p – 12a", "4p – 12a", "4p – 12a", "4p – 12a", "4p – 12a", "—", "—"], total: "40h" },
+    { name: "Priya Sharma", shifts: ["11a – 7p", "11a – 7p", "11a – 7p", "11a – 7p", "—", "—", "—"], total: "32h" },
     { name: "Leanne Vidal", shifts: ["7a – 3p", "7a – 3p", "7a – 3p", "7a – 3p", "7a – 3p", "—", "—"], total: "40h" },
-    { name: "Jake Morrison", shifts: ["7a – 3p", "7a – 3p", "—", "7a – 3p", "7a – 3p", "—", "—"], total: "32h" },
-    { name: "Liam O'Brien", shifts: ["6a – 2p", "6a – 2p", "6a – 2p", "6a – 2p", "6a – 2p", "—", "—"], total: "40h" },
-    { name: "Michael Tan", shifts: ["3p – 11p", "3p – 11p", "3p – 11p", "3p – 11p", "—", "—", "—"], total: "32h" },
+    { name: "Jake Morrison", shifts: ["4p – 12a", "4p – 12a", "—", "4p – 12a", "4p – 12a", "—", "—"], total: "32h" },
+    { name: "Liam O'Brien", shifts: ["7a – 3p", "7a – 3p", "7a – 3p", "7a – 3p", "7a – 3p", "—", "—"], total: "40h" },
+    { name: "Michael Tan", shifts: ["11a – 7p", "11a – 7p", "11a – 7p", "11a – 7p", "—", "—", "—"], total: "32h" },
   ]);
 
   const shiftColor: Record<string, [string, string]> = {
-    "7a – 3p": ["#E6F4F2", "#075A54"],
-    "6a – 2p": ["#E8F1FC", "#1E5FB0"],
-    "3p – 11p": ["#EDEAFB", "#5B4BC4"],
+    "7a – 3p": ["#E6F4F2", "#075A54"], // open / prep
+    "11a – 7p": ["#E8F1FC", "#1E5FB0"], // day
+    "4p – 12a": ["#EDEAFB", "#5B4BC4"], // evening / close
   };
 
   /* eligibility per crew member — live preview from Idara (no audit) */
@@ -226,7 +228,7 @@ export default function SchedulePage() {
       recordPublish(SITE_ID, result); // the blocked attempt is itself audited
       setGate(result);
       toast(
-        `Publish blocked — ${result.blocked.length} ineligible worker${result.blocked.length === 1 ? "" : "s"}`,
+        `Publish blocked — ${result.blocked.length} ineligible staff member${result.blocked.length === 1 ? "" : "s"}`,
         { tone: "danger", icon: "shield-alert" },
       );
       return;
@@ -234,7 +236,7 @@ export default function SchedulePage() {
 
     const ok = await confirm({
       title: "Publish roster?",
-      body: `All ${result.eligible.length} rostered workers are credential-verified for ${siteName}. This notifies staff and locks the schedule for the week of May 12 – May 18.`,
+      body: `All ${result.eligible.length} rostered staff are credential-verified for ${siteName}. This notifies staff and locks the schedule for the week of May 12 – May 18.`,
       confirmLabel: "Publish",
       tone: "teal",
     });
@@ -244,12 +246,12 @@ export default function SchedulePage() {
     toast(
       result.warnings.length
         ? `Roster published — ${result.warnings.length} expiring-credential warning${result.warnings.length === 1 ? "" : "s"} flagged`
-        : "Roster published — all workers verified by Idara",
+        : "Roster published — all staff verified by Idara",
       { tone: "success", icon: "check" },
     );
   };
 
-  // resolve the gate by publishing only the eligible workers
+  // resolve the gate by publishing only the eligible staff
   const publishEligibleOnly = () => {
     if (!gate) return;
     const eligibleNames = new Set(gate.eligible.map((d) => d.context.subjectName));
@@ -261,7 +263,7 @@ export default function SchedulePage() {
     setPublished(nowLabel());
     setGate(null);
     toast(
-      `Published ${result.eligible.length} verified worker${result.eligible.length === 1 ? "" : "s"} — ${removed} removed`,
+      `Published ${result.eligible.length} verified staff member${result.eligible.length === 1 ? "" : "s"} — ${removed} removed`,
       { tone: "success", icon: "check" },
     );
   };
@@ -427,7 +429,7 @@ export default function SchedulePage() {
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12.5 }}>
             <thead>
               <tr>
-                <th style={{ textAlign: "left", padding: "8px 16px", fontSize: 10.5, fontWeight: 700, textTransform: "uppercase", color: "var(--fg-4)" }}>Worker</th>
+                <th style={{ textAlign: "left", padding: "8px 16px", fontSize: 10.5, fontWeight: 700, textTransform: "uppercase", color: "var(--fg-4)" }}>Staff</th>
                 {["M", "T", "W", "T", "F", "S", "S"].map((d, i) => <th key={i} style={{ padding: "8px 4px", fontSize: 11, color: "var(--fg-4)", fontWeight: 600 }}>{d}</th>)}
                 <th style={{ padding: "8px 8px", fontSize: 10.5, fontWeight: 700, textTransform: "uppercase", color: "var(--fg-4)", textAlign: "right" }}>Total</th>
                 <th style={{ padding: "8px 12px", fontSize: 10.5, fontWeight: 700, textTransform: "uppercase", color: "var(--fg-4)", textAlign: "right" }}>Eligibility</th>
@@ -460,7 +462,7 @@ export default function SchedulePage() {
           {blockedCount > 0 && (
             <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "11px 16px", borderTop: "1px solid var(--border)", background: "var(--danger-bg)", fontSize: 12.5, color: "var(--danger-fg)" }}>
               <Icon name="shield-alert" size={15} />
-              {blockedCount} worker{blockedCount === 1 ? "" : "s"} can&apos;t be rostered until credentials are resolved — Idara will block publish.
+              {blockedCount} staff member{blockedCount === 1 ? "" : "s"} can&apos;t be rostered until credentials are resolved — Idara will block publish.
             </div>
           )}
         </Card>
@@ -536,7 +538,7 @@ export default function SchedulePage() {
             <div style={{ display: "flex", alignItems: "flex-start", gap: 10, padding: "12px 14px", borderRadius: 10, background: "var(--danger-bg)", marginBottom: 14 }}>
               <Icon name="shield-alert" size={18} color="var(--danger-fg)" />
               <div style={{ fontSize: 13, color: "var(--danger-fg)" }}>
-                {gate.blocked.length} of {gate.decisions.length} rostered workers are not eligible for {siteName}. A roster can&apos;t be published with a non-compliant worker on site — this attempt has been written to the audit log.
+                {gate.blocked.length} of {gate.decisions.length} rostered staff are not eligible for {siteName}. A roster can&apos;t be published with a non-compliant staff member on shift — this attempt has been written to the audit log.
               </div>
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>

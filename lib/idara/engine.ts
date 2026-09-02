@@ -10,7 +10,7 @@
    writing to the audit log (previews are not; a publish is).
    ============================================================ */
 
-import { CREDENTIAL_TYPES } from "./construction";
+import { CREDENTIAL_TYPES } from "./hospitality";
 import type { CredentialVerifier } from "./verifier";
 import type {
   Action,

@@ -46,12 +46,12 @@ const ROLES: SelectOption[] = [
   { label: "Owner", value: "owner" },
   { label: "Administrator", value: "admin" },
   { label: "Scheduling Manager", value: "manager" },
-  { label: "Site Supervisor", value: "supervisor" },
+  { label: "Venue Manager", value: "supervisor" },
   { label: "Viewer", value: "viewer" },
 ];
 
 const INDUSTRIES: SelectOption[] = [
-  { label: "Construction", value: "construction" },
+  { label: "Hospitality", value: "hospitality" },
   { label: "Aged & Disability Care", value: "care" },
   { label: "Security Services", value: "security" },
   { label: "Facilities & Maintenance", value: "facilities" },
@@ -59,11 +59,11 @@ const INDUSTRIES: SelectOption[] = [
 ];
 
 const SITES: SelectOption[] = [
-  { label: "Melbourne Site", value: "melbourne" },
-  { label: "Port Melbourne", value: "port-melbourne" },
-  { label: "Brisbane Warehouse", value: "brisbane" },
-  { label: "Sydney CBD Tower", value: "sydney" },
-  { label: "Perth Civic Centre", value: "perth" },
+  { label: "Brightwater Hotel", value: "brightwater" },
+  { label: "Brightwater Gaming Room", value: "brightwater-gaming" },
+  { label: "Northside Tavern", value: "northside" },
+  { label: "Quayside Bar & Kitchen", value: "quayside" },
+  { label: "Off-premise catering", value: "off-premise" },
 ];
 
 const FAIRNESS: SelectOption[] = [
@@ -98,7 +98,7 @@ interface NotiState {
 }
 
 const NOTI_DEFS: NotiDef[] = [
-  { key: "emailDigests", title: "Email digests", sub: "Daily summary of activity across your sites", icon: "mail" },
+  { key: "emailDigests", title: "Email digests", sub: "Daily summary of activity across your venues", icon: "mail" },
   { key: "credentialAlerts", title: "Credential alerts", sub: "Expiring licences, tickets and inductions", icon: "shield-alert" },
   { key: "lateClockIn", title: "Late clock-in alerts", sub: "Notify when a worker is more than 10m late", icon: "clock" },
   { key: "rosterPublished", title: "Roster published", sub: "When a roster goes live to your workforce", icon: "calendar-check" },
@@ -231,9 +231,9 @@ export default function SettingsPage() {
   /* ---- Company ---- */
   const [companyForm, setCompanyForm] = useState({
     abn: "53 004 085 616",
-    industry: "construction",
+    industry: "hospitality",
     address: "Level 4, 120 Collins Street\nMelbourne VIC 3000\nAustralia",
-    defaultSite: "melbourne",
+    defaultSite: "brightwater",
   });
 
   /* ---- Notifications ---- */
@@ -343,7 +343,7 @@ export default function SettingsPage() {
             <Field label="Industry">
               <Select value={companyForm.industry} onChange={(v) => setCompanyForm({ ...companyForm, industry: v })} options={INDUSTRIES} />
             </Field>
-            <Field label="Default site">
+            <Field label="Default venue">
               <Select value={companyForm.defaultSite} onChange={(v) => setCompanyForm({ ...companyForm, defaultSite: v })} options={SITES} />
             </Field>
           </div>

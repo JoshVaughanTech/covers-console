@@ -6,7 +6,7 @@
 > needed, often as a **zero-knowledge proof**. Account abstraction makes the
 > wallet usable by people who will never touch crypto.
 >
-> The construction/FairShift app is **Idara's first relying party** — the
+> The hospitality/FairShift app is **Idara's first relying party** — the
 > bootstrapping wedge, not the product.
 
 ---
@@ -46,8 +46,8 @@ the Australian Privacy Act, since an immutable ledger can't honour erasure).
 The reason every prior decentralised-identity effort stalled is this triangle is
 three-sided: no wallets without issuers, no issuers without relying parties, no
 relying parties without wallets. **We break the deadlock by owning all three
-sides inside one closed loop first** (construction: Idara issues inductions,
-workers hold wallets, sites verify), then opening each side outward.
+sides inside one closed loop first** (hospitality: Idara issues venue
+inductions, staff hold wallets, venues verify), then opening each side outward.
 
 ---
 
@@ -68,7 +68,7 @@ workers hold wallets, sites verify), then opening each side outward.
 - **Consent UI** — every disclosure is an explicit, legible user approval.
 
 ### Issuer service (Idara + delegated issuers)
-- **OpenID4VCI** issuance endpoint; signs VCs (e.g. White Card verified, Site
+- **OpenID4VCI** issuance endpoint; signs VCs (e.g. RSA verified, Venue
   Induction completed).
 - Writes **revocation / issuer state** roots to the ledger.
 - Issuer keys via `did:web` (domain-anchored, human-trustable).
@@ -84,7 +84,7 @@ workers hold wallets, sites verify), then opening each side outward.
 
 ### On-chain contracts (L2, PII-free)
 - **Issuer trust registry** — which DIDs may issue which credential types
-  (e.g. "SafeWork → White Card"). Relying parties anchor trust here.
+  (e.g. "Liquor Control Victoria → RSA"). Relying parties anchor trust here.
 - **Revocation / issuer-state registry** — Merkle/sparse-Merkle roots; holders
   prove **non-revocation in ZK** against the current root.
 - **ZK verifier contracts** — Groth16/PLONK verifiers for on-chain checks.
@@ -102,14 +102,14 @@ workers hold wallets, sites verify), then opening each side outward.
 
 ### A. Issuance (issue → hold)
 ```
-Idara verifies a fact (e.g. White Card check) ─▶ Issuer signs a VC (SD-JWT/ZK form)
+Idara verifies a fact (e.g. an RSA check) ─▶ Issuer signs a VC (SD-JWT/ZK form)
    ─▶ OpenID4VCI offer (QR/deeplink) ─▶ wallet pulls + stores VC
    ─▶ issuer state/revocation root updated on-chain
 ```
 
 ### B. Presentation (present → verify), privacy-preserving
 ```
-Relying party builds a request: "valid White Card AND unexpired Site-A induction"
+Relying party builds a request: "valid RSA AND unexpired induction for this venue"
    ─▶ OpenID4VP request ─▶ wallet asks user to consent
    ─▶ wallet generates ZK PROOF: "I hold valid, non-revoked credentials
        satisfying this predicate" — WITHOUT revealing card numbers, other
@@ -202,6 +202,11 @@ The key insight: **the eligibility/policy brain we built doesn't change; only th
 source of truth under it changes** — from "a row in our database" to "a
 cryptographically verified, user-consented, possibly zero-knowledge proof."
 
+The same holds for the vertical. `lib/idara/hospitality.ts` is the only file that
+knows what an RSA is; the engine, verifier and audit chain never learn the
+vocabulary. Swapping industries swaps that one file plus its seed data — which is
+exactly how this console moved from construction to hospitality.
+
 ---
 
 ## 8. Phased build order (so we don't boil the ocean)
@@ -215,7 +220,7 @@ cryptographically verified, user-consented, possibly zero-knowledge proof."
 3. **Add ZK.** Swap SD-JWT presentations for ZK predicate + non-revocation proofs
    (Iden3/Privado). Unlinkability + minimal disclosure.
 4. **Open the sides.** External issuers (RTOs, regulators); external relying
-   parties via the SDK; generalise beyond construction.
+   parties via the SDK; generalise beyond hospitality.
 
 > Account abstraction belongs in **phase 1** (it's the usability unlock).
 > ZK belongs in **phase 3** (it's the privacy/differentiation unlock). Building
@@ -227,7 +232,7 @@ cryptographically verified, user-consented, possibly zero-knowledge proof."
 
 - **Three-sided cold-start** — mitigated only by the closed-loop wedge.
 - **On-device ZK proving** can be slow/heavy on cheap Android hardware — measure
-  early; it's a real UX constraint for a construction workforce.
+  early; it's a real UX constraint for a casualised hospitality workforce.
 - **Bleeding-edge surface area** — AA + ZK + SSI are each immature; leaning on
   Safe/ZeroDev and Iden3/Privado instead of hand-rolling is non-negotiable.
 - **Key recovery is existential** — losing keys must never mean losing identity;

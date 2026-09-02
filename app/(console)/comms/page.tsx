@@ -121,57 +121,57 @@ function seedMessages(intro: string): Msg[] {
 const INITIAL_ROOMS: Room[] = [
   {
     id: "r1",
-    name: "Commercial Build – Level 3",
-    site: "Barangaroo South · Tower B",
+    name: "Brightwater — Friday Live",
+    site: "Brightwater Hotel · Main Bar",
     ago: "2m",
     unread: 12,
     icon: "building-2",
     live: false,
-    time: "Today, 7:00am – 3:00pm",
-    jobNo: "J-48102",
-    pinned: "Concrete pour scheduled 9am — clear Level 3 deck beforehand.",
-    messages: seedMessages("Morning team — pour starts at 9. Confirm formwork sign-off before then."),
+    time: "Today, 3:00pm – 12:00am",
+    jobNo: "FN-2035",
+    pinned: "Band on at 8pm — bar fully stocked and RSA sign-on complete by 3:45pm.",
+    messages: seedMessages("Afternoon team — doors at 4, band on at 8. Confirm your RSA sign-on before service."),
   },
   {
     id: "r2",
-    name: "Crown Event Security",
-    site: "Crown Sydney · Main Floor",
+    name: "Werribee Wedding — Event Crew",
+    site: "Werribee Park Mansion · Marquee",
     ago: "5m",
     unread: 8,
     icon: "shield",
     live: true,
     time: "Today, 6:00pm – 2:00am",
-    jobNo: "J-48291",
-    pinned: "Site access change: Use Staff Entry B from 6pm tonight. Full details in Brief.",
+    jobNo: "FN-2041",
+    pinned: "Access change: staff park at the service gate from 6pm. Full details in the run sheet.",
     messages: seedMessages(
-      "Team, doors open at 6pm. Please review the brief and check your positions. Let me know if you have any questions."
+      "Team, guests arrive 6pm. Please review the run sheet and check your section. Let me know if you have any questions."
     ),
   },
   {
     id: "r3",
-    name: "Retail Fitout – Level 1",
-    site: "Chadstone · Zone A",
+    name: "Northside — Kitchen & Floor",
+    site: "Northside Tavern · Bistro",
     ago: "18m",
     unread: 3,
     icon: "briefcase",
     live: false,
-    time: "Today, 8:00am – 4:00pm",
-    jobNo: "J-47980",
-    pinned: "Deliveries via loading dock 4 only. Trolleys to be returned after each run.",
-    messages: seedMessages("Fitout crew — shelving units arriving 10am. Stage them in Zone A."),
+    time: "Today, 10:00am – 6:00pm",
+    jobNo: "FN-2033",
+    pinned: "Deliveries via the rear laneway only. Cool room to be logged after each run.",
+    messages: seedMessages("Kitchen — produce delivery lands 10am. Stage it in the cool room and log temps."),
   },
   {
     id: "r4",
-    name: "Maintenance – Site Wide",
-    site: "Multiple Locations",
+    name: "All Venues — Ops",
+    site: "All Venues",
     ago: "1h",
     unread: 2,
     icon: "wrench",
     live: false,
     time: "Today, 6:00am – 2:00pm",
-    jobNo: "J-47744",
-    pinned: "Log all completed jobs in the maintenance tracker before clocking off.",
-    messages: seedMessages("Maintenance rounds start at 6. HVAC checks are priority this morning."),
+    jobNo: "FN-2055",
+    pinned: "Log cellar and cool-room temps in the compliance tracker before clocking off.",
+    messages: seedMessages("Cellar checks start at 6. Keg lines and glasswasher are the priority this morning."),
   },
 ];
 
@@ -191,7 +191,7 @@ const INITIAL_TASKS: TaskItem[] = [
 ];
 
 const FILES: [string, string, string, string][] = [
-  ["Site Brief – Crown Event.pdf", "PDF · 1.4 MB", "file-text", "Jason Miller"],
+  ["Run Sheet – Werribee Wedding.pdf", "PDF · 1.4 MB", "file-text", "Jason Miller"],
   ["Floor Plan – Main Floor.png", "Image · 820 KB", "image", "Ops Team"],
   ["Emergency Procedures.docx", "Doc · 240 KB", "file-text", "HSE"],
   ["Roster – Tonight.xlsx", "Sheet · 96 KB", "table", "Scheduling"],
@@ -246,14 +246,14 @@ export default function CommsPage() {
   const overview: [string, string, string, string, Tone][] = [
     ["Unread Messages", "18", "+6 new", "message-square", "info"],
     ["Urgent Alerts", "3", "Requires attention", "triangle-alert", "danger"],
-    ["Pending Acknowledgements", "12", "Job briefs & announcements", "clipboard-check", "warning"],
+    ["Pending Acknowledgements", "12", "Function briefs & announcements", "clipboard-check", "warning"],
     ["Handover Notes", "7", "Awaiting review", "notebook-pen", "teal"],
   ];
 
   const instr = [
     "Arrive 15 mins early for briefing",
     "Wear full uniform & ID at all times",
-    "Use Staff Entry B after 6pm",
+    "Sign the RSA register before service",
     "Report incidents immediately",
   ];
 
@@ -344,7 +344,7 @@ export default function CommsPage() {
       icon: "building-2",
       live: false,
       time,
-      jobNo: `J-${Math.floor(40000 + Math.random() * 9999)}`,
+      jobNo: `FN-${Math.floor(2000 + Math.random() * 999)}`,
       pinned: "New room created. Add a pinned brief to get started.",
       messages: [
         {
@@ -364,7 +364,7 @@ export default function CommsPage() {
     setNewName("");
     setNewSite("");
     setNewTime("");
-    toast(`Job room "${name}" created`, { tone: "success", icon: "circle-check" });
+    toast(`Function room "${name}" created`, { tone: "success", icon: "circle-check" });
   }
 
   function addPeople() {
@@ -396,7 +396,7 @@ export default function CommsPage() {
 
   return (
     <div>
-      <PageHead title="Communications" sub="Job-based communication, real-time updates and accountability." />
+      <PageHead title="Communications" sub="Function and venue communication, real-time updates and accountability." />
       <div style={{ display: "grid", gridTemplateColumns: "300px 1fr 318px", gap: 16, alignItems: "start" }}>
         {/* LEFT */}
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
@@ -419,7 +419,7 @@ export default function CommsPage() {
             </div>
           </Card>
           <Card pad={16}>
-            <CardHead title="Active Job Rooms" right={<LinkBtn onClick={() => toast("Showing all job rooms", { tone: "info" })}>View all rooms</LinkBtn>} />
+            <CardHead title="Active Function Rooms" right={<LinkBtn onClick={() => toast("Showing all function rooms", { tone: "info" })}>View all rooms</LinkBtn>} />
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
               {rooms.map((r) => {
                 const isActive = r.id === activeId;
@@ -438,14 +438,14 @@ export default function CommsPage() {
                 );
               })}
             </div>
-            <Button variant="sec" size="sm" icon="plus" style={{ width: "100%", marginTop: 12 }} onClick={() => setRoomOpen(true)}>Create Job Room</Button>
+            <Button variant="sec" size="sm" icon="plus" style={{ width: "100%", marginTop: 12 }} onClick={() => setRoomOpen(true)}>Create Function Room</Button>
           </Card>
         </div>
 
         {/* CENTER — chat */}
         <Card pad={0} style={{ display: "flex", flexDirection: "column", minHeight: 620 }}>
           <div style={{ padding: "14px 18px", borderBottom: "1px solid var(--border)" }}>
-            <div style={{ fontSize: 11.5, color: "var(--fg-4)", display: "flex", alignItems: "center", gap: 6, marginBottom: 5 }}>Job Rooms <Icon name="chevron-right" size={12} /> <span style={{ color: "var(--fs-teal)", fontWeight: 600 }}>{active.name}</span></div>
+            <div style={{ fontSize: 11.5, color: "var(--fg-4)", display: "flex", alignItems: "center", gap: 6, marginBottom: 5 }}>Function Rooms <Icon name="chevron-right" size={12} /> <span style={{ color: "var(--fs-teal)", fontWeight: 600 }}>{active.name}</span></div>
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
               <h3 style={{ margin: 0, fontSize: 20 }}>{active.name}</h3>
               {active.live && <Badge tone="success" dot>Live</Badge>}
@@ -456,7 +456,7 @@ export default function CommsPage() {
             <div style={{ display: "flex", alignItems: "center", gap: 14, fontSize: 12, color: "var(--fg-3)", marginTop: 7 }}>
               <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}><Icon name="map-pin" size={13} color="var(--fg-4)" />{active.site}</span>
               <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}><Icon name="clock" size={13} color="var(--fg-4)" />{active.time}</span>
-              <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}><Icon name="hash" size={13} color="var(--fg-4)" />Job #{active.jobNo}</span>
+              <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}><Icon name="hash" size={13} color="var(--fg-4)" />Function #{active.jobNo}</span>
             </div>
             <div style={{ display: "flex", gap: 18, marginTop: 12, fontSize: 13 }}>
               {CHANNELS.map((t) => {
@@ -485,7 +485,7 @@ export default function CommsPage() {
                   <div key={m.id} style={{ display: "flex", gap: 10 }}>
                     <Avatar name={m.name.replace(" (You)", "")} size={32} />
                     <div style={{ flex: 1 }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 3 }}><span style={{ fontSize: 12.5, fontWeight: 700, color: "var(--fg-1)" }}>{m.name}</span>{m.supervisor && <Badge tone="teal" style={{ padding: "1px 7px", fontSize: 10 }}>Supervisor</Badge>}<span style={{ fontSize: 11, color: "var(--fg-4)" }}>{m.time}</span></div>
+                      <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 3 }}><span style={{ fontSize: 12.5, fontWeight: 700, color: "var(--fg-1)" }}>{m.name}</span>{m.supervisor && <Badge tone="teal" style={{ padding: "1px 7px", fontSize: 10 }}>Duty Manager</Badge>}<span style={{ fontSize: 11, color: "var(--fg-4)" }}>{m.time}</span></div>
                       <div style={{ background: "#fff", border: "1px solid var(--border)", borderRadius: 12, padding: "9px 13px", fontSize: 13, color: "var(--fg-2)", maxWidth: 460, lineHeight: 1.45 }}>{m.text}</div>
                       <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 5 }}>
                         {m.reactions.map((r) => (
@@ -565,7 +565,7 @@ export default function CommsPage() {
               </div>
               <div style={{ background: "#fff", border: "1px solid var(--border)", borderRadius: 12, padding: 14 }}>
                 <div style={{ fontSize: 12.5, fontWeight: 700, color: "var(--fg-1)", marginBottom: 6 }}>Shift details</div>
-                <div style={{ fontSize: 12.5, color: "var(--fg-3)" }}>{active.site} · {active.time} · Job #{active.jobNo}</div>
+                <div style={{ fontSize: 12.5, color: "var(--fg-3)" }}>{active.site} · {active.time} · Function #{active.jobNo}</div>
               </div>
             </div>
           )}
@@ -576,7 +576,7 @@ export default function CommsPage() {
                 <Icon name="pin" size={15} color="var(--fs-teal-700)" /><span style={{ fontSize: 13, color: "var(--fs-teal-700)", flex: 1, lineHeight: 1.5 }}><b>Pinned brief</b> · {active.pinned}</span>
               </div>
               <div style={{ background: "#fff", border: "1px solid var(--border)", borderRadius: 12, padding: 16 }}>
-                <h4 style={{ margin: "0 0 10px", fontSize: 14 }}>Site Instructions</h4>
+                <h4 style={{ margin: "0 0 10px", fontSize: 14 }}>Venue & Site Instructions</h4>
                 <div style={{ display: "flex", flexDirection: "column", gap: 9 }}>{instr.map((t) => <Check key={t}>{t}</Check>)}</div>
               </div>
             </div>
@@ -635,12 +635,12 @@ export default function CommsPage() {
             <div style={{ display: "flex", alignItems: "center", marginBottom: 12 }}><h4 style={{ margin: 0, fontSize: 14.5, flex: 1 }}>Assigned Team (11)</h4><LinkBtn onClick={() => toast("Viewing assigned team", { tone: "info" })}>View all</LinkBtn></div>
             <AvatarStack names={["Jason Miller", "Sophie Nguyen", "Liam Patel", "Priya Shah", "Ana Reed", "Ben Cole", "Cara Vu"]} size={32} max={6} extra={6} />
             <div style={{ marginTop: 14, paddingTop: 12, borderTop: "1px solid var(--border)" }}>
-              <div style={{ fontSize: 11, color: "var(--fg-4)", fontWeight: 700, textTransform: "uppercase", letterSpacing: ".04em", marginBottom: 8 }}>Supervisor</div>
+              <div style={{ fontSize: 11, color: "var(--fg-4)", fontWeight: 700, textTransform: "uppercase", letterSpacing: ".04em", marginBottom: 8 }}>Duty Manager</div>
               <div style={{ display: "flex", alignItems: "center", gap: 10 }}><Avatar name="Jason Miller" size={34} /><div style={{ flex: 1 }}><div style={{ fontSize: 13, fontWeight: 700, color: "var(--fg-1)" }}>Jason Miller</div><div className="fs-tnum" style={{ fontSize: 11, color: "var(--fg-4)" }}>0401 234 567</div></div><button type="button" aria-label="Call supervisor" onClick={() => toast("Calling Jason Miller", { tone: "teal", icon: "phone" })} style={{ border: 0, background: "transparent", cursor: "pointer", padding: 4, display: "inline-flex" }}><Icon name="phone" size={16} color="var(--fs-teal)" /></button></div>
             </div>
           </Card>
           <Card pad={16}>
-            <div style={{ display: "flex", alignItems: "center", marginBottom: 4 }}><h4 style={{ margin: 0, fontSize: 14, flex: 1 }}>Job Brief Acknowledgement</h4></div>
+            <div style={{ display: "flex", alignItems: "center", marginBottom: 4 }}><h4 style={{ margin: 0, fontSize: 14, flex: 1 }}>Function Brief Acknowledgement</h4></div>
             <div style={{ fontSize: 11.5, color: "var(--fg-3)", marginBottom: 8 }}>{ackdCount} / {ackTotal} acknowledged</div>
             <Bar value={ackPct} color="var(--success)" />
             <div style={{ display: "flex", flexDirection: "column", gap: 9, marginTop: 12 }}>
@@ -665,7 +665,7 @@ export default function CommsPage() {
             <LinkBtn onClick={() => toast("Showing all acknowledgements", { tone: "info" })}>+ 7 more</LinkBtn>
           </Card>
           <Card pad={16}>
-            <h4 style={{ margin: "0 0 10px", fontSize: 14 }}>Site Instructions</h4>
+            <h4 style={{ margin: "0 0 10px", fontSize: 14 }}>Venue & Site Instructions</h4>
             <div style={{ display: "flex", flexDirection: "column", gap: 9 }}>{instr.map((t) => <Check key={t}>{t}</Check>)}</div>
             <Button variant="sec" size="sm" style={{ width: "100%", marginTop: 12 }} onClick={() => setChannel("Brief")}>View full site instructions</Button>
           </Card>
@@ -680,7 +680,7 @@ export default function CommsPage() {
       <Modal
         open={roomOpen}
         onClose={() => setRoomOpen(false)}
-        title="Create Job Room"
+        title="Create Function Room"
         size="sm"
         footer={
           <>
@@ -693,7 +693,7 @@ export default function CommsPage() {
           <Field label="Room name">
             <TextField value={newName} onChange={setNewName} placeholder="e.g. Stadium Event Security" icon="users" />
           </Field>
-          <Field label="Site / location">
+          <Field label="Venue / site">
             <TextField value={newSite} onChange={setNewSite} placeholder="e.g. Olympic Park · Gate 4" icon="map-pin" />
           </Field>
           <Field label="Shift time">
