@@ -6,18 +6,17 @@
    so the engine and the Publish gate have something real to
    enforce.
 
-   Locations cover both halves of the industry: three fixed
-   venues (including a separately-licensed gaming room) and two
+   Locations cover both halves of the industry: four fixed venues
+   (including a separately-licensed gaming room) and two
    off-premise catering operations. The same person moves
    between them carrying the same RSA but a different induction,
    which is the portability argument in miniature.
 
-   Simplification worth naming: every location here requires RSA
-   of everyone rostered. In reality RSA binds only those serving
-   alcohol, so a kitchen hand wouldn't need one — modelling that
-   properly needs role-scoped requirements, which the engine
-   doesn't do yet. Venues that require RSA of all floor-capable
-   staff are common enough that this stays defensible.
+   Requirements are role-scoped: RSA binds to whoever serves
+   alcohol, food handling to whoever touches food, RSG to gaming.
+   Hassan Ali is the proof — a Head Chef holding no RSA who is
+   still eligible, because the licence was never owed by the
+   kitchen.
 
    TODAY is the demo clock; it lines up with the date pills in
    the console chrome so decisions are deterministic.
@@ -54,7 +53,11 @@ export const SITES: Site[] = [
     id: "s-brightwater-gaming",
     name: "Brightwater Gaming Room",
     region: "Fitzroy",
-    // same building as the hotel, separately licensed — RSG on top
+    // Same building as the hotel, separately licensed — RSG on top, and
+    // deliberately NOT role-scoped: being rostered into the gaming room is
+    // itself the gaming duty, whatever the person's usual title. Where a
+    // location implies the duty, the location scopes the requirement; role
+    // scoping is for requirements that differ between people at one place.
     requires: [...BASE_REQUIREMENTS, { type: "rsg" }],
   },
   {
@@ -62,7 +65,7 @@ export const SITES: Site[] = [
     name: "Northside Tavern",
     region: "Brunswick",
     // full kitchen: supervised food handling
-    requires: [...BASE_REQUIREMENTS, { type: "food_safety_supervisor" }],
+    requires: [...BASE_REQUIREMENTS, { type: "food_safety_supervisor", appliesTo: ["handle_food"] }],
   },
   {
     id: "s-quayside",
@@ -77,15 +80,15 @@ export const SITES: Site[] = [
     // plated event, declared dietaries, food transported to site
     requires: [
       ...BASE_REQUIREMENTS,
-      { type: "allergen_management" },
-      { type: "food_safety_supervisor" },
+      { type: "allergen_management", appliesTo: ["handle_food"] },
+      { type: "food_safety_supervisor", appliesTo: ["handle_food"] },
     ],
   },
   {
     id: "s-docklands-lunch",
     name: "Docklands Corporate Lunch",
     region: "Off-premise",
-    requires: [...BASE_REQUIREMENTS, { type: "allergen_management" }],
+    requires: [...BASE_REQUIREMENTS, { type: "allergen_management", appliesTo: ["handle_food"] }],
   },
 ];
 
@@ -181,8 +184,9 @@ export const CREDENTIALS: Credential[] = [
   cred(W["Jake Morrison"], "site_induction", ISSUERS.idara, "2024-09-30", { claims: { siteId: "s-brightwater" } }),
   cred(W["Jake Morrison"], "food_handling", ISSUERS.rto, "2025-03-01"),
 
-  // Hassan — head chef; inducted for the wedding but lacks allergen + FSS
-  cred(W["Hassan Ali"], "rsa", ISSUERS.liquor, "2025-05-20", { claims: { cert: "RSA-778116" } }),
+  // Hassan — head chef, holds NO RSA and doesn't need one: the licence binds
+  // to alcohol service, not to the kitchen. Inducted for the wedding, but
+  // lacks the allergen and FSS tickets that off-premise catering demands.
   cred(W["Hassan Ali"], "site_induction", ISSUERS.idara, "2024-10-05", { claims: { siteId: "s-brightwater" } }),
   cred(W["Hassan Ali"], "site_induction", ISSUERS.idara, "2024-12-01", { claims: { siteId: "s-werribee-wedding" } }),
   cred(W["Hassan Ali"], "food_handling", ISSUERS.rto, "2025-11-01"),

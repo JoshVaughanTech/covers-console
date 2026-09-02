@@ -165,6 +165,9 @@ export default function SchedulePage() {
     { name: "Aaron Patel", shifts: ["4p – 12a", "4p – 12a", "4p – 12a", "4p – 12a", "4p – 12a", "—", "—"], total: "40h" },
     { name: "Priya Sharma", shifts: ["11a – 7p", "11a – 7p", "11a – 7p", "11a – 7p", "—", "—", "—"], total: "32h" },
     { name: "Leanne Vidal", shifts: ["7a – 3p", "7a – 3p", "7a – 3p", "7a – 3p", "7a – 3p", "—", "—"], total: "40h" },
+    // head chef: holds no RSA and doesn't need one — the licence binds to
+    // alcohol service, so he clears the gate on induction + food handling
+    { name: "Hassan Ali", shifts: ["7a – 3p", "7a – 3p", "7a – 3p", "7a – 3p", "7a – 3p", "—", "—"], total: "40h" },
     { name: "Jake Morrison", shifts: ["4p – 12a", "4p – 12a", "—", "4p – 12a", "4p – 12a", "—", "—"], total: "32h" },
     { name: "Liam O'Brien", shifts: ["7a – 3p", "7a – 3p", "7a – 3p", "7a – 3p", "7a – 3p", "—", "—"], total: "40h" },
     { name: "Michael Tan", shifts: ["11a – 7p", "11a – 7p", "11a – 7p", "11a – 7p", "—", "—", "—"], total: "32h" },

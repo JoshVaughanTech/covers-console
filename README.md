@@ -86,12 +86,27 @@ themselves — they ask the engine, and consequential answers land in the audit 
 | `verifier.ts` | The `CredentialVerifier` seam — the single place "is this credential real and current?" is answered. |
 | `audit.ts` | Append-only, SHA-256 hash-chained log; `verifyChain()` reports the first broken link. |
 | `hash.ts` | SHA-256 + canonical (key-sorted) JSON, so hashes survive a serialisation round-trip. |
-| `hospitality.ts` | The hospitality credential taxonomy. Swapping verticals = swapping this file. |
+| `hospitality.ts` | The hospitality credential taxonomy + the role → duty map. Swapping verticals = swapping this file. |
 | `seed.ts` | Demo dataset — deliberately mixed: eligible, expiring, and blocked staff. |
 | `provider.tsx` | React binding: `useIdara()`, the publish gate, credential revocation. |
 
 Roster eligibility, verified clock-in, function-room access and verified sign-off are all
 the same `decide()` call with a different `action`.
+
+**Requirements bind to duties, not job titles.** A `CredentialRequirement` can carry
+`appliesTo: WorkFunction[]` — `serve_alcohol`, `handle_food`, `gaming`, `supervise` — so
+RSA is owed by whoever pours and not by the kitchen. Titles drift between venues
+("Bartender" / "Bar Attendant") while the duty that triggers a legal obligation doesn't,
+so `ROLE_FUNCTIONS` maps titles to duties inside the vertical pack and the engine stays
+ignorant of bars and kitchens. Two rules make it safe to rely on:
+
+- **Unknown titles fail safe** — a role the pack doesn't recognise is treated as doing
+  everything, so it can only ever be over-checked, never under-checked.
+- **Skipped requirements are recorded**, not dropped: `CheckOutcome` includes `"n/a"`, so
+  the trail says *"RSA not required for Head Chef"* rather than falling silent.
+
+Where a location *implies* the duty, the location scopes it instead — RSG is unscoped at
+the gaming room, because being rostered there is the gaming duty whatever your title.
 
 **The publish gate** is the load-bearing demo: `/schedule` → *Publish Roster* runs the
 engine over every rostered staff member, and a roster containing someone non-compliant
@@ -102,11 +117,13 @@ In the seeded week that means three blocks for three different reasons: an **exp
 RSA**, a **missing venue induction**, and an **RSA revoked by the regulator** — plus a
 bartender cleared for the floor but not the **gaming room**, because RSG is licensed
 separately. A functions coordinator clears the venue *and* both catering operations on
-one RSA and three separate inductions — the portability argument in miniature.
+one RSA and three separate inductions — the portability argument in miniature. The head
+chef holds no RSA at all and is still eligible, because the licence never bound to the
+kitchen.
 
 ### Tests
 
-`npm test` — 85 tests over the engine, verifier, hash chain and seed dataset.
+`npm test` — 105 tests over the engine, verifier, hash chain, role scoping and seed dataset.
 Notably `tests/demo.test.ts` pins the demo's *narrative*: if a seeded credential date
 is edited and a blocked staff member quietly becomes eligible, the suite fails before
 the demo does. `tests/hash.test.ts` checks the SHA-256 implementation against published

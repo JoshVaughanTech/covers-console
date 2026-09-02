@@ -10,7 +10,7 @@
    writing to the audit log (previews are not; a publish is).
    ============================================================ */
 
-import { CREDENTIAL_TYPES } from "./hospitality";
+import { CREDENTIAL_TYPES, functionsForRole } from "./hospitality";
 import type { CredentialVerifier } from "./verifier";
 import type {
   Action,
@@ -44,9 +44,24 @@ function daysUntil(from: ISODate, to: ISODate): number {
 export function decide(input: DecideInput): Decision {
   const { person, credentials, action, site, at, verifier } = input;
   const reasons: DecisionReason[] = [];
+  const duties = functionsForRole(person.role);
 
   for (const req of site.requires) {
     const meta = CREDENTIAL_TYPES[req.type];
+
+    // A requirement scoped to duties this person doesn't perform is recorded
+    // as considered-and-not-binding rather than dropped, so the trail shows
+    // why it went unchecked.
+    if (req.appliesTo && !req.appliesTo.some((f) => duties.includes(f))) {
+      reasons.push({
+        code: "credential.not_applicable",
+        outcome: "n/a",
+        credentialType: req.type,
+        detail: `${meta.shortLabel} not required for ${person.role}.`,
+      });
+      continue;
+    }
+
     const match = credentials.find(
       (c) =>
         c.type === req.type &&

@@ -34,6 +34,18 @@ export type CredentialTypeId =
   | "site_induction"
   | "wwcc";
 
+/**
+ * What a person actually does on shift. Requirements bind to these rather
+ * than to job titles, because titles drift between venues ("Bartender",
+ * "Bar Attendant") while the duty that triggers a legal obligation does not.
+ * The role → function mapping is vertical-specific and lives in hospitality.ts.
+ */
+export type WorkFunction =
+  | "serve_alcohol"
+  | "handle_food"
+  | "gaming"
+  | "supervise";
+
 /** A person known to Idara (bar staff, chef, duty manager, casual…). */
 export interface Identity {
   did: DID;
@@ -64,6 +76,15 @@ export interface CredentialRequirement {
   type: CredentialTypeId;
   /** true → the credential must be scoped to this exact site (claims.siteId). */
   siteScoped?: boolean;
+  /**
+   * When set, the requirement binds only to people who perform at least one
+   * of these functions — an RSA is demanded of whoever serves alcohol, not of
+   * the kitchen. Omitted means it binds to everyone rostered.
+   *
+   * A role the vertical pack doesn't recognise is treated as performing every
+   * function, so an unmapped job title can never quietly skip a requirement.
+   */
+  appliesTo?: WorkFunction[];
 }
 
 /** A physical place with its own eligibility rules. */
@@ -82,8 +103,12 @@ export type Action =
   | "sign_off"
   | "view_job_room";
 
-/** Per-check result inside a decision. */
-export type CheckOutcome = "pass" | "warn" | "fail";
+/**
+ * Per-check result inside a decision. `n/a` records a requirement that was
+ * considered and found not to bind to this person — kept in the trail rather
+ * than dropped, so "why wasn't the chef's RSA checked?" has a written answer.
+ */
+export type CheckOutcome = "pass" | "warn" | "fail" | "n/a";
 
 export interface DecisionReason {
   /** machine code, e.g. "credential.missing", "credential.expired". */

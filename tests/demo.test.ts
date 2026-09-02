@@ -147,6 +147,49 @@ describe("demo dataset — same building, different licence", () => {
   });
 });
 
+describe("demo dataset — requirements bind to duties, not to everyone", () => {
+  it("Hassan holds no RSA at all, and is still eligible on the floor", () => {
+    const rsas = CREDENTIALS.filter(
+      (c) => c.subject === didOf("Hassan Ali") && c.type === "rsa",
+    );
+    expect(rsas).toHaveLength(0);
+
+    const d = check("Hassan Ali");
+    expect(d.allowed).toBe(true);
+    const rsaCheck = d.reasons.find((r) => r.credentialType === "rsa");
+    expect(rsaCheck?.outcome).toBe("n/a");
+    expect(rsaCheck?.detail).toContain("Head Chef");
+  });
+
+  it("the same missing RSA still blocks people who do serve alcohol", () => {
+    // Jake is a Bar Attendant — the licence binds, and his has expired
+    expect(check("Jake Morrison").allowed).toBe(false);
+    expect(failTypes(check("Jake Morrison"))).toEqual(["rsa"]);
+  });
+
+  it("records the skipped check rather than dropping it from the trail", () => {
+    const d = check("Hassan Ali");
+    // one entry per requirement at this location, none silently missing
+    expect(d.reasons).toHaveLength(siteOf(HOTEL).requires.length);
+  });
+
+  it("a bartender is still blocked from the gaming room — the room implies the duty", () => {
+    // RSG is not role-scoped: rostering someone into the gaming room IS the
+    // gaming duty, so a bartender without RSG cannot work it.
+    const d = check("Darie Roberts", GAMING);
+    expect(d.allowed).toBe(false);
+    expect(failTypes(d)).toEqual(["rsg"]);
+  });
+
+  it("food tickets bind to the kitchen, not to the bar", () => {
+    // Hassan handles food, so the wedding's allergen + FSS tickets bind to him
+    expect(failTypes(check("Hassan Ali", WEDDING))).toEqual([
+      "allergen_management",
+      "food_safety_supervisor",
+    ]);
+  });
+});
+
 describe("demo dataset — venues vs. off-premise catering", () => {
   it("Hassan clears the hotel but is blocked at the wedding", () => {
     expect(check("Hassan Ali", HOTEL).allowed).toBe(true);

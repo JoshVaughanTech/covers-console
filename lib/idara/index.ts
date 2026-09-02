@@ -6,7 +6,14 @@
    ============================================================ */
 
 export * from "./types";
-export { CREDENTIAL_TYPES, CREDENTIAL_ORDER, BASE_REQUIREMENTS } from "./hospitality";
+export {
+  CREDENTIAL_TYPES,
+  CREDENTIAL_ORDER,
+  BASE_REQUIREMENTS,
+  ROLE_FUNCTIONS,
+  ALL_WORK_FUNCTIONS,
+  functionsForRole,
+} from "./hospitality";
 export type { CredentialTypeMeta } from "./hospitality";
 export { decide, summarise, EXPIRY_WARN_DAYS } from "./engine";
 export type { DecideInput } from "./engine";

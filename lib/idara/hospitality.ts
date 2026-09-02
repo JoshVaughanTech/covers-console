@@ -12,7 +12,11 @@
    which is the whole portability argument.
    ============================================================ */
 
-import type { CredentialTypeId, CredentialRequirement } from "./types";
+import type {
+  CredentialTypeId,
+  CredentialRequirement,
+  WorkFunction,
+} from "./types";
 
 export interface CredentialTypeMeta {
   id: CredentialTypeId;
@@ -128,9 +132,51 @@ export const CREDENTIAL_ORDER: CredentialTypeId[] = [
   "wwcc",
 ];
 
+/* ---------- roles → what they actually do ----------
+   Requirements bind to duties, not titles. RSA is owed by whoever serves
+   alcohol; a chef who never goes near the taps doesn't need one. Keeping the
+   mapping here rather than in the engine means the engine still knows nothing
+   about bars or kitchens. */
+
+export const ALL_WORK_FUNCTIONS: WorkFunction[] = [
+  "serve_alcohol",
+  "handle_food",
+  "gaming",
+  "supervise",
+];
+
+export const ROLE_FUNCTIONS: Record<string, WorkFunction[]> = {
+  "Venue Manager": ALL_WORK_FUNCTIONS,
+  "Duty Manager": ALL_WORK_FUNCTIONS,
+  "Functions Coordinator": ["serve_alcohol", "handle_food", "supervise"],
+  Bartender: ["serve_alcohol", "handle_food"],
+  "Bar Attendant": ["serve_alcohol", "handle_food"],
+  "Bar Supervisor": ["serve_alcohol", "handle_food", "supervise"],
+  // a barback pours and restocks, so the licence still binds
+  Barback: ["serve_alcohol"],
+  "Wait Staff": ["serve_alcohol", "handle_food"],
+  "Gaming Attendant": ["serve_alcohol", "gaming"],
+  "Head Chef": ["handle_food", "supervise"],
+  "Sous Chef": ["handle_food"],
+  "Kitchen Hand": ["handle_food"],
+  Barista: ["handle_food"],
+  // glassies clear tables; they neither pour nor prepare
+  Glassy: [],
+};
+
+/**
+ * Duties for a role. An unrecognised title is assumed to do everything, so a
+ * job title nobody has mapped yet fails safe — it can only ever be asked for
+ * more than it needs, never less.
+ */
+export function functionsForRole(role: string): WorkFunction[] {
+  return ROLE_FUNCTIONS[role] ?? ALL_WORK_FUNCTIONS;
+}
+
 /** Baseline every hospitality location demands. */
 export const BASE_REQUIREMENTS: CredentialRequirement[] = [
-  { type: "rsa" },
+  { type: "rsa", appliesTo: ["serve_alcohol"] },
+  // everyone on site is inducted, whatever they're there to do
   { type: "site_induction", siteScoped: true },
-  { type: "food_handling" },
+  { type: "food_handling", appliesTo: ["handle_food"] },
 ];
