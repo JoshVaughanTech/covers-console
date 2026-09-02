@@ -87,12 +87,45 @@ export interface CredentialRequirement {
   appliesTo?: WorkFunction[];
 }
 
+/**
+ * A requirement the roster satisfies collectively rather than person by
+ * person. A venue must have a nominated Food Safety Supervisor on shift; it
+ * does not need every hand in the kitchen to hold the ticket. Expressing this
+ * as a per-person rule would either over-demand (everyone must hold it) or
+ * under-demand (nobody need hold it) — neither is the law.
+ */
+export interface RosterRequirement {
+  type: CredentialTypeId;
+  /** how many rostered people must hold it. Usually 1. */
+  minHolders: number;
+  /** true → the credential must be scoped to this exact site. */
+  siteScoped?: boolean;
+}
+
 /** A physical place with its own eligibility rules. */
 export interface Site {
   id: string;
   name: string;
   region: string;
+  /** checked against each person individually. */
   requires: CredentialRequirement[];
+  /** checked against the roster as a whole; see RosterRequirement. */
+  requiresOnRoster?: RosterRequirement[];
+}
+
+/**
+ * Result of one roster-level requirement.
+ *
+ * Only people who are themselves eligible count as holders: a supervisor
+ * whose own induction has lapsed can't be rostered, so they cannot discharge
+ * the venue's obligation on paper either.
+ */
+export interface CoverageCheck {
+  type: CredentialTypeId;
+  required: number;
+  holders: { did: DID; name: string }[];
+  met: boolean;
+  detail: string;
 }
 
 /** Things a person can be checked for. Recorded on every decision. */

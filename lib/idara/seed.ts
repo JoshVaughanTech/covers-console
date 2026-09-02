@@ -48,6 +48,9 @@ export const SITES: Site[] = [
     name: "Brightwater Hotel",
     region: "Fitzroy",
     requires: BASE_REQUIREMENTS,
+    // the bistro serves food, so the venue owes a nominated supervisor on
+    // shift — covered here by Sophie and Priya, so the gate stays green
+    requiresOnRoster: [{ type: "food_safety_supervisor", minHolders: 1 }],
   },
   {
     id: "s-brightwater-gaming",
@@ -64,8 +67,11 @@ export const SITES: Site[] = [
     id: "s-northside",
     name: "Northside Tavern",
     region: "Brunswick",
-    // full kitchen: supervised food handling
-    requires: [...BASE_REQUIREMENTS, { type: "food_safety_supervisor", appliesTo: ["handle_food"] }],
+    requires: BASE_REQUIREMENTS,
+    // Full kitchen. The FSS obligation belongs to the venue, not to each
+    // cook: one nominated supervisor must be on, and requiring the ticket of
+    // every kitchen hand would be over-demanding it.
+    requiresOnRoster: [{ type: "food_safety_supervisor", minHolders: 1 }],
   },
   {
     id: "s-quayside",
@@ -77,12 +83,14 @@ export const SITES: Site[] = [
     id: "s-werribee-wedding",
     name: "Werribee Park Wedding",
     region: "Off-premise",
-    // plated event, declared dietaries, food transported to site
+    // Plated event, declared dietaries, food transported to site. Allergen
+    // training is genuinely per-person — anyone plating needs it — while the
+    // FSS nomination covers the operation as a whole.
     requires: [
       ...BASE_REQUIREMENTS,
       { type: "allergen_management", appliesTo: ["handle_food"] },
-      { type: "food_safety_supervisor", appliesTo: ["handle_food"] },
     ],
+    requiresOnRoster: [{ type: "food_safety_supervisor", minHolders: 1 }],
   },
   {
     id: "s-docklands-lunch",
@@ -148,6 +156,9 @@ export const CREDENTIALS: Credential[] = [
   cred(W["Darie Roberts"], "rsa", ISSUERS.liquor, "2026-03-01", { claims: { cert: "RSA-884201" } }),
   cred(W["Darie Roberts"], "site_induction", ISSUERS.idara, "2024-11-01", { claims: { siteId: "s-brightwater" } }),
   cred(W["Darie Roberts"], "site_induction", ISSUERS.idara, "2024-11-01", { claims: { siteId: "s-brightwater-gaming" } }),
+  // also inducted at the tavern — where he is personally eligible but cannot
+  // be rostered alone, because the venue still owes a Food Safety Supervisor
+  cred(W["Darie Roberts"], "site_induction", ISSUERS.idara, "2024-11-01", { claims: { siteId: "s-northside" } }),
   cred(W["Darie Roberts"], "food_handling", ISSUERS.rto, "2025-08-01"),
 
   // Leanne — RSA expiring within the warning window

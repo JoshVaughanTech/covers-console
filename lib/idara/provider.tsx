@@ -22,12 +22,14 @@ import {
   type ReactNode,
 } from "react";
 import { LocalCredentialVerifier } from "./verifier";
-import { decide, summarise } from "./engine";
+import { CREDENTIAL_TYPES } from "./hospitality";
+import { decide, decideRoster, summarise, summariseCoverage } from "./engine";
 import { appendEvent, type NewAuditEvent } from "./audit";
 import { CREDENTIALS, SITES, WORKERS, TODAY, SEED_AUDIT } from "./seed";
 import type {
   Action,
   AuditEvent,
+  CoverageCheck,
   Credential,
   Decision,
   DID,
@@ -40,6 +42,10 @@ export interface PublishResult {
   eligible: Decision[];
   blocked: Decision[];
   warnings: Decision[];
+  /** roster-level requirements — a venue's nominated FSS and the like. */
+  coverage: CoverageCheck[];
+  /** collective requirements the roster fails to cover. */
+  uncovered: CoverageCheck[];
   published: boolean;
 }
 
@@ -60,6 +66,23 @@ interface IdaraState {
   /** write the publish outcome (clean OR blocked attempt) to the audit log. */
   recordPublish: (siteId: string, result: PublishResult, actor?: string) => void;
   revokeCredential: (credId: string, actor?: string) => void;
+}
+
+/**
+ * A publish can now be blocked by individuals, by the roster as a whole, or
+ * by both at once — the audit summary has to say which.
+ */
+function blockedSummary(siteName: string, r: PublishResult): string {
+  const parts: string[] = [];
+  if (r.blocked.length > 0) {
+    parts.push(
+      `${r.blocked.length} ineligible staff member${r.blocked.length === 1 ? "" : "s"}`,
+    );
+  }
+  for (const c of r.uncovered) {
+    parts.push(`no ${CREDENTIAL_TYPES[c.type].shortLabel} on shift`);
+  }
+  return `Publish blocked for ${siteName} — ${parts.join(" and ")}`;
 }
 
 const IdaraContext = createContext<IdaraState | null>(null);
@@ -104,15 +127,34 @@ export function IdaraProvider({ children }: { children: ReactNode }) {
 
   const evaluateRoster = useCallback(
     (siteId: string, dids: DID[]): PublishResult => {
-      const decisions = dids
-        .map((did) => decideFor(did, "be_rostered", siteId))
-        .filter((d): d is Decision => d !== null);
+      const site = siteIndex.get(siteId);
+      const roster = dids
+        .map((did) => workerIndex.get(did))
+        .filter((p): p is Identity => p !== undefined)
+        .map((person) => ({
+          person,
+          credentials: credentials.filter((c) => c.subject === person.did),
+        }));
+
+      if (!site) {
+        return { decisions: [], eligible: [], blocked: [], warnings: [], coverage: [], uncovered: [], published: false };
+      }
+
+      const { decisions, coverage, allowed } = decideRoster({
+        roster,
+        action: "be_rostered",
+        site,
+        at: TODAY,
+        verifier,
+      });
+
       const eligible = decisions.filter((d) => d.allowed);
       const blocked = decisions.filter((d) => !d.allowed);
       const warnings = decisions.filter((d) => d.allowed && d.warnings > 0);
-      return { decisions, eligible, blocked, warnings, published: blocked.length === 0 };
+      const uncovered = coverage.filter((c) => !c.met);
+      return { decisions, eligible, blocked, warnings, coverage, uncovered, published: allowed };
     },
-    [decideFor],
+    [workerIndex, siteIndex, credentials, verifier],
   );
 
   const recordPublish = useCallback(
@@ -132,20 +174,37 @@ export function IdaraProvider({ children }: { children: ReactNode }) {
               data: { siteId, reasons: d.reasons.filter((r) => r.outcome === "fail") },
             });
           }
+          // …a record of any collective gap…
+          const coverageGap = summariseCoverage(result.coverage);
+          if (coverageGap) {
+            next = appendEvent(next, {
+              type: "decision",
+              at: TODAY,
+              actor,
+              summary: `${site?.name ?? siteId}: ${coverageGap}`,
+              data: { siteId, uncovered: result.uncovered },
+            });
+          }
           // …then the blocked publish attempt itself
           next = appendEvent(next, {
             type: "roster.published",
             at: TODAY,
             actor,
-            summary: `Publish blocked for ${site?.name ?? siteId} — ${result.blocked.length} ineligible worker${result.blocked.length === 1 ? "" : "s"}`,
-            data: { siteId, attempted: result.decisions.length, blocked: result.blocked.length, published: false },
+            summary: blockedSummary(site?.name ?? siteId, result),
+            data: {
+              siteId,
+              attempted: result.decisions.length,
+              blocked: result.blocked.length,
+              uncovered: result.uncovered.map((c) => c.type),
+              published: false,
+            },
           });
         } else {
           next = appendEvent(next, {
             type: "roster.published",
             at: TODAY,
             actor,
-            summary: `Roster published for ${site?.name ?? siteId} — ${result.eligible.length} workers, all eligible`,
+            summary: `Roster published for ${site?.name ?? siteId} — ${result.eligible.length} staff, all eligible`,
             data: { siteId, eligible: result.eligible.length, warnings: result.warnings.length, published: true },
           });
         }

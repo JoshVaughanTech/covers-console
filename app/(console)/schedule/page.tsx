@@ -17,7 +17,7 @@ import {
   useConfirm,
 } from "@/components/ui";
 import type { Tone } from "@/lib/status";
-import { useIdara, type Decision, type PublishResult } from "@/lib/idara";
+import { useIdara, CREDENTIAL_TYPES, type Decision, type PublishResult } from "@/lib/idara";
 import { PageHead, CardHead, LinkBtn } from "@/components/screen/page-head";
 
 /* ---- types ---- */
@@ -216,6 +216,20 @@ export default function SchedulePage() {
   const budgetPct = useMemo(() => Math.min(100, Math.round((labourCost / 135000) * 100)), [labourCost]);
   const fairnessLabel = fairnessScore >= 90 ? "Excellent" : fairnessScore >= 80 ? "Very Good" : "Fair";
 
+  /* one line naming why a publish was refused — individuals, the roster, or both */
+  const blockReasons = (r: PublishResult) => {
+    const parts: string[] = [];
+    if (r.blocked.length > 0) {
+      parts.push(
+        `${r.blocked.length} ineligible staff member${r.blocked.length === 1 ? "" : "s"}`,
+      );
+    }
+    for (const c of r.uncovered) {
+      parts.push(`no ${CREDENTIAL_TYPES[c.type].shortLabel} on shift`);
+    }
+    return parts.join(" · ");
+  };
+
   const nowLabel = () => {
     const now = new Date();
     return `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
@@ -230,10 +244,10 @@ export default function SchedulePage() {
     if (!result.published) {
       recordPublish(SITE_ID, result); // the blocked attempt is itself audited
       setGate(result);
-      toast(
-        `Publish blocked — ${result.blocked.length} ineligible staff member${result.blocked.length === 1 ? "" : "s"}`,
-        { tone: "danger", icon: "shield-alert" },
-      );
+      toast(`Publish blocked — ${blockReasons(result)}`, {
+        tone: "danger",
+        icon: "shield-alert",
+      });
       return;
     }
 
@@ -254,14 +268,26 @@ export default function SchedulePage() {
     );
   };
 
-  // resolve the gate by publishing only the eligible staff
+  // resolve the gate by publishing only the eligible staff. This can only
+  // ever fix individual ineligibility — a roster-level gap survives dropping
+  // people, so the result is re-checked rather than assumed published.
   const publishEligibleOnly = () => {
     if (!gate) return;
     const eligibleNames = new Set(gate.eligible.map((d) => d.context.subjectName));
     const removed = gate.blocked.length;
     const remaining = crew.filter((c) => eligibleNames.has(c.name));
-    setCrew(remaining);
     const result = evaluateRoster(SITE_ID, remaining.map((c) => didOf[c.name]));
+
+    if (!result.published) {
+      setGate(result);
+      toast(`Still blocked — ${blockReasons(result)}`, {
+        tone: "danger",
+        icon: "shield-alert",
+      });
+      return;
+    }
+
+    setCrew(remaining);
     recordPublish(SITE_ID, result);
     setPublished(nowLabel());
     setGate(null);
@@ -530,9 +556,12 @@ export default function SchedulePage() {
             <Button variant="sec" size="sm" onClick={() => setGate(null)}>
               Back to roster
             </Button>
-            <Button variant="pri" size="sm" icon="shield-check" onClick={publishEligibleOnly}>
-              Publish {gate?.eligible.length ?? 0} verified
-            </Button>
+            {/* dropping people cannot satisfy a roster-level requirement */}
+            {(gate?.uncovered.length ?? 0) === 0 && (
+              <Button variant="pri" size="sm" icon="shield-check" onClick={publishEligibleOnly}>
+                Publish {gate?.eligible.length ?? 0} verified
+              </Button>
+            )}
           </>
         }
       >
@@ -541,10 +570,42 @@ export default function SchedulePage() {
             <div style={{ display: "flex", alignItems: "flex-start", gap: 10, padding: "12px 14px", borderRadius: 10, background: "var(--danger-bg)", marginBottom: 14 }}>
               <Icon name="shield-alert" size={18} color="var(--danger-fg)" />
               <div style={{ fontSize: 13, color: "var(--danger-fg)" }}>
-                {gate.blocked.length} of {gate.decisions.length} rostered staff are not eligible for {siteName}. A roster can&apos;t be published with a non-compliant staff member on shift — this attempt has been written to the audit log.
+                {gate.blocked.length > 0 && (
+                  <>
+                    {gate.blocked.length} of {gate.decisions.length} rostered staff are not eligible for {siteName}.{" "}
+                  </>
+                )}
+                {gate.uncovered.length > 0 && (
+                  <>
+                    This roster has no{" "}
+                    {gate.uncovered.map((c) => CREDENTIAL_TYPES[c.type].shortLabel).join(" or ")}{" "}
+                    on shift. That is required of the venue rather than of any one person, so removing staff won&apos;t resolve it.{" "}
+                  </>
+                )}
+                This attempt has been written to the audit log.
               </div>
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              {gate.uncovered.map((c) => (
+                <div key={c.type} style={{ border: "1px solid var(--warning)", background: "var(--warning-bg)", borderRadius: 12, padding: 12 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 9, marginBottom: 6 }}>
+                    <span style={{ width: 28, height: 28, borderRadius: 8, background: "#fff", display: "inline-flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                      <Icon name={CREDENTIAL_TYPES[c.type].icon} size={15} color="var(--warning-fg)" />
+                    </span>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: 13.5, fontWeight: 600, color: "var(--fg-1)" }}>
+                        {CREDENTIAL_TYPES[c.type].label}
+                      </div>
+                      <div style={{ fontSize: 11.5, color: "var(--fg-4)" }}>Required of the roster, not the person</div>
+                    </div>
+                    <Badge tone="warning" icon="users">Not covered</Badge>
+                  </div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, color: "var(--fg-2)" }}>
+                    <span style={{ width: 6, height: 6, borderRadius: 999, background: "var(--warning)", flexShrink: 0 }} />
+                    {c.detail}
+                  </div>
+                </div>
+              ))}
               {gate.blocked.map((d) => (
                 <div key={d.context.subject} style={{ border: "1px solid var(--border)", borderRadius: 12, padding: 12 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 9, marginBottom: 8 }}>

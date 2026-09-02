@@ -65,14 +65,12 @@ inside another) and two off-premise catering operations.
 Recorded here rather than hidden, because each is a real gap between the model and
 the industry:
 
-1. ~~**RSA is required of everyone rostered.**~~ **Resolved** — see §6.
-2. **Food Safety Supervisor is modelled per-person.** It is really a *venue-level*
-   obligation — the business must nominate one, not every worker must hold one.
-   Expressing that needs a requirement kind the engine doesn't have: "at least one
-   person on this roster holds X." This remains open.
+1. ~~**RSA is required of everyone rostered.**~~ **Resolved** — see §5.
+2. ~~**Food Safety Supervisor is modelled per-person.**~~ **Resolved** — see §6.
 3. **RSA expiry rules vary by state.** Victoria requires refresher training; NSW
    issues a five-year competency card. The seed uses concrete dates and the copy
-   avoids asserting a national rule.
+   avoids asserting a national rule. This remains open, and is a copy/data
+   question rather than a modelling one.
 
 ---
 
@@ -125,7 +123,47 @@ duties travelling with the roster assignment rather than the person.
 
 ---
 
-## 6. Verification
+## 6. Roster-level requirements (added 2026-09-02)
+
+`Site` gained `requiresOnRoster?: RosterRequirement[]`, and the engine gained
+`decideRoster()`. A `RosterRequirement` carries `minHolders`, and is satisfied by
+the roster collectively rather than by each person.
+
+This is the shape `decide()` could never express: it only ever sees one person, so
+a "the venue must have a nominated FSS on shift" rule had to be forced into either
+*everyone must hold it* (over-demanding) or *nobody need hold it* (under-demanding).
+Neither is the law.
+
+`decideRoster()` composes rather than replaces — it maps `decide()` over the roster,
+then evaluates coverage. The per-person primitive is untouched.
+
+**Only eligible people count as holders.** A supervisor whose own induction has
+lapsed can't be rostered, so they aren't going to be on shift and can't discharge
+the venue's obligation on paper either. Counting them would let a roster pass on
+somebody's absence — the single most important rule here, and the one most easily
+got wrong.
+
+Consequences worth noting:
+
+- **A publish can now be blocked with nobody at fault.** Every person individually
+  eligible, and the shift still illegal. The gate UI says so explicitly, and the
+  *"publish the verified subset"* action is withdrawn rather than disabled — dropping
+  people can never satisfy a collective requirement, so offering it would mislead.
+- **`publishEligibleOnly` re-checks rather than assuming.** Previously it filtered
+  the blocked staff out and declared success; now it re-evaluates, because removing
+  individuals leaves a coverage gap exactly where it was.
+- **The audit trail records the collective gap** as its own entry, alongside the
+  per-person receipts, so "why was Friday refused?" has an answer even when no
+  individual was at fault.
+
+Seeded so it's real rather than theoretical: Brightwater Hotel has a bistro and so
+owes an FSS (covered by Sophie and Priya), and Darie is inducted at Northside
+Tavern — personally eligible there, but unable to be rostered alone, because the
+venue still owes a supervisor.
+
+---
+
+## 7. Verification
 
 The demo narrative is pinned by `tests/demo.test.ts` so a seed edit can't quietly
 turn a blocked person eligible:
@@ -138,4 +176,4 @@ turn a blocked person eligible:
 - **Hassan Ali** — holds **no RSA at all** and still clears the hotel floor; blocked at the wedding (no allergen, no FSS)
 - **Priya Sharma** — clears the venue and both catering operations on one RSA and three inductions
 
-105 tests pass; typecheck, lint and production build are clean.
+126 tests pass; typecheck, lint and production build are clean.

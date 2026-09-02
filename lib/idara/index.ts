@@ -15,8 +15,8 @@ export {
   functionsForRole,
 } from "./hospitality";
 export type { CredentialTypeMeta } from "./hospitality";
-export { decide, summarise, EXPIRY_WARN_DAYS } from "./engine";
-export type { DecideInput } from "./engine";
+export { decide, decideRoster, summarise, summariseCoverage, EXPIRY_WARN_DAYS } from "./engine";
+export type { DecideInput, DecideRosterInput, RosterDecision, RosterMember } from "./engine";
 export { LocalCredentialVerifier } from "./verifier";
 export type { CredentialVerifier, VerificationResult } from "./verifier";
 export { appendEvent, verifyChain, shortHash, GENESIS_HASH, HASH_ALGORITHM } from "./audit";

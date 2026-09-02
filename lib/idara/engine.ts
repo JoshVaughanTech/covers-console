@@ -14,6 +14,7 @@ import { CREDENTIAL_TYPES, functionsForRole } from "./hospitality";
 import type { CredentialVerifier } from "./verifier";
 import type {
   Action,
+  CoverageCheck,
   Credential,
   Decision,
   DecisionReason,
@@ -128,6 +129,103 @@ export function decide(input: DecideInput): Decision {
       at,
     },
   };
+}
+
+/* ============================================================
+   Roster-level requirements
+   Some obligations belong to the shift, not to the person: a venue
+   needs a nominated Food Safety Supervisor on, it doesn't need
+   every kitchen hand to hold the ticket. decide() can't answer
+   that — it only ever sees one person — so decideRoster() layers
+   the collective check over the per-person ones.
+   ============================================================ */
+
+export interface RosterMember {
+  person: Identity;
+  credentials: Credential[];
+}
+
+export interface DecideRosterInput {
+  roster: RosterMember[];
+  action: Action;
+  site: Site;
+  at: ISODate;
+  verifier: CredentialVerifier;
+}
+
+export interface RosterDecision {
+  /** per-person outcomes, in roster order. */
+  decisions: Decision[];
+  /** one entry per roster-level requirement. */
+  coverage: CoverageCheck[];
+  /** everyone individually eligible AND every collective requirement met. */
+  allowed: boolean;
+}
+
+/**
+ * Evaluate a whole roster: every person individually, then the requirements
+ * the roster must satisfy together.
+ *
+ * Only eligible people count toward coverage. Someone who can't lawfully be
+ * rostered can't be the venue's nominated supervisor either, so counting them
+ * would let a roster pass on a person who isn't going to be there.
+ */
+export function decideRoster(input: DecideRosterInput): RosterDecision {
+  const { roster, action, site, at, verifier } = input;
+
+  const decisions = roster.map((m) =>
+    decide({
+      person: m.person,
+      credentials: m.credentials,
+      action,
+      site,
+      at,
+      verifier,
+    }),
+  );
+
+  const eligible = roster.filter((_, i) => decisions[i].allowed);
+
+  const coverage = (site.requiresOnRoster ?? []).map((req): CoverageCheck => {
+    const meta = CREDENTIAL_TYPES[req.type];
+
+    const holders = eligible
+      .filter((m) =>
+        m.credentials.some(
+          (c) =>
+            c.type === req.type &&
+            (!req.siteScoped || c.claims.siteId === site.id) &&
+            verifier.verify(c, at).status === "valid",
+        ),
+      )
+      .map((m) => ({ did: m.person.did, name: m.person.name }));
+
+    const met = holders.length >= req.minHolders;
+    return {
+      type: req.type,
+      required: req.minHolders,
+      holders,
+      met,
+      detail: met
+        ? `${meta.shortLabel} covered by ${holders.map((h) => h.name).join(", ")}.`
+        : `No one rostered holds a current ${meta.shortLabel} — ${req.minHolders} required on shift.`,
+    };
+  });
+
+  return {
+    decisions,
+    coverage,
+    allowed: decisions.every((d) => d.allowed) && coverage.every((c) => c.met),
+  };
+}
+
+/** One-line summary of a roster's collective gaps, for the audit log / UI. */
+export function summariseCoverage(coverage: CoverageCheck[]): string | null {
+  const missing = coverage.filter((c) => !c.met);
+  if (missing.length === 0) return null;
+  return `Roster lacks ${missing
+    .map((c) => CREDENTIAL_TYPES[c.type].shortLabel)
+    .join(" and ")} cover`;
 }
 
 /** One-line summary of a decision for the audit log / UI. */

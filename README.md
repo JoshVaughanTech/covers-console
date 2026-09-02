@@ -82,13 +82,13 @@ themselves — they ask the engine, and consequential answers land in the audit 
 | File | Role |
 |---|---|
 | `types.ts` | Domain model: `Identity`, `Credential`, `Site`, `Decision`, `AuditEvent`. Vertical-agnostic. |
-| `engine.ts` | **`decide(person, action, site, at)` → allow/deny + reasons.** The primitive. Pure and synchronous. |
+| `engine.ts` | **`decide()`** → allow/deny + reasons for one person, and **`decideRoster()`** for what the shift owes collectively. Pure and synchronous. |
 | `verifier.ts` | The `CredentialVerifier` seam — the single place "is this credential real and current?" is answered. |
 | `audit.ts` | Append-only, SHA-256 hash-chained log; `verifyChain()` reports the first broken link. |
 | `hash.ts` | SHA-256 + canonical (key-sorted) JSON, so hashes survive a serialisation round-trip. |
 | `hospitality.ts` | The hospitality credential taxonomy + the role → duty map. Swapping verticals = swapping this file. |
 | `seed.ts` | Demo dataset — deliberately mixed: eligible, expiring, and blocked staff. |
-| `provider.tsx` | React binding: `useIdara()`, the publish gate, credential revocation. |
+| `provider.tsx` | React binding: `useIdara()`, the publish gate (individual + roster coverage), credential revocation. |
 
 Roster eligibility, verified clock-in, function-room access and verified sign-off are all
 the same `decide()` call with a different `action`.
@@ -108,6 +108,19 @@ ignorant of bars and kitchens. Two rules make it safe to rely on:
 Where a location *implies* the duty, the location scopes it instead — RSG is unscoped at
 the gaming room, because being rostered there is the gaming duty whatever your title.
 
+**Some obligations belong to the shift, not the person.** A venue must have a nominated
+Food Safety Supervisor on; it does not need every kitchen hand to hold the ticket.
+`Site.requiresOnRoster` carries those, and `decideRoster()` checks them — mapping
+`decide()` over the roster first, then evaluating coverage, so the per-person primitive
+is untouched. **Only eligible people count as holders**: a supervisor whose own induction
+has lapsed isn't going to be on shift, so they can't discharge the venue's obligation
+either.
+
+The consequence is a second kind of block — a roster where **nobody is individually at
+fault and the shift is still illegal**. The gate says so plainly, and withdraws the
+"publish the verified subset" action, because dropping people can never satisfy a
+collective requirement.
+
 **The publish gate** is the load-bearing demo: `/schedule` → *Publish Roster* runs the
 engine over every rostered staff member, and a roster containing someone non-compliant
 **cannot be published**. The blocked attempt is itself written to the audit log, with a
@@ -123,7 +136,8 @@ kitchen.
 
 ### Tests
 
-`npm test` — 105 tests over the engine, verifier, hash chain, role scoping and seed dataset.
+`npm test` — 126 tests over the engine, verifier, hash chain, role scoping, roster coverage
+and seed dataset.
 Notably `tests/demo.test.ts` pins the demo's *narrative*: if a seeded credential date
 is edited and a blocked staff member quietly becomes eligible, the suite fails before
 the demo does. `tests/hash.test.ts` checks the SHA-256 implementation against published

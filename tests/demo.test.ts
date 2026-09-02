@@ -8,7 +8,7 @@
    ============================================================ */
 
 import { describe, it, expect } from "vitest";
-import { decide, summarise } from "../lib/idara/engine";
+import { decide, decideRoster, summarise, summariseCoverage } from "../lib/idara/engine";
 import { LocalCredentialVerifier } from "../lib/idara/verifier";
 import { verifyChain } from "../lib/idara/audit";
 import {
@@ -182,11 +182,14 @@ describe("demo dataset — requirements bind to duties, not to everyone", () => 
   });
 
   it("food tickets bind to the kitchen, not to the bar", () => {
-    // Hassan handles food, so the wedding's allergen + FSS tickets bind to him
-    expect(failTypes(check("Hassan Ali", WEDDING))).toEqual([
-      "allergen_management",
-      "food_safety_supervisor",
-    ]);
+    // allergen training is genuinely per-person, so it binds to Hassan.
+    // FSS is not: it's owed by the operation, so it never appears here.
+    expect(failTypes(check("Hassan Ali", WEDDING))).toEqual(["allergen_management"]);
+    expect(
+      check("Hassan Ali", WEDDING).reasons.some(
+        (r) => r.credentialType === "food_safety_supervisor",
+      ),
+    ).toBe(false);
   });
 });
 
@@ -196,8 +199,9 @@ describe("demo dataset — venues vs. off-premise catering", () => {
 
     const d = check("Hassan Ali", WEDDING);
     expect(d.allowed).toBe(false);
-    // he is briefed for the event; off-premise catering demands more of him
-    expect(failTypes(d)).toEqual(["allergen_management", "food_safety_supervisor"]);
+    // he is briefed for the event; off-premise catering demands allergen
+    // training of anyone plating
+    expect(failTypes(d)).toEqual(["allergen_management"]);
   });
 
   it("Priya carries one RSA across the venue and both catering operations", () => {
@@ -224,6 +228,76 @@ describe("demo dataset — venues vs. off-premise catering", () => {
       const anyEligible = WORKERS.some((w) => check(w.name, s.id).allowed);
       expect(anyEligible, `nobody can work ${s.name}`).toBe(true);
     }
+  });
+});
+
+describe("demo dataset — obligations owed by the roster, not the person", () => {
+  const rosterAt = (names: string[], siteId: string) =>
+    decideRoster({
+      roster: names.map((n) => {
+        const did = didOf(n);
+        return {
+          person: WORKERS.find((w) => w.did === did)!,
+          credentials: CREDENTIALS.filter((c) => c.subject === did),
+        };
+      }),
+      action: "be_rostered",
+      site: siteOf(siteId),
+      at: TODAY,
+      verifier,
+    });
+
+  it("blocks a tavern shift with no Food Safety Supervisor on, though nobody is at fault", () => {
+    // Darie is personally eligible at the tavern — RSA, induction, food handling
+    const alone = rosterAt(["Darie Roberts"], TAVERN);
+    expect(alone.decisions.every((d) => d.allowed)).toBe(true);
+
+    // …and the shift is still unpublishable, because the venue owes an FSS
+    expect(alone.allowed).toBe(false);
+    expect(summariseCoverage(alone.coverage)).toBe("Roster lacks FSS cover");
+    expect(alone.coverage[0].detail).toContain("No one rostered holds");
+  });
+
+  it("the same shift publishes once a supervisor is on it", () => {
+    const withSophie = rosterAt(["Darie Roberts", "Sophie Nguyen"], TAVERN);
+    expect(withSophie.allowed).toBe(true);
+    expect(withSophie.coverage[0].holders.map((h) => h.name)).toEqual(["Sophie Nguyen"]);
+    expect(summariseCoverage(withSophie.coverage)).toBeNull();
+  });
+
+  it("the wedding is covered by its functions coordinator", () => {
+    const r = rosterAt(["Priya Sharma"], WEDDING);
+    expect(r.allowed).toBe(true);
+    expect(r.coverage[0].holders.map((h) => h.name)).toEqual(["Priya Sharma"]);
+  });
+
+  it("does not demand the FSS ticket of every cook", () => {
+    const r = rosterAt(["Priya Sharma", "Hassan Ali"], TAVERN);
+    // Hassan holds no FSS and is not personally faulted for it
+    expect(
+      r.decisions.some((d) =>
+        d.reasons.some((x) => x.credentialType === "food_safety_supervisor"),
+      ),
+    ).toBe(false);
+  });
+
+  it("won't accept a supervisor who can't be rostered anyway", () => {
+    // Sophie holds the FSS but has no induction for the wedding site
+    const r = rosterAt(["Sophie Nguyen"], WEDDING);
+    expect(r.decisions[0].allowed).toBe(false);
+    expect(r.coverage[0].holders).toHaveLength(0);
+    expect(r.coverage[0].met).toBe(false);
+  });
+
+  it("the hotel bistro owes a supervisor, and the seeded crew covers it", () => {
+    const r = rosterAt(["Sophie Nguyen", "Darie Roberts", "Aaron Patel"], HOTEL);
+    expect(r.coverage[0].met).toBe(true);
+    expect(r.coverage[0].holders.map((h) => h.name)).toEqual(["Sophie Nguyen"]);
+    expect(r.allowed).toBe(true);
+  });
+
+  it("the gaming room owes no collective ticket", () => {
+    expect(rosterAt(["Mitch Egan"], GAMING).coverage).toHaveLength(0);
   });
 });
 
