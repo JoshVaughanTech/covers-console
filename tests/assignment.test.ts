@@ -154,7 +154,7 @@ describe("decideRoster — assignments travel with the roster", () => {
   const member = (duties?: WorkFunction[], credentials: Credential[] = []): RosterMember => ({
     person: bartender,
     credentials,
-    duties,
+    shifts: [{ id: "Sat", duties }],
   });
 
   it("applies each member's own assignment", () => {

@@ -149,6 +149,12 @@ export interface DecisionReason {
   outcome: CheckOutcome;
   credentialType?: CredentialTypeId;
   detail: string;
+  /**
+   * Which of the person's shifts this applies to — set only when it does not
+   * apply to all of them. "Blocked" is much less useful to a manager than
+   * "blocked on Saturday, fine the rest of the week".
+   */
+  shifts?: string[];
 }
 
 export interface DecisionContext {

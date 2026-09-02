@@ -14,6 +14,7 @@ import { CREDENTIAL_TYPES, functionsForRole } from "./hospitality";
 import type { CredentialVerifier } from "./verifier";
 import type {
   Action,
+  CheckOutcome,
   CoverageCheck,
   Credential,
   Decision,
@@ -158,11 +159,105 @@ export function decide(input: DecideInput): Decision {
    the collective check over the per-person ones.
    ============================================================ */
 
+/** One shift on the roster: when it is, and what it is. */
+export interface ShiftAssignment {
+  /** short label used when reporting — "Sat", "Sat 4p – 12a". */
+  id: string;
+  /** duties for this shift; omitted falls back to the person's job title. */
+  duties?: WorkFunction[];
+}
+
 export interface RosterMember {
   person: Identity;
   credentials: Credential[];
-  /** duties for this shift; omitted falls back to the person's job title. */
-  duties?: WorkFunction[];
+  /**
+   * The shifts this person is rostered for. Omitted or empty means a single
+   * notional shift carrying whatever their job title implies, which is the
+   * behaviour for callers that don't model shifts.
+   */
+  shifts?: ShiftAssignment[];
+}
+
+/** fail beats warn beats pass beats not-applicable, when merging shifts. */
+const SEVERITY: Record<CheckOutcome, number> = {
+  "n/a": 0,
+  pass: 1,
+  warn: 2,
+  fail: 3,
+};
+
+export interface DecideMemberInput extends Omit<DecideInput, "duties"> {
+  shifts?: ShiftAssignment[];
+}
+
+/**
+ * One person's eligibility across everything they are rostered for.
+ *
+ * Duties belong to a shift, not to a week: someone can be fine behind the bar
+ * Monday to Thursday and ineligible for Saturday's gaming shift. Evaluating the
+ * week as one lump would either over-demand (union every duty) or miss it.
+ *
+ * Shifts are grouped by duty set before evaluation — five identical bar shifts
+ * are one question, not five — and the merged result keeps the worst outcome per
+ * requirement, naming the shifts it came from when they aren't all of them.
+ */
+export function decideMember(input: DecideMemberInput): Decision {
+  const { shifts, ...base } = input;
+  const list = shifts && shifts.length > 0 ? shifts : [{ id: "" }];
+
+  const groups = new Map<string, { duties?: WorkFunction[]; ids: string[] }>();
+  for (const s of list) {
+    // a shift with no duties of its own is a different question from one with
+    // an explicit set, so the two never share a key
+    const key = s.duties ? `d:${[...s.duties].sort().join("|")}` : "title";
+    const found = groups.get(key);
+    if (found) found.ids.push(s.id);
+    else groups.set(key, { duties: s.duties, ids: [s.id] });
+  }
+
+  const evaluated = [...groups.values()].map((g) => ({
+    ids: g.ids,
+    decision: decide({ ...base, duties: g.duties }),
+  }));
+
+  // one duty set across the whole week: nothing to merge
+  if (evaluated.length === 1) return evaluated[0].decision;
+
+  const order = new Map(list.map((s, i) => [s.id, i]));
+  const reasons: DecisionReason[] = [];
+
+  for (let i = 0; i < evaluated[0].decision.reasons.length; i++) {
+    let worst = evaluated[0].decision.reasons[i];
+    let ids = [...evaluated[0].ids];
+
+    for (let g = 1; g < evaluated.length; g++) {
+      const r = evaluated[g].decision.reasons[i];
+      if (SEVERITY[r.outcome] > SEVERITY[worst.outcome]) {
+        worst = r;
+        ids = [...evaluated[g].ids];
+      } else if (SEVERITY[r.outcome] === SEVERITY[worst.outcome]) {
+        ids.push(...evaluated[g].ids);
+      }
+    }
+
+    if (ids.length === list.length) {
+      reasons.push(worst);
+      continue;
+    }
+    ids.sort((a, b) => (order.get(a) ?? 0) - (order.get(b) ?? 0));
+    reasons.push({
+      ...worst,
+      shifts: ids,
+      detail: `${worst.detail.replace(/\.$/, "")} (${ids.join(", ")}).`,
+    });
+  }
+
+  return {
+    allowed: reasons.every((r) => r.outcome !== "fail"),
+    warnings: reasons.filter((r) => r.outcome === "warn").length,
+    reasons,
+    context: evaluated[0].decision.context,
+  };
 }
 
 export interface DecideRosterInput {
@@ -194,14 +289,14 @@ export function decideRoster(input: DecideRosterInput): RosterDecision {
   const { roster, action, site, at, verifier } = input;
 
   const decisions = roster.map((m) =>
-    decide({
+    decideMember({
       person: m.person,
       credentials: m.credentials,
       action,
       site,
       at,
       verifier,
-      duties: m.duties,
+      shifts: m.shifts,
     }),
   );
 

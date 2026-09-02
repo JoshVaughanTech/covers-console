@@ -23,7 +23,13 @@ import {
 } from "react";
 import { LocalCredentialVerifier } from "./verifier";
 import { CREDENTIAL_TYPES } from "./hospitality";
-import { decide, decideRoster, summarise, summariseCoverage } from "./engine";
+import {
+  decideMember,
+  decideRoster,
+  summarise,
+  summariseCoverage,
+  type ShiftAssignment,
+} from "./engine";
 import { appendEvent, type NewAuditEvent } from "./audit";
 import { CREDENTIALS, SITES, WORKERS, TODAY, SEED_AUDIT } from "./seed";
 import type {
@@ -35,17 +41,17 @@ import type {
   DID,
   Identity,
   Site,
-  WorkFunction,
 } from "./types";
 
 /**
- * One slot on a roster. `duties` is what this person is rostered to *do* —
- * a bartender covering the gaming floor performs gaming duties whatever their
- * title says. Omit it and the engine falls back to their job title.
+ * One slot on a roster: who, and which shifts they are on.
+ *
+ * Duties belong to a shift rather than to a week — someone can be fine behind
+ * the bar Monday to Thursday and ineligible for Saturday's gaming shift.
  */
 export interface RosterAssignment {
   did: DID;
-  duties?: WorkFunction[];
+  shifts?: ShiftAssignment[];
 }
 
 export interface PublishResult {
@@ -75,7 +81,7 @@ interface IdaraState {
     did: DID,
     action: Action,
     siteId: string,
-    duties?: WorkFunction[],
+    shifts?: ShiftAssignment[],
   ) => Decision | null;
   /** pure pass over a roster — eligible / blocked / warnings. No audit. */
   evaluateRoster: (siteId: string, roster: RosterAssignment[]) => PublishResult;
@@ -129,19 +135,19 @@ export function IdaraProvider({ children }: { children: ReactNode }) {
       did: DID,
       action: Action,
       siteId: string,
-      duties?: WorkFunction[],
+      shifts?: ShiftAssignment[],
     ): Decision | null => {
       const person = workerIndex.get(did);
       const site = siteIndex.get(siteId);
       if (!person || !site) return null;
-      return decide({
+      return decideMember({
         person,
         credentials: credentials.filter((c) => c.subject === did),
         action,
         site,
         at: TODAY,
         verifier,
-        duties,
+        shifts,
       });
     },
     [workerIndex, siteIndex, credentials, verifier],
@@ -156,7 +162,7 @@ export function IdaraProvider({ children }: { children: ReactNode }) {
         .map(({ a, person }) => ({
           person,
           credentials: credentials.filter((c) => c.subject === person.did),
-          duties: a.duties,
+          shifts: a.shifts,
         }));
 
       if (!site) {

@@ -62,18 +62,36 @@ interface Scenario {
   coverage: number;
   overtime: string;
 }
+/* one shift in the week: when it is, and what it is */
+interface Shift {
+  /** display time, or "—" for a day off. */
+  time: string;
+  /**
+   * What this shift actually is, when it isn't what the job title implies.
+   * Idara checks the assignment, and it checks it per shift — someone can be
+   * fine behind the bar all week and ineligible for Saturday's gaming shift.
+   */
+  duties?: WorkFunction[];
+  label?: string;
+}
+
 /* a rostered staff member, keyed by the name Idara knows them by */
 interface CrewRow {
   name: string;
-  shifts: string[];
+  shifts: Shift[];
   total: string;
-  /**
-   * What this person is on for, when the roster puts them somewhere their job
-   * title wouldn't imply. Idara checks the assignment, not the title.
-   */
-  duties?: WorkFunction[];
-  dutyLabel?: string;
 }
+
+/** shift ids, used when a reason needs to name the day it came from */
+const DAY_IDS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+
+const OFF = "—";
+
+/** a week of shifts from display times, with per-day assignment overrides */
+const week = (
+  times: string[],
+  special: Record<number, { duties: WorkFunction[]; label: string }> = {},
+): Shift[] => times.map((time, i) => ({ time, ...(special[i] ?? {}) }));
 
 /* the location this roster is being built for */
 const SITE_ID = "s-brightwater";
@@ -173,25 +191,26 @@ export default function SchedulePage() {
 
   /* ---- the rostered crew (Idara-backed) ---- */
   const [crew, setCrew] = useState<CrewRow[]>([
-    { name: "Sophie Nguyen", shifts: ["11a – 7p", "11a – 7p", "11a – 7p", "11a – 7p", "11a – 7p", "—", "—"], total: "40h" },
-    // covering the gaming floor this week — a bartender by title, but the
-    // assignment is what Idara checks, so his missing RSG now bites
+    { name: "Sophie Nguyen", shifts: week(["11a – 7p", "11a – 7p", "11a – 7p", "11a – 7p", "11a – 7p", OFF, OFF]), total: "40h" },
+    // on the bar Mon–Thu, then the gaming floor on Saturday. A bartender by
+    // title, so only that one shift demands an RSG — and he hasn't got one.
     {
       name: "Darie Roberts",
-      shifts: ["4p – 12a", "4p – 12a", "4p – 12a", "4p – 12a", "—", "4p – 12a", "—"],
+      shifts: week(
+        ["4p – 12a", "4p – 12a", "4p – 12a", "4p – 12a", OFF, "4p – 12a", OFF],
+        { 5: { duties: ["serve_alcohol", "gaming"], label: "gaming floor" } },
+      ),
       total: "40h",
-      duties: ["serve_alcohol", "gaming"],
-      dutyLabel: "on the gaming floor",
     },
-    { name: "Aaron Patel", shifts: ["4p – 12a", "4p – 12a", "4p – 12a", "4p – 12a", "4p – 12a", "—", "—"], total: "40h" },
-    { name: "Priya Sharma", shifts: ["11a – 7p", "11a – 7p", "11a – 7p", "11a – 7p", "—", "—", "—"], total: "32h" },
-    { name: "Leanne Vidal", shifts: ["7a – 3p", "7a – 3p", "7a – 3p", "7a – 3p", "7a – 3p", "—", "—"], total: "40h" },
+    { name: "Aaron Patel", shifts: week(["4p – 12a", "4p – 12a", "4p – 12a", "4p – 12a", "4p – 12a", OFF, OFF]), total: "40h" },
+    { name: "Priya Sharma", shifts: week(["11a – 7p", "11a – 7p", "11a – 7p", "11a – 7p", OFF, OFF, OFF]), total: "32h" },
+    { name: "Leanne Vidal", shifts: week(["7a – 3p", "7a – 3p", "7a – 3p", "7a – 3p", "7a – 3p", OFF, OFF]), total: "40h" },
     // head chef: holds no RSA and doesn't need one — the licence binds to
     // alcohol service, so he clears the gate on induction + food handling
-    { name: "Hassan Ali", shifts: ["7a – 3p", "7a – 3p", "7a – 3p", "7a – 3p", "7a – 3p", "—", "—"], total: "40h" },
-    { name: "Jake Morrison", shifts: ["4p – 12a", "4p – 12a", "—", "4p – 12a", "4p – 12a", "—", "—"], total: "32h" },
-    { name: "Liam O'Brien", shifts: ["7a – 3p", "7a – 3p", "7a – 3p", "7a – 3p", "7a – 3p", "—", "—"], total: "40h" },
-    { name: "Michael Tan", shifts: ["11a – 7p", "11a – 7p", "11a – 7p", "11a – 7p", "—", "—", "—"], total: "32h" },
+    { name: "Hassan Ali", shifts: week(["7a – 3p", "7a – 3p", "7a – 3p", "7a – 3p", "7a – 3p", OFF, OFF]), total: "40h" },
+    { name: "Jake Morrison", shifts: week(["4p – 12a", "4p – 12a", OFF, "4p – 12a", "4p – 12a", OFF, OFF]), total: "32h" },
+    { name: "Liam O'Brien", shifts: week(["7a – 3p", "7a – 3p", "7a – 3p", "7a – 3p", "7a – 3p", OFF, OFF]), total: "40h" },
+    { name: "Michael Tan", shifts: week(["11a – 7p", "11a – 7p", "11a – 7p", "11a – 7p", OFF, OFF, OFF]), total: "32h" },
   ]);
 
   const shiftColor: Record<string, [string, string]> = {
@@ -200,15 +219,31 @@ export default function SchedulePage() {
     "4p – 12a": ["#EDEAFB", "#5B4BC4"], // evening / close
   };
 
-  /* the roster as Idara sees it: who, and what they are actually on for */
+  /* the roster as Idara sees it: who, and which shifts they're on. Days off
+     are dropped — an unworked shift can't make anyone ineligible. */
+  const shiftsOf = (c: CrewRow) =>
+    c.shifts
+      .map((sh, i) => ({ id: DAY_IDS[i], duties: sh.duties, off: sh.time === OFF }))
+      .filter((sh) => !sh.off)
+      .map(({ id, duties }) => ({ id, duties }));
+
   const assignmentsOf = (rows: CrewRow[]): RosterAssignment[] =>
     rows
-      .map((c) => ({ did: didOf[c.name], duties: c.duties }))
+      .map((c) => ({ did: didOf[c.name], shifts: shiftsOf(c) }))
       .filter((a) => Boolean(a.did));
 
   /* what each person is rostered onto, for explaining assignment-driven blocks */
   const dutyLabelOf = useMemo(
-    () => Object.fromEntries(crew.map((c) => [c.name, c.dutyLabel])) as Record<string, string | undefined>,
+    () =>
+      Object.fromEntries(
+        crew.map((c) => [
+          c.name,
+          c.shifts
+            .map((sh, i) => (sh.label ? `${DAY_IDS[i]} ${sh.label}` : null))
+            .filter(Boolean)
+            .join(", ") || undefined,
+        ]),
+      ) as Record<string, string | undefined>,
     [crew],
   );
 
@@ -216,7 +251,7 @@ export default function SchedulePage() {
   const decisionByName = useMemo(() => {
     const out: Record<string, Decision | null> = {};
     for (const c of crew) {
-      out[c.name] = decideFor(didOf[c.name], "be_rostered", SITE_ID, c.duties);
+      out[c.name] = decideFor(didOf[c.name], "be_rostered", SITE_ID, shiftsOf(c));
     }
     return out;
   }, [crew, decideFor, didOf]);
@@ -505,10 +540,25 @@ export default function SchedulePage() {
                 const blockReason = d && !d.allowed ? d.reasons.find((r) => r.outcome === "fail")?.detail : null;
                 return (
                   <tr key={i} style={{ borderTop: "1px solid var(--border)", opacity: d && !d.allowed ? 0.92 : 1 }}>
-                    <td style={{ padding: "8px 16px" }}><div style={{ display: "flex", alignItems: "center", gap: 8 }}><Avatar name={p.name} size={24} /><span><div style={{ fontWeight: 600, color: "var(--fg-1)", fontSize: 12.5 }}>{p.name}</div><div style={{ fontSize: 10.5, color: "var(--fg-4)" }}>{roleOf[p.name]}{p.dutyLabel && <span style={{ color: "var(--warning-fg)", fontWeight: 600 }}> · {p.dutyLabel}</span>}</div></span></div></td>
-                    {p.shifts.map((s, j) => {
-                      const c = shiftColor[s];
-                      return <td key={j} style={{ padding: "5px 3px", textAlign: "center" }}>{s === "—" || !c ? <span style={{ color: "var(--fg-4)" }}>—</span> : <span className="fs-tnum" style={{ background: c[0], color: c[1], fontSize: 10.5, fontWeight: 600, padding: "4px 5px", borderRadius: 6, display: "inline-block", whiteSpace: "nowrap" }}>{s}</span>}</td>;
+                    <td style={{ padding: "8px 16px" }}><div style={{ display: "flex", alignItems: "center", gap: 8 }}><Avatar name={p.name} size={24} /><span><div style={{ fontWeight: 600, color: "var(--fg-1)", fontSize: 12.5 }}>{p.name}</div><div style={{ fontSize: 10.5, color: "var(--fg-4)" }}>{roleOf[p.name]}{dutyLabelOf[p.name] && <span style={{ color: "var(--warning-fg)", fontWeight: 600 }}> · {dutyLabelOf[p.name]}</span>}</div></span></div></td>
+                    {p.shifts.map((sh, j) => {
+                      const c = shiftColor[sh.time];
+                      if (sh.time === OFF || !c) {
+                        return <td key={j} style={{ padding: "5px 3px", textAlign: "center" }}><span style={{ color: "var(--fg-4)" }}>—</span></td>;
+                      }
+                      // a shift assigned away from the person's usual duties is
+                      // ringed, so a block on one day is visible in the grid
+                      return (
+                        <td key={j} style={{ padding: "5px 3px", textAlign: "center" }}>
+                          <span
+                            className="fs-tnum"
+                            title={sh.label ? `${DAY_IDS[j]} · ${sh.label}` : undefined}
+                            style={{ background: c[0], color: c[1], fontSize: 10.5, fontWeight: 600, padding: "4px 5px", borderRadius: 6, display: "inline-block", whiteSpace: "nowrap", boxShadow: sh.label ? "0 0 0 1.5px var(--warning)" : undefined }}
+                          >
+                            {sh.time}
+                          </span>
+                        </td>
+                      );
                     })}
                     <td className="fs-tnum" style={{ padding: "8px 8px", textAlign: "right", fontWeight: 700, color: "var(--fg-1)" }}>{p.total}</td>
                     <td style={{ padding: "8px 12px", textAlign: "right" }}>

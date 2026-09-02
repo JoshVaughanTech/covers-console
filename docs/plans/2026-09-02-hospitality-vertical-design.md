@@ -197,18 +197,51 @@ title, holds no RSG, and is **blocked** — while Aaron, the same job title with
 gaming assignment, is eligible. The roster row and the publish gate both show
 *"Bartender · on the gaming floor"*, so the block explains itself.
 
-### What is still not modelled
-
-Duties are per-roster, not per-shift: the crew row carries one set of duties for the
-week rather than one per day. A person who works the bar Monday and the gaming floor
-Saturday is checked against the union of both for the whole week — conservative, so
-it over-checks rather than under-checks, but it is not the real shape. Per-shift
-assignment is the next refinement, and needs the roster model to carry shifts as
-first-class objects rather than display strings.
+Duties were still per-roster at this point — one set per crew row for the week.
+**Closed in §8.**
 
 ---
 
-## 8. Verification
+## 8. Duties per shift (added 2026-09-02)
+
+`RosterMember.duties` became `RosterMember.shifts: ShiftAssignment[]`, and
+`decideMember()` evaluates a person across everything they are rostered for.
+
+The previous step attached duties to a *week*, so someone on the bar Monday to
+Thursday and the gaming floor Saturday was checked against the union of both for
+every shift. That over-checks rather than under-checks, so it was safe — but it
+tells a manager "blocked" when the useful answer is "blocked on Saturday, fine the
+rest of the week".
+
+Three things make this cheap rather than combinatorial:
+
+- **Shifts are grouped by duty set before evaluation.** Five identical bar shifts
+  are one question, not five. A week with two distinct assignments costs two
+  `decide()` calls regardless of how many days it spans.
+- **Merging keeps the worst outcome per requirement** (fail > warn > pass > n/a),
+  which works because every group walks the same `site.requires` in the same order,
+  so reasons zip by index.
+- **A reason is annotated only when it doesn't apply to every shift.** The common
+  case — one duty set all week — returns the single decision untouched, so nothing
+  downstream sees new noise.
+
+Days off are dropped before evaluation: an unworked shift can't make anyone
+ineligible. `ShiftAssignment.id` is just a label ("Sat"), so the engine stays
+ignorant of calendars.
+
+The demo reads precisely now: Darie is on the bar Monday to Thursday and the gaming
+floor on Saturday, so the block is *"RSG not held (Sat)"* rather than a flat
+rejection, and the roster grid rings the one shift responsible.
+
+### What is still not modelled
+
+`ShiftAssignment` has no time in it — the id is a display label, so the engine can't
+reason about shift length, overlap, or rest between them. That's the boundary where
+eligibility stops and award interpretation begins.
+
+---
+
+## 9. Verification
 
 The demo narrative is pinned by `tests/demo.test.ts` so a seed edit can't quietly
 turn a blocked person eligible:
@@ -220,6 +253,6 @@ turn a blocked person eligible:
 - **Darie Roberts** — clears the hotel floor, blocked from the gaming room (no RSG) — *same building*
 - **Hassan Ali** — holds **no RSA at all** and still clears the hotel floor; blocked at the wedding (no allergen)
 - **Priya Sharma** — clears the venue and both catering operations on one RSA and three inductions
-- **Darie Roberts** — rostered onto the gaming floor: same job title as Aaron, different assignment, blocked for RSG
+- **Darie Roberts** — bar Mon–Thu, gaming floor Sat: same job title as Aaron, and blocked only for the Saturday shift
 
-136 tests pass; typecheck, lint and production build are clean.
+149 tests pass over this work; typecheck and lint are clean for it.
