@@ -18,6 +18,7 @@ export interface ButtonProps {
   iconRight?: string;
   children?: ReactNode;
   onClick?: () => void;
+  disabled?: boolean;
   style?: CSSProperties;
   type?: "button" | "submit" | "reset";
 }
@@ -45,6 +46,7 @@ export function Button({
   iconRight,
   children,
   onClick,
+  disabled,
   style,
   type = "button",
 }: ButtonProps) {
@@ -52,7 +54,7 @@ export function Button({
   const base: CSSProperties = {
     fontFamily: "var(--font-body)",
     fontWeight: 600,
-    cursor: "pointer",
+    cursor: disabled ? "not-allowed" : "pointer",
     display: "inline-flex",
     alignItems: "center",
     justifyContent: "center",
@@ -67,10 +69,11 @@ export function Button({
   return (
     <button
       type={type}
-      onClick={onClick}
+      onClick={disabled ? undefined : onClick}
+      disabled={disabled}
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
-      style={{ ...base, ...VARIANTS[variant], ...(hover ? HOVER[variant] : {}), ...style }}
+      style={{ ...base, ...VARIANTS[variant], ...(hover && !disabled ? HOVER[variant] : {}), ...(disabled ? { opacity: 0.5 } : {}), ...style }}
     >
       {icon && <Icon name={icon} size={size === "sm" ? 15 : 16} />}
       {children}

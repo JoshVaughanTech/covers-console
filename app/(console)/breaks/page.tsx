@@ -202,7 +202,12 @@ export default function BreaksPage() {
       <PageHead
         title="Break Compliance"
         sub={`${HIGA.awardLabel} · cl 16 — live entitlements from clock-ins, ${fmtClock(now, TZ)}.`}
-        right={modeBadge}
+        right={
+          <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+            {modeBadge}
+            <LinkBtn href="/reports/breaks">Weekly loading report</LinkBtn>
+          </div>
+        }
       />
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(5,1fr)", gap: 16, marginBottom: 16 }}>

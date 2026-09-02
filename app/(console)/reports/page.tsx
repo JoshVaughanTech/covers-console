@@ -249,6 +249,7 @@ export default function ReportsPage() {
         sub="Analytics across fairness, labour cost, attendance and compliance."
         right={
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <LinkBtn href="/reports/breaks">Break loading</LinkBtn>
             <Tabs tabs={RANGES} value={range} onChange={(v) => setRange(v as Range)} />
             <Button variant="sec" size="sm" icon="download" onClick={handleExport}>
               Export
