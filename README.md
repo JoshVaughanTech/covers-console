@@ -38,6 +38,7 @@ npm test         # Idara Core test suite (vitest)
 | `/schedule` | AI-powered rostering (shift grid, AI preview, **Idara publish gate**) |
 | `/jobs` | Functions & Events (venue functions + off-premise catering engagements) |
 | `/attendance` | Time & Attendance (live status, variance table, function profitability) |
+| `/breaks` | Break Compliance — live Hospitality Award cl 16 entitlements from Connecteam clock-ins, loading exposure, audited break decisions |
 | `/projects` | Run Sheets (event task board, timeline, verified sign-off) |
 | `/people` | People (staff directory, credentials-at-a-glance, profiles) |
 | `/comms` | Communications (function rooms, chat, acknowledgements) |

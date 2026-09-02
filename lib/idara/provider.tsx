@@ -88,6 +88,8 @@ interface IdaraState {
   /** write the publish outcome (clean OR blocked attempt) to the audit log. */
   recordPublish: (siteId: string, result: PublishResult, actor?: string) => void;
   revokeCredential: (credId: string, actor?: string) => void;
+  /** append any consequential event from a module (e.g. a break sent under cl 16). */
+  recordEvent: (ev: NewAuditEvent) => void;
 }
 
 /**
@@ -277,8 +279,9 @@ export function IdaraProvider({ children }: { children: ReactNode }) {
       evaluateRoster,
       recordPublish,
       revokeCredential,
+      recordEvent: record,
     }),
-    [credentials, auditLog, credentialsOf, workerIndex, siteIndex, decideFor, evaluateRoster, recordPublish, revokeCredential],
+    [credentials, auditLog, credentialsOf, workerIndex, siteIndex, decideFor, evaluateRoster, recordPublish, revokeCredential, record],
   );
 
   return <IdaraContext.Provider value={value}>{children}</IdaraContext.Provider>;
