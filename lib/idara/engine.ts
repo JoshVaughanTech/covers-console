@@ -21,6 +21,7 @@ import type {
   Identity,
   ISODate,
   Site,
+  WorkFunction,
 } from "./types";
 
 /** A valid credential within this many days of expiry raises a warning. */
@@ -34,6 +35,19 @@ export interface DecideInput {
   site: Site;
   at: ISODate;
   verifier: CredentialVerifier;
+  /**
+   * What this person is rostered to actually do on this shift.
+   *
+   * A job title is only a guess at someone's duties: put a bartender on the
+   * gaming floor for a night and they perform gaming duties regardless of what
+   * their title says. Where the roster knows the assignment, it is the
+   * authority; omit this and the engine falls back to the title.
+   *
+   * An explicitly empty array is a real statement — "rostered, performs none of
+   * the gated duties" — and is honoured. The fail-safe for *unknown* titles
+   * lives in functionsForRole().
+   */
+  duties?: WorkFunction[];
 }
 
 function daysUntil(from: ISODate, to: ISODate): number {
@@ -45,7 +59,8 @@ function daysUntil(from: ISODate, to: ISODate): number {
 export function decide(input: DecideInput): Decision {
   const { person, credentials, action, site, at, verifier } = input;
   const reasons: DecisionReason[] = [];
-  const duties = functionsForRole(person.role);
+  // the assignment is the authority; the job title is only the fallback
+  const duties = input.duties ?? functionsForRole(person.role);
 
   for (const req of site.requires) {
     const meta = CREDENTIAL_TYPES[req.type];
@@ -58,7 +73,10 @@ export function decide(input: DecideInput): Decision {
         code: "credential.not_applicable",
         outcome: "n/a",
         credentialType: req.type,
-        detail: `${meta.shortLabel} not required for ${person.role}.`,
+        // name the actual basis: the shift's assignment, or the job title
+        detail: input.duties
+          ? `${meta.shortLabel} not required for this assignment.`
+          : `${meta.shortLabel} not required for ${person.role}.`,
       });
       continue;
     }
@@ -143,6 +161,8 @@ export function decide(input: DecideInput): Decision {
 export interface RosterMember {
   person: Identity;
   credentials: Credential[];
+  /** duties for this shift; omitted falls back to the person's job title. */
+  duties?: WorkFunction[];
 }
 
 export interface DecideRosterInput {
@@ -181,6 +201,7 @@ export function decideRoster(input: DecideRosterInput): RosterDecision {
       site,
       at,
       verifier,
+      duties: m.duties,
     }),
   );
 

@@ -35,7 +35,18 @@ import type {
   DID,
   Identity,
   Site,
+  WorkFunction,
 } from "./types";
+
+/**
+ * One slot on a roster. `duties` is what this person is rostered to *do* —
+ * a bartender covering the gaming floor performs gaming duties whatever their
+ * title says. Omit it and the engine falls back to their job title.
+ */
+export interface RosterAssignment {
+  did: DID;
+  duties?: WorkFunction[];
+}
 
 export interface PublishResult {
   decisions: Decision[];
@@ -60,9 +71,14 @@ interface IdaraState {
   worker: (did: DID) => Identity | undefined;
   site: (id: string) => Site | undefined;
   /** pure eligibility preview — does NOT write to the audit log. */
-  decideFor: (did: DID, action: Action, siteId: string) => Decision | null;
+  decideFor: (
+    did: DID,
+    action: Action,
+    siteId: string,
+    duties?: WorkFunction[],
+  ) => Decision | null;
   /** pure pass over a roster — eligible / blocked / warnings. No audit. */
-  evaluateRoster: (siteId: string, dids: DID[]) => PublishResult;
+  evaluateRoster: (siteId: string, roster: RosterAssignment[]) => PublishResult;
   /** write the publish outcome (clean OR blocked attempt) to the audit log. */
   recordPublish: (siteId: string, result: PublishResult, actor?: string) => void;
   revokeCredential: (credId: string, actor?: string) => void;
@@ -109,7 +125,12 @@ export function IdaraProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const decideFor = useCallback(
-    (did: DID, action: Action, siteId: string): Decision | null => {
+    (
+      did: DID,
+      action: Action,
+      siteId: string,
+      duties?: WorkFunction[],
+    ): Decision | null => {
       const person = workerIndex.get(did);
       const site = siteIndex.get(siteId);
       if (!person || !site) return null;
@@ -120,20 +141,22 @@ export function IdaraProvider({ children }: { children: ReactNode }) {
         site,
         at: TODAY,
         verifier,
+        duties,
       });
     },
     [workerIndex, siteIndex, credentials, verifier],
   );
 
   const evaluateRoster = useCallback(
-    (siteId: string, dids: DID[]): PublishResult => {
+    (siteId: string, assignments: RosterAssignment[]): PublishResult => {
       const site = siteIndex.get(siteId);
-      const roster = dids
-        .map((did) => workerIndex.get(did))
-        .filter((p): p is Identity => p !== undefined)
-        .map((person) => ({
+      const roster = assignments
+        .map((a) => ({ a, person: workerIndex.get(a.did) }))
+        .filter((x): x is { a: RosterAssignment; person: Identity } => x.person !== undefined)
+        .map(({ a, person }) => ({
           person,
           credentials: credentials.filter((c) => c.subject === person.did),
+          duties: a.duties,
         }));
 
       if (!site) {

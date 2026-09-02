@@ -17,7 +17,14 @@ import {
   useConfirm,
 } from "@/components/ui";
 import type { Tone } from "@/lib/status";
-import { useIdara, CREDENTIAL_TYPES, type Decision, type PublishResult } from "@/lib/idara";
+import {
+  useIdara,
+  CREDENTIAL_TYPES,
+  type Decision,
+  type PublishResult,
+  type RosterAssignment,
+  type WorkFunction,
+} from "@/lib/idara";
 import { PageHead, CardHead, LinkBtn } from "@/components/screen/page-head";
 
 /* ---- types ---- */
@@ -60,6 +67,12 @@ interface CrewRow {
   name: string;
   shifts: string[];
   total: string;
+  /**
+   * What this person is on for, when the roster puts them somewhere their job
+   * title wouldn't imply. Idara checks the assignment, not the title.
+   */
+  duties?: WorkFunction[];
+  dutyLabel?: string;
 }
 
 /* the location this roster is being built for */
@@ -161,7 +174,15 @@ export default function SchedulePage() {
   /* ---- the rostered crew (Idara-backed) ---- */
   const [crew, setCrew] = useState<CrewRow[]>([
     { name: "Sophie Nguyen", shifts: ["11a – 7p", "11a – 7p", "11a – 7p", "11a – 7p", "11a – 7p", "—", "—"], total: "40h" },
-    { name: "Darie Roberts", shifts: ["4p – 12a", "4p – 12a", "4p – 12a", "4p – 12a", "—", "4p – 12a", "—"], total: "40h" },
+    // covering the gaming floor this week — a bartender by title, but the
+    // assignment is what Idara checks, so his missing RSG now bites
+    {
+      name: "Darie Roberts",
+      shifts: ["4p – 12a", "4p – 12a", "4p – 12a", "4p – 12a", "—", "4p – 12a", "—"],
+      total: "40h",
+      duties: ["serve_alcohol", "gaming"],
+      dutyLabel: "on the gaming floor",
+    },
     { name: "Aaron Patel", shifts: ["4p – 12a", "4p – 12a", "4p – 12a", "4p – 12a", "4p – 12a", "—", "—"], total: "40h" },
     { name: "Priya Sharma", shifts: ["11a – 7p", "11a – 7p", "11a – 7p", "11a – 7p", "—", "—", "—"], total: "32h" },
     { name: "Leanne Vidal", shifts: ["7a – 3p", "7a – 3p", "7a – 3p", "7a – 3p", "7a – 3p", "—", "—"], total: "40h" },
@@ -179,10 +200,24 @@ export default function SchedulePage() {
     "4p – 12a": ["#EDEAFB", "#5B4BC4"], // evening / close
   };
 
+  /* the roster as Idara sees it: who, and what they are actually on for */
+  const assignmentsOf = (rows: CrewRow[]): RosterAssignment[] =>
+    rows
+      .map((c) => ({ did: didOf[c.name], duties: c.duties }))
+      .filter((a) => Boolean(a.did));
+
+  /* what each person is rostered onto, for explaining assignment-driven blocks */
+  const dutyLabelOf = useMemo(
+    () => Object.fromEntries(crew.map((c) => [c.name, c.dutyLabel])) as Record<string, string | undefined>,
+    [crew],
+  );
+
   /* eligibility per crew member — live preview from Idara (no audit) */
   const decisionByName = useMemo(() => {
     const out: Record<string, Decision | null> = {};
-    for (const c of crew) out[c.name] = decideFor(didOf[c.name], "be_rostered", SITE_ID);
+    for (const c of crew) {
+      out[c.name] = decideFor(didOf[c.name], "be_rostered", SITE_ID, c.duties);
+    }
     return out;
   }, [crew, decideFor, didOf]);
 
@@ -237,8 +272,7 @@ export default function SchedulePage() {
 
   /* ---- actions ---- */
   const handlePublish = async () => {
-    const dids = crew.map((c) => didOf[c.name]).filter(Boolean);
-    const result = evaluateRoster(SITE_ID, dids);
+    const result = evaluateRoster(SITE_ID, assignmentsOf(crew));
 
     // Idara gate: a non-compliant roster cannot be published.
     if (!result.published) {
@@ -276,7 +310,7 @@ export default function SchedulePage() {
     const eligibleNames = new Set(gate.eligible.map((d) => d.context.subjectName));
     const removed = gate.blocked.length;
     const remaining = crew.filter((c) => eligibleNames.has(c.name));
-    const result = evaluateRoster(SITE_ID, remaining.map((c) => didOf[c.name]));
+    const result = evaluateRoster(SITE_ID, assignmentsOf(remaining));
 
     if (!result.published) {
       setGate(result);
@@ -471,7 +505,7 @@ export default function SchedulePage() {
                 const blockReason = d && !d.allowed ? d.reasons.find((r) => r.outcome === "fail")?.detail : null;
                 return (
                   <tr key={i} style={{ borderTop: "1px solid var(--border)", opacity: d && !d.allowed ? 0.92 : 1 }}>
-                    <td style={{ padding: "8px 16px" }}><div style={{ display: "flex", alignItems: "center", gap: 8 }}><Avatar name={p.name} size={24} /><span><div style={{ fontWeight: 600, color: "var(--fg-1)", fontSize: 12.5 }}>{p.name}</div><div style={{ fontSize: 10.5, color: "var(--fg-4)" }}>{roleOf[p.name]}</div></span></div></td>
+                    <td style={{ padding: "8px 16px" }}><div style={{ display: "flex", alignItems: "center", gap: 8 }}><Avatar name={p.name} size={24} /><span><div style={{ fontWeight: 600, color: "var(--fg-1)", fontSize: 12.5 }}>{p.name}</div><div style={{ fontSize: 10.5, color: "var(--fg-4)" }}>{roleOf[p.name]}{p.dutyLabel && <span style={{ color: "var(--warning-fg)", fontWeight: 600 }}> · {p.dutyLabel}</span>}</div></span></div></td>
                     {p.shifts.map((s, j) => {
                       const c = shiftColor[s];
                       return <td key={j} style={{ padding: "5px 3px", textAlign: "center" }}>{s === "—" || !c ? <span style={{ color: "var(--fg-4)" }}>—</span> : <span className="fs-tnum" style={{ background: c[0], color: c[1], fontSize: 10.5, fontWeight: 600, padding: "4px 5px", borderRadius: 6, display: "inline-block", whiteSpace: "nowrap" }}>{s}</span>}</td>;
@@ -612,7 +646,7 @@ export default function SchedulePage() {
                     <Avatar name={d.context.subjectName} size={28} />
                     <div style={{ flex: 1 }}>
                       <div style={{ fontSize: 13.5, fontWeight: 600, color: "var(--fg-1)" }}>{d.context.subjectName}</div>
-                      <div style={{ fontSize: 11.5, color: "var(--fg-4)" }}>{roleOf[d.context.subjectName]}</div>
+                      <div style={{ fontSize: 11.5, color: "var(--fg-4)" }}>{roleOf[d.context.subjectName]}{dutyLabelOf[d.context.subjectName] && <span style={{ color: "var(--warning-fg)", fontWeight: 600 }}> · {dutyLabelOf[d.context.subjectName]}</span>}</div>
                     </div>
                     <Badge tone="danger" icon="shield-alert">Blocked</Badge>
                   </div>

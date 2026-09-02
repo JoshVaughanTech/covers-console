@@ -23,5 +23,5 @@ export { appendEvent, verifyChain, shortHash, GENESIS_HASH, HASH_ALGORITHM } fro
 export { sha256Hex, canonicalJson } from "./hash";
 export type { NewAuditEvent } from "./audit";
 export { IdaraProvider, useIdara } from "./provider";
-export type { PublishResult } from "./provider";
+export type { PublishResult, RosterAssignment } from "./provider";
 export { TODAY, SITES, WORKERS, CREDENTIALS, ISSUERS } from "./seed";

@@ -115,11 +115,10 @@ person's usual title. The room already scopes the requirement. So:
 > Role scoping is for requirements that differ **between people at the same
 > location** — RSA versus the kitchen at one pub.
 
-RSG is therefore deliberately unscoped at the gaming room. This is the limit of
-the current model: duties are derived from the person's title, not from the
-assignment. A bartender covering a gaming shift at a venue that *doesn't* have a
-dedicated gaming location would still be under-checked. Fixing that properly means
-duties travelling with the roster assignment rather than the person.
+RSG is therefore deliberately unscoped at the gaming room. That was the limit of
+the model at the time: duties came from the person's title, not from the
+assignment, so a bartender covering a gaming shift at a venue *without* a
+dedicated gaming location went under-checked. **Closed in §7.**
 
 ---
 
@@ -163,7 +162,53 @@ venue still owes a supervisor.
 
 ---
 
-## 7. Verification
+## 7. Duties from the shift assignment (added 2026-09-02)
+
+`DecideInput` and `RosterMember` gained `duties?: WorkFunction[]`. Where the roster
+knows what someone is on for, **the assignment is the authority and the job title
+is only the fallback** — one line in `decide()`:
+
+```ts
+const duties = input.duties ?? functionsForRole(person.role);
+```
+
+This closes the hole left by §5. A title is a guess at what someone does; put a
+bartender on the gaming floor for a night and they perform gaming duties whatever
+their title says. Previously the only way to catch that was to give the gaming area
+its own `Site`, which works for Brightwater's separately-licensed room but not for a
+venue with a gaming area and no separate location.
+
+Three properties worth keeping straight, all pinned by tests:
+
+- **The assignment replaces the title, it does not add to it.** A chef put on the
+  bar owes RSA and not food handling *for that shift*. Union-ing the two would
+  over-demand.
+- **An explicitly empty `duties: []` is honoured.** "Rostered, performs none of the
+  gated duties" is a real statement about an assignment. The fail-safe for *unknown
+  job titles* lives in `functionsForRole()` and is untouched — the two cases are
+  deliberately distinct.
+- **The `n/a` reason names its basis** — "not required for this assignment" versus
+  "not required for Bartender" — because otherwise a skipped check cites a job title
+  that had nothing to do with the decision.
+
+Demonstrated rather than described: Brightwater Hotel now gates RSG on the `gaming`
+duty, and Darie is rostered onto the gaming floor for the week. He is a Bartender by
+title, holds no RSG, and is **blocked** — while Aaron, the same job title with no
+gaming assignment, is eligible. The roster row and the publish gate both show
+*"Bartender · on the gaming floor"*, so the block explains itself.
+
+### What is still not modelled
+
+Duties are per-roster, not per-shift: the crew row carries one set of duties for the
+week rather than one per day. A person who works the bar Monday and the gaming floor
+Saturday is checked against the union of both for the whole week — conservative, so
+it over-checks rather than under-checks, but it is not the real shape. Per-shift
+assignment is the next refinement, and needs the roster model to carry shifts as
+first-class objects rather than display strings.
+
+---
+
+## 8. Verification
 
 The demo narrative is pinned by `tests/demo.test.ts` so a seed edit can't quietly
 turn a blocked person eligible:
@@ -173,7 +218,8 @@ turn a blocked person eligible:
 - **Michael Tan** — blocked, RSA revoked by the regulator, with a dated audit record
 - **Leanne Vidal** — eligible, warned: RSA expiring in 18 days
 - **Darie Roberts** — clears the hotel floor, blocked from the gaming room (no RSG) — *same building*
-- **Hassan Ali** — holds **no RSA at all** and still clears the hotel floor; blocked at the wedding (no allergen, no FSS)
+- **Hassan Ali** — holds **no RSA at all** and still clears the hotel floor; blocked at the wedding (no allergen)
 - **Priya Sharma** — clears the venue and both catering operations on one RSA and three inductions
+- **Darie Roberts** — rostered onto the gaming floor: same job title as Aaron, different assignment, blocked for RSG
 
-126 tests pass; typecheck, lint and production build are clean.
+136 tests pass; typecheck, lint and production build are clean.

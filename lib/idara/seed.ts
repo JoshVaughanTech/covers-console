@@ -47,7 +47,9 @@ export const SITES: Site[] = [
     id: "s-brightwater",
     name: "Brightwater Hotel",
     region: "Fitzroy",
-    requires: BASE_REQUIREMENTS,
+    // the hotel has a gaming area of its own, so RSG binds to whoever is
+    // rostered onto it — decided from the shift assignment, not the job title
+    requires: [...BASE_REQUIREMENTS, { type: "rsg", appliesTo: ["gaming"] }],
     // the bistro serves food, so the venue owes a nominated supervisor on
     // shift — covered here by Sophie and Priya, so the gate stays green
     requiresOnRoster: [{ type: "food_safety_supervisor", minHolders: 1 }],

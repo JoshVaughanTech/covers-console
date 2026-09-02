@@ -108,6 +108,13 @@ ignorant of bars and kitchens. Two rules make it safe to rely on:
 Where a location *implies* the duty, the location scopes it instead — RSG is unscoped at
 the gaming room, because being rostered there is the gaming duty whatever your title.
 
+**And a job title is only the fallback.** `DecideInput.duties` carries what someone is
+actually rostered to do, and where the roster knows the assignment it wins:
+`input.duties ?? functionsForRole(person.role)`. Put a bartender on the gaming floor and
+they owe an RSG whatever their title says. The assignment *replaces* the title rather than
+adding to it — a chef put on the bar owes RSA, not food handling, for that shift — and an
+explicit `duties: []` is honoured, which is distinct from the fail-safe for unknown titles.
+
 **Some obligations belong to the shift, not the person.** A venue must have a nominated
 Food Safety Supervisor on; it does not need every kitchen hand to hold the ticket.
 `Site.requiresOnRoster` carries those, and `decideRoster()` checks them — mapping
@@ -132,12 +139,13 @@ bartender cleared for the floor but not the **gaming room**, because RSG is lice
 separately. A functions coordinator clears the venue *and* both catering operations on
 one RSA and three separate inductions — the portability argument in miniature. The head
 chef holds no RSA at all and is still eligible, because the licence never bound to the
-kitchen.
+kitchen. And a bartender rostered onto the gaming floor is blocked for RSG while another
+bartender, same title but no gaming assignment, is not.
 
 ### Tests
 
-`npm test` — 126 tests over the engine, verifier, hash chain, role scoping, roster coverage
-and seed dataset.
+`npm test` — 136 tests over the engine, verifier, hash chain, role scoping, roster coverage,
+shift assignments and seed dataset.
 Notably `tests/demo.test.ts` pins the demo's *narrative*: if a seeded credential date
 is edited and a blocked staff member quietly becomes eligible, the suite fails before
 the demo does. `tests/hash.test.ts` checks the SHA-256 implementation against published
