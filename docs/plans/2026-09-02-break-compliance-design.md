@@ -11,7 +11,7 @@ per person, when a break must be given under the **Hospitality Industry (General
 Award 2020 (MA000009) clause 16** — and what it is costing when it isn't. It is the
 first feature in the console that is driven by real time-clock data rather than seed.
 
-The pitch line: *"You already know who's clocked in. FairShift tells you who's
+The pitch line: *"You already know who's clocked in. Covers tells you who's
 about to cost you 50% loading, and proves you sent them on break when you did."*
 
 ---

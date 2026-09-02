@@ -6,7 +6,7 @@
 > needed, often as a **zero-knowledge proof**. Account abstraction makes the
 > wallet usable by people who will never touch crypto.
 >
-> The hospitality/FairShift app is **Idara's first relying party** — the
+> The hospitality/Covers app is **Idara's first relying party** — the
 > bootstrapping wedge, not the product.
 
 ---
@@ -28,7 +28,7 @@ the Australian Privacy Act, since an immutable ledger can't honour erasure).
             issues VC                         requests proof
  ┌────────┐ ───────────▶ ┌──────────────┐ ◀─────────────── ┌───────────────┐
  │ ISSUER │              │   HOLDER      │                  │ RELYING PARTY │
- │(Idara, │              │  (the user's  │  presents ZK     │ (FairShift,   │
+ │(Idara, │              │  (the user's  │  presents ZK     │ (Covers,   │
  │ RTO,   │              │   Idara       │  proof / VP      │  any 3rd-party│
  │ reg!.) │              │   wallet)     │ ───────────────▶ │  software)    │
  └────────┘              └──────────────┘                  └───────────────┘

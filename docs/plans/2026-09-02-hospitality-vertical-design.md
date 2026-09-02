@@ -1,4 +1,4 @@
-# Design — Re-pointing FairShift from construction to hospitality
+# Design — Re-pointing Covers from construction to hospitality
 
 **Date:** 2026-09-02 · **Status:** implemented
 
@@ -6,7 +6,7 @@
 
 ## 1. What changed and why
 
-FairShift Console was built around Australian construction: White Cards, SWMS,
+Covers Console was built around Australian construction: White Cards, SWMS,
 site inductions, carpenters and concreters. This re-points it at **hospitality** —
 multi-venue pub and hotel groups, *and* the off-premise catering they run
 alongside.

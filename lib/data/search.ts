@@ -1,5 +1,5 @@
 /* ============================================================
-   FairShift — global search index
+   Covers — global search index
    A static, in-memory index of people, jobs and sites used by
    useGlobalSearch(). Results route to real console screens.
    ============================================================ */

@@ -1,8 +1,8 @@
 {
-  "name": "fairshift-console",
+  "name": "covers-console",
   "version": "0.1.0",
   "private": true,
-  "description": "FairShift Console — desktop workforce operations app (powered by idara)",
+  "description": "Covers Console — desktop workforce operations app (powered by idara)",
   "scripts": {
     "dev": "next dev",
     "build": "next build",

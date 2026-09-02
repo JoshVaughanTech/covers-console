@@ -13,7 +13,7 @@ const eslintConfig = [
   ...compat.extends("next/core-web-vitals", "next/typescript"),
   {
     rules: {
-      // Brand marks (FairShift/idara logos) are tiny static PNGs in /public,
+      // Brand marks (Covers/idara logos) are tiny static PNGs in /public,
       // rendered at exact px sizes for pixel-fidelity with the design handoff.
       // next/image optimization offers no benefit at <24px and can shift
       // sub-20px inline layout, so plain <img> is intentional here.

@@ -1,5 +1,5 @@
 /* ============================================================
-   FairShift — status tone map
+   Covers — status tone map
    Each tone resolves to [background, foreground, dot] color vars.
    Status is always a small dot/icon + tinted pill — never a large
    fill (see BRAND_README). Destructure as: const [bg, fg, dc] = STATUS[tone]

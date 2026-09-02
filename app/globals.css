@@ -1,5 +1,5 @@
 /* ============================================================
-   FairShift — Design System Foundations (Tailwind v4)
+   Covers — Design System Foundations (Tailwind v4)
    Colors + Typography tokens (base + semantic)
    Powered by idara
    Ported from colors_and_type.css. Fonts are wired via
@@ -7,7 +7,7 @@
    ============================================================ */
 @import "tailwindcss";
 
-/* ---- Expose FairShift tokens to Tailwind's utility engine ----
+/* ---- Expose Covers tokens to Tailwind's utility engine ----
    `@theme inline` lets utilities (bg-fs-teal, text-fg-2, …) resolve
    to the raw CSS variables declared in :root below, so both the
    ported inline-style components (var(--fs-teal)) and Tailwind

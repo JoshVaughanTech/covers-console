@@ -41,11 +41,11 @@ export function Sidebar() {
         }}
       >
         <img
-          src="/assets/fairshift-icon-t.png"
-          alt="FairShift"
+          src="/assets/covers-icon-t.png"
+          alt="Covers"
           style={{ width: 24, height: 24, objectFit: "contain" }}
         />
-        FairShift
+        covers
       </div>
       <nav style={{ display: "flex", flexDirection: "column", gap: 2, flex: 1 }}>
         {NAV.map((n) => {

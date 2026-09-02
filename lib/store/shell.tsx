@@ -1,7 +1,7 @@
 "use client";
 
 /* ============================================================
-   FairShift — app-shell context
+   Covers — app-shell context
    Holds the active company + the notifications feed. Company and
    notification read-state persist to localStorage (SSR-guarded,
    hydrated inside useEffect to avoid hydration mismatch).
@@ -61,8 +61,8 @@ const COMPANIES = [
 ];
 const DEFAULT_COMPANY = "Brightwater Hospitality";
 
-const COMPANY_KEY = "fairshift.company";
-const READ_KEY = "fairshift.notifications.read";
+const COMPANY_KEY = "covers.company";
+const READ_KEY = "covers.notifications.read";
 const MAX_RESULTS = 8;
 
 const SEED_NOTIFICATIONS: Notification[] = [

@@ -1,4 +1,4 @@
-/* Barrel export for the FairShift UI primitive library. */
+/* Barrel export for the Covers UI primitive library. */
 export { Icon, type IconProps } from "./icon";
 export { Avatar, AvatarStack, type AvatarProps, type AvatarStackProps } from "./avatar";
 export { Button, type ButtonProps, type ButtonVariant } from "./button";

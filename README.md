@@ -1,7 +1,9 @@
-# FairShift Console
+# Covers Console
 
-The desktop **workforce operations** web app for **FairShift** — *powered by idara* (identity &
-credential verification). Built from the FairShift design system handoff as a real
+> Formerly FairShift. Renamed Sep 2026 — see `docs/plans/2026-09-02-covers-rebrand.md`.
+
+The desktop **workforce operations** web app for **Covers** — *powered by idara* (identity &
+credential verification). Built from the Covers design system handoff as a real
 **Next.js 15 + TypeScript + Tailwind v4** application (the handoff prototypes were React-via-Babel
 references; this is the production recreation).
 
@@ -72,7 +74,7 @@ lib/
   data/search.ts         # static search index
 tests/                   # vitest suite over Idara Core
 docs/                    # identity architecture + the Experiment 1 mandate test
-public/assets/           # FairShift + idara logos & marks
+public/assets/           # Covers + idara logos & marks
 ```
 
 ## Idara Core (`lib/idara/`)
