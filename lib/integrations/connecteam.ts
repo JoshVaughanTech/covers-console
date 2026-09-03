@@ -23,6 +23,8 @@ interface TimePoint { timestamp: number; timezone?: string }
 interface CtShift { id: string; start: TimePoint; end: TimePoint | null; schedulerShiftId?: string | null }
 interface CtBreak { id?: string; manualBreakId?: string; start: TimePoint; end: TimePoint | null }
 interface CtUserRow { userId: number; shifts?: CtShift[]; manualBreaks?: CtBreak[] }
+/** A break TYPE as configured on the time clock, not an instance of one. */
+export interface CtManualBreak { id: string; name?: string; isPaid?: boolean; duration?: number }
 interface CtUser { userId?: number; id?: number; firstName?: string; lastName?: string; employmentType?: string; customFields?: Record<string, string> }
 
 export interface ConnecteamConfig {
@@ -32,6 +34,31 @@ export interface ConnecteamConfig {
   timezone?: string;
   /** map Connecteam userId → site name for the board; optional */
   siteName?: string;
+}
+
+/**
+ * Meal or rest, decided by what a break IS rather than what it is called.
+ *
+ * Under the Hospitality Award the meal break is the unpaid one (cl 16.2, at
+ * least 30 minutes) and rest breaks are paid (Table 2, 20 minutes). Connecteam
+ * returns isPaid and duration on every break type, so payment status is the
+ * reliable signal.
+ *
+ * The name is not. A real venue's configured types are "Break" (unpaid, 30 min)
+ * and "Rest Break" (paid, 20 min): a name-based classifier reads the first as a
+ * rest break, so the meal is never satisfied, 50% loading accrues from the 6h
+ * mark for the whole shift, and the weekly report bills for breaks that were
+ * actually taken. That was this function's previous behaviour.
+ *
+ * Name and duration remain as fallbacks for a clock that omits isPaid.
+ */
+export function classifyBreak(b: CtManualBreak): BreakKind {
+  if (b.isPaid === false) return "meal";
+  if (b.isPaid === true) return "rest";
+  if (/meal|lunch|dinner|unpaid/i.test(b.name ?? "")) return "meal";
+  if (/rest|tea|smoko|coffee/i.test(b.name ?? "")) return "rest";
+  // last resort: a meal break is long, a rest break is short
+  return (b.duration ?? 0) >= 30 ? "meal" : "rest";
 }
 
 export class ConnecteamClient {
@@ -65,10 +92,8 @@ export class ConnecteamClient {
 
   private async loadBreakKinds(): Promise<Map<string, BreakKind>> {
     if (!this.breakKinds) {
-      const d = await this.get<{ manualBreaks?: { id: string; name?: string }[] }>(`/time-clock/v1/time-clocks/${this.cfg.timeClockId}/manual-breaks`);
-      this.breakKinds = new Map(
-        (d.manualBreaks ?? []).map((b) => [b.id, /meal|lunch|dinner|unpaid/i.test(b.name ?? "") ? "meal" : "rest"]),
-      );
+      const d = await this.get<{ manualBreaks?: CtManualBreak[] }>(`/time-clock/v1/time-clocks/${this.cfg.timeClockId}/manual-breaks`);
+      this.breakKinds = new Map((d.manualBreaks ?? []).map((b) => [b.id, classifyBreak(b)]));
     }
     return this.breakKinds;
   }

@@ -55,7 +55,17 @@ enterprise agreements, Restaurant Award (MA000119) variants.
 
 - `GET /time-clock/v1/time-clocks/{id}/time-activities` — open shift = `end: null`
 - `GET /time-clock/v1/time-clocks/{id}/manual-breaks` — break types; **meal vs rest is
-  classified by name** (`meal|lunch|dinner|unpaid` → meal). Venues must name breaks accordingly.
+  classified by `isPaid`**. Under cl 16 the meal break is the unpaid one and rest breaks are
+  paid, and the API returns `isPaid` and `duration` on every type. Name and duration remain
+  as fallbacks for a clock that omits the flag.
+
+  **Corrected 2026-09-03, against the live account.** This originally classified by name and
+  required venues to name their breaks accordingly. Discovery against real data showed why
+  that fails: the account's configured types are `Break` (unpaid, 30 min) and `Rest Break`
+  (paid, 20 min). "Break" matches none of `meal|lunch|dinner|unpaid`, so the meal break was
+  read as a rest break — cl 16.2 never satisfied, 50% loading accruing from the 6h mark for
+  the whole shift, and the weekly report billing for breaks that had been taken. Pinned by
+  `tests/break-kinds.test.ts` using the account's actual types.
 - `GET /users/v1/users` — names, employment type
 - `GET /scheduler/v1/schedulers/{sid}/shifts/{id}` — rostered end (optional)
 - Time Clock API is a **paid Connecteam add-on** ("Operations API"). Check before quoting.
