@@ -35,6 +35,8 @@ function eventMeta(e: AuditEvent): EventMeta {
       return { icon: "badge-check", tone: "success", kind: "Credential issued" };
     case "credential.revoked":
       return { icon: "shield-off", tone: "danger", kind: "Credential revoked" };
+    case "shift.assigned":
+      return { icon: "user-check", tone: "success", kind: "Shift assigned" };
     case "break.decision":
       return e.data.overdue
         ? { icon: "coffee", tone: "warning", kind: "Break sent (late)" }

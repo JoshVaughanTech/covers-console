@@ -162,12 +162,16 @@ export const CREDENTIALS: Credential[] = [
   // be rostered alone, because the venue still owes a Food Safety Supervisor
   cred(W["Darie Roberts"], "site_induction", ISSUERS.idara, "2024-11-01", { claims: { siteId: "s-northside" } }),
   cred(W["Darie Roberts"], "food_handling", ISSUERS.rto, "2025-08-01"),
+  cred(W["Darie Roberts"], "site_induction", ISSUERS.idara, "2024-12-01", { claims: { siteId: "s-werribee-wedding" } }),
+  cred(W["Darie Roberts"], "allergen_management", ISSUERS.rto, "2026-02-01"),
 
   // Leanne — RSA expiring within the warning window
   cred(W["Leanne Vidal"], "rsa", ISSUERS.liquor, "2024-06-03", { claims: { cert: "RSA-220778" } }),
   cred(W["Leanne Vidal"], "site_induction", ISSUERS.idara, "2024-10-12", { claims: { siteId: "s-brightwater" } }),
   cred(W["Leanne Vidal"], "food_handling", ISSUERS.rto, "2025-06-20"),
   cred(W["Leanne Vidal"], "rsg", ISSUERS.gaming, "2025-04-01", { claims: { cert: "RSG-110293" } }),
+  cred(W["Leanne Vidal"], "site_induction", ISSUERS.idara, "2024-12-15", { claims: { siteId: "s-docklands-lunch" } }),
+  cred(W["Leanne Vidal"], "allergen_management", ISSUERS.rto, "2026-04-01"),
 
   // Mitch — gaming-room ready
   cred(W["Mitch Egan"], "rsa", ISSUERS.liquor, "2025-09-01", { claims: { cert: "RSA-551119" } }),
@@ -175,6 +179,8 @@ export const CREDENTIALS: Credential[] = [
   cred(W["Mitch Egan"], "site_induction", ISSUERS.idara, "2024-12-01", { claims: { siteId: "s-brightwater-gaming" } }),
   cred(W["Mitch Egan"], "food_handling", ISSUERS.rto, "2025-07-15"),
   cred(W["Mitch Egan"], "rsg", ISSUERS.gaming, "2025-08-01", { claims: { cert: "RSG-448120" } }),
+  cred(W["Mitch Egan"], "site_induction", ISSUERS.idara, "2024-12-01", { claims: { siteId: "s-werribee-wedding" } }),
+  cred(W["Mitch Egan"], "allergen_management", ISSUERS.rto, "2026-01-10"),
 
   // Aaron — clean
   cred(W["Aaron Patel"], "rsa", ISSUERS.liquor, "2025-12-01", { claims: { cert: "RSA-905482" } }),

@@ -14,6 +14,7 @@ export const NAV: NavItem[] = [
   { id: "overview", label: "Overview", icon: "layout-grid", href: "/overview" },
   { id: "schedule", label: "Schedule", icon: "calendar-days", href: "/schedule" },
   { id: "jobs", label: "Functions", icon: "party-popper", href: "/jobs" },
+  { id: "open-shifts", label: "Open Shifts", icon: "hand", href: "/open-shifts" },
   { id: "attendance", label: "Time & Attendance", icon: "clock", href: "/attendance" },
   { id: "breaks", label: "Break Compliance", icon: "coffee", href: "/breaks" },
   { id: "projects", label: "Run Sheets", icon: "clipboard-list", href: "/projects" },

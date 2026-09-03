@@ -183,7 +183,9 @@ export type AuditEventType =
   | "credential.revoked"
   | "roster.published"
   /** a supervisor acting on an award break entitlement (Break Compliance). */
-  | "break.decision";
+  | "break.decision"
+  /** a manager assigning someone to an open shift (Open Shifts). */
+  | "shift.assigned";
 
 export interface AuditEvent {
   /** monotonic sequence number, 0-based. */
