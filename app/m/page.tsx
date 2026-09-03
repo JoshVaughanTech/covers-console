@@ -36,9 +36,16 @@ const SEV: Record<Severity, { label: string; bg: string; fg: string; border: str
   0: { label: "Clear", bg: "var(--success-bg)", fg: "var(--success-fg)", border: "var(--success)" },
 };
 
+interface Degradation {
+  scope: string;
+  effect: string;
+}
+
 interface Payload {
   mode: "demo" | "live" | "error";
   sessions: ShiftSession[];
+  /** checks that cannot run because the integration lacks a scope */
+  degraded?: Degradation[];
 }
 
 /** A decision this device has sent, and what became of it. */
@@ -177,6 +184,17 @@ export default function MobileBreaksPage() {
         <Banner tone="danger">Time-clock data unavailable — this list may be out of date.</Banner>
       )}
 
+      {/* A check that is off for want of a permission looks exactly like one
+          that passed, so it is named here rather than left to be inferred. */}
+      {(payload?.degraded ?? []).length > 0 && (
+        <Banner tone="warn">
+          <strong>Some checks are not running.</strong>
+          {(payload?.degraded ?? []).map((d) => (
+            <span key={d.scope} style={{ display: "block", marginTop: 4 }}>{d.effect}</span>
+          ))}
+        </Banner>
+      )}
+
       {queue.length === 0 && staff.length > 0 && (
         <Banner tone="success">Nobody is due or overdue. {staff.length} on shift.</Banner>
       )}
@@ -259,9 +277,11 @@ function Section({ title, children }: { title: string; children: React.ReactNode
   );
 }
 
-function Banner({ tone, children }: { tone: "danger" | "success"; children: React.ReactNode }) {
+function Banner({ tone, children }: { tone: "danger" | "success" | "warn"; children: React.ReactNode }) {
   const c = tone === "danger"
     ? { bg: "var(--danger-bg)", fg: "var(--danger-fg)", border: "var(--danger)" }
+    : tone === "warn"
+    ? { bg: "var(--warning-bg)", fg: "var(--warning-fg)", border: "var(--warning)" }
     : { bg: "var(--success-bg)", fg: "var(--success-fg)", border: "var(--success)" };
   return (
     <div style={{ background: c.bg, color: c.fg, border: `1px solid ${c.border}`, borderRadius: 10, padding: "10px 12px", fontSize: 12.5, marginBottom: 14, lineHeight: 1.5 }}>

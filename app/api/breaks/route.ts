@@ -44,7 +44,13 @@ export async function GET() {
     if (Date.now() - cache.at > TTL_MS) {
       cache = { at: Date.now(), sessions: await client.sessions() };
     }
-    return NextResponse.json({ mode: "live", asOf: Math.floor(Date.now() / 1000), sessions: cache.sessions });
+    return NextResponse.json({
+      mode: "live",
+      asOf: Math.floor(Date.now() / 1000),
+      sessions: cache.sessions,
+      // what the integration could not read, and which checks that disables
+      degraded: client.degradations(),
+    });
   } catch (e) {
     return NextResponse.json({ mode: "error", error: (e as Error).message, sessions: [] }, { status: 502 });
   }

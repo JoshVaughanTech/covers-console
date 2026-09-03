@@ -35,6 +35,8 @@ interface BoardPayload {
   asOf?: number;
   sessions: ShiftSession[];
   error?: string;
+  /** Checks that cannot run because the integration lacks a scope. */
+  degraded?: { scope: string; effect: string }[];
 }
 
 const SEV_TONE: Record<Severity, Tone> = { 0: "success", 1: "info", 2: "warning", 3: "danger" };
@@ -209,6 +211,24 @@ export default function BreaksPage() {
           </div>
         }
       />
+
+      {(payload?.degraded ?? []).length > 0 && (
+        <Card pad={14} style={{ marginBottom: 16, borderColor: "var(--warning)", background: "var(--warning-bg)" }}>
+          <div style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
+            <Icon name="alert-triangle" size={16} color="var(--warning-fg)" />
+            <div style={{ fontSize: 12.5, color: "var(--fg-2)", lineHeight: 1.6 }}>
+              <strong>Some award checks are not running.</strong> The Connecteam integration is
+              missing permissions, and a check that cannot run looks the same on this board as one
+              that passed.
+              {(payload?.degraded ?? []).map((d) => (
+                <div key={d.scope} style={{ marginTop: 4 }}>
+                  <span style={{ fontFamily: "var(--font-mono)", fontSize: 11.5 }}>{d.scope}</span> — {d.effect}
+                </div>
+              ))}
+            </div>
+          </div>
+        </Card>
+      )}
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(5,1fr)", gap: 16, marginBottom: 16 }}>
         {metrics.map((m) => (

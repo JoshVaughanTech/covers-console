@@ -61,6 +61,11 @@ export interface ConnecteamConfig {
    * this or the client pair.
    */
   apiKey?: string;
+  /**
+   * One clock, or several separated by commas. An operator with a venue, a
+   * gaming room and an off-premise crew runs a clock each, and reading one of
+   * them silently shows a third of the floor as the whole floor.
+   */
   timeClockId: string;
   schedulerId?: string | null;
   timezone?: string;
@@ -96,6 +101,13 @@ export function classifyBreak(b: CtManualBreak): BreakKind {
 export class ConnecteamClient {
   private users: Map<number, CtUser> | null = null;
   private breakKinds: Map<string, BreakKind> | null = null;
+  /**
+   * Scopes this integration turned out not to hold, discovered by being
+   * refused. Surfaced rather than swallowed: a compliance check that is off
+   * because of a permission looks exactly like one that passed.
+   */
+  private readonly refused = new Set<string>();
+
   /** cached bearer token; refreshed a minute before it lapses */
   private token: { value: string; expiresAt: number } | null = null;
   /**
@@ -218,6 +230,7 @@ export class ConnecteamClient {
         this.users = new Map((d.users ?? []).map((u) => [(u.userId ?? u.id) as number, u]));
       } catch (e) {
         if (!(e instanceof ConnecteamScopeError)) throw e;
+        this.refused.add(e.scope);
         this.users = new Map();
       }
     }
@@ -226,8 +239,17 @@ export class ConnecteamClient {
 
   private async loadBreakKinds(): Promise<Map<string, BreakKind>> {
     if (!this.breakKinds) {
-      const d = await this.get<{ manualBreaks?: CtManualBreak[] }>(`/time-clock/v1/time-clocks/${this.cfg.timeClockId}/manual-breaks`);
-      this.breakKinds = new Map((d.manualBreaks ?? []).map((b) => [b.id, classifyBreak(b)]));
+      /* Each clock configures its own break types, and they genuinely differ:
+         one account has "Break" (unpaid 30m) on two clocks and "Lunch break"
+         on a third. Ids are unique across clocks, so one map serves all. */
+      const perClock = await Promise.all(
+        this.clockIds().map((id) =>
+          this.get<{ manualBreaks?: CtManualBreak[] }>(`/time-clock/v1/time-clocks/${id}/manual-breaks`),
+        ),
+      );
+      this.breakKinds = new Map(
+        perClock.flatMap((d) => (d.manualBreaks ?? []).map((b) => [b.id, classifyBreak(b)] as const)),
+      );
     }
     return this.breakKinds;
   }
@@ -242,20 +264,50 @@ export class ConnecteamClient {
     }
   }
 
+  /** The clocks configured, in order. */
+  private clockIds(): string[] {
+    return String(this.cfg.timeClockId)
+      .split(",")
+      .map((x) => x.trim())
+      .filter(Boolean);
+  }
+
+  /**
+   * What this integration could not read, and what that costs.
+   *
+   * Returned to the client so a screen can say which checks are inactive.
+   * Without users.read there is no employmentType, so the casual 12h cap
+   * (cl 11.2/11.4) cannot be evaluated at all — and an unevaluated check
+   * renders identically to a passing one, which is the failure this exists
+   * to prevent.
+   */
+  degradations(): { scope: string; effect: string }[] {
+    const effects: Record<string, string> = {
+      "users.read": "Names show as ids, and the casual 12h cap (cl 11.2) cannot be checked — employment type is unknown.",
+      "pay_rates.read": "Loading is shown in hours only; no dollar figures.",
+      "jobs.read": "Per-shift duties fall back to job title.",
+    };
+    return [...this.refused].map((scope) => ({ scope, effect: effects[scope] ?? "Some data is unavailable." }));
+  }
+
   /** Everyone with an open shift right now (plus completed today when includeCompleted). */
   async sessions(now = Math.floor(Date.now() / 1000), includeCompleted = false): Promise<ShiftSession[]> {
-    const [users, kinds, data] = await Promise.all([
+    const clocks = this.clockIds();
+    const [users, kinds, ...perClock] = await Promise.all([
       this.loadUsers(),
       this.loadBreakKinds(),
-      this.get<{ timeActivitiesByUsers?: CtUserRow[] }>(`/time-clock/v1/time-clocks/${this.cfg.timeClockId}/time-activities`, {
-        startDate: this.localDate(now, -1),
-        endDate: this.localDate(now),
-        activityTypes: ["shift", "manual_break"],
-      }),
+      ...clocks.map((id) =>
+        this.get<{ timeActivitiesByUsers?: CtUserRow[] }>(`/time-clock/v1/time-clocks/${id}/time-activities`, {
+          startDate: this.localDate(now, -1),
+          endDate: this.localDate(now),
+          activityTypes: ["shift", "manual_break"],
+        }),
+      ),
     ]);
 
+    const rows = perClock.flatMap((d) => d.timeActivitiesByUsers ?? []);
     const out: ShiftSession[] = [];
-    for (const row of data.timeActivitiesByUsers ?? []) {
+    for (const row of rows) {
       const u = users.get(row.userId) ?? {};
       const name = [u.firstName, u.lastName].filter(Boolean).join(" ") || `User ${row.userId}`;
       const breaks = (row.manualBreaks ?? []).map((b) => ({
