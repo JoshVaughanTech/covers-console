@@ -40,7 +40,10 @@ import { SKILLS, profileOf, type SkillId, type SkillLevel } from "@/lib/people";
 import {
   POSTINGS,
   seatsLeft,
-  openClaims,
+  reviewClaims,
+  actionableClaims,
+  needsReview,
+  declineClaim,
   claimShift,
   hasClaimed,
   buildPosting,
@@ -138,8 +141,29 @@ export default function OpenShiftsPage() {
   const seatsToFill = postings
     .filter((p) => p.status !== "draft")
     .reduce((n, p) => n + seatsLeft(p), 0);
-  const claimCount = postings.reduce((n, p) => n + openClaims(p).length, 0);
   const filledCount = postings.filter((p) => p.status === "filled").length;
+
+  /* ---- declining a claim ---- */
+  const decline = (posting: ShiftPosting, did: string, name: string) => {
+    const next = postings.map((p) =>
+      p.id === posting.id ? declineClaim(p, did, "Not needed for this shift") : p,
+    );
+    setPostings(next);
+
+    // a refused claim is not a new kind of thing — it is a decision, so it
+    // writes as one rather than earning its own event type
+    recordEvent({
+      type: "decision",
+      at: today,
+      actor: "Emma Taylor",
+      subject: did,
+      summary: `${name}'s claim for ${posting.role} on ${posting.functionName} was declined`,
+      data: { postingId: posting.id, siteId: posting.siteId, outcome: "declined" },
+    });
+
+    setMatching(next.find((p) => p.id === posting.id) ?? null);
+    toast(`Declined ${name}'s claim`, { tone: "info" });
+  };
 
   /* ---- assigning ---- */
   const assign = (posting: ShiftPosting, did: string, name: string) => {
@@ -256,6 +280,23 @@ export default function OpenShiftsPage() {
     );
   };
 
+  /* Claims answered against today, never against the day they were made.
+     A credential can move between the two, and a queue that ignores that
+     tells the manager to do something the gate will then refuse. */
+  const reviewOf = useCallback(
+    (p: ShiftPosting) => reviewClaims(p, (did) => blockReasonFor(p, did)),
+    [blockReasonFor],
+  );
+
+  // Counted after the review, not before it: only what a manager can actually
+  // act on. A lapsed claim is not work to do, it is something to be told
+  // about, and counting it as a task is a lie the headline number tells.
+  const claimCount = postings.reduce((n, p) => n + actionableClaims(reviewOf(p)).length, 0);
+  const lapsedCount = postings.reduce(
+    (n, p) => n + reviewOf(p).filter((c) => c.standing === "lapsed").length,
+    0,
+  );
+
   /* ---- what one person sees ---- */
   const staffView = useMemo(() => {
     if (!worker(staffDid)) return [];
@@ -325,7 +366,15 @@ export default function OpenShiftsPage() {
         <>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 14, marginBottom: 16 }}>
             <MetricCard label="Open Shifts" value={String(openCount)} status={`${seatsToFill} seats to fill`} />
-            <MetricCard label="Claims to Review" value={String(claimCount)} status="Staff have put their hand up" />
+            <MetricCard
+              label="Claims to Review"
+              value={String(claimCount)}
+              status={
+                lapsedCount > 0
+                  ? `${lapsedCount} no longer eligible since claiming`
+                  : "Staff have put their hand up"
+              }
+            />
             <MetricCard label="Filled" value={String(filledCount)} status="This week" />
             <MetricCard label="Matcher" value="Live" status="Idara-gated · explainable" />
           </div>
@@ -385,9 +434,23 @@ export default function OpenShiftsPage() {
                       {p.assigned.length}/{p.seats}
                     </td>
                     <td style={{ padding: "12px 8px", textAlign: "right" }}>
-                      {openClaims(p).length > 0 && (
-                        <Badge tone="warning" icon="hand">{openClaims(p).length}</Badge>
-                      )}
+                      {(() => {
+                        const reviewed = reviewOf(p);
+                        const open = actionableClaims(reviewed).length;
+                        // a lapsed claim is shown even when nothing is
+                        // actionable, because an empty cell would read as
+                        // "nobody asked" rather than "one no longer holds"
+                        if (needsReview(reviewed)) {
+                          return (
+                            <Badge tone="danger" icon="shield-alert">
+                              {open > 0 ? `${open} · needs review` : "Needs review"}
+                            </Badge>
+                          );
+                        }
+                        return open > 0 ? (
+                          <Badge tone="warning" icon="hand">{open}</Badge>
+                        ) : null;
+                      })()}
                     </td>
                     <td style={{ padding: "12px 16px", textAlign: "right" }}>
                       <Badge tone={STATUS_TONE[p.status]} dot>{STATUS_LABEL[p.status]}</Badge>
@@ -522,6 +585,86 @@ export default function OpenShiftsPage() {
               <strong>Idara eligibility is a gate, not a score.</strong> {seatsLeft(matching)} seats left.
             </p>
 
+            {reviewOf(matching).length > 0 && (
+              <div style={{ marginBottom: 16 }}>
+                <div style={{ fontSize: 12, fontWeight: 700, color: "var(--fg-2)", marginBottom: 8 }}>
+                  Put their hand up
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                  {reviewOf(matching).map((c) => {
+                    const person = worker(c.did);
+                    if (!person) return null;
+                    const tone =
+                      c.standing === "open"
+                        ? "var(--success)"
+                        : c.standing === "lapsed"
+                          ? "var(--danger)"
+                          : "var(--fg-4)";
+                    return (
+                      <div
+                        key={c.did}
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 10,
+                          border: "1px solid var(--border)",
+                          borderLeft: `3px solid ${tone}`,
+                          borderRadius: 10,
+                          padding: "9px 12px",
+                        }}
+                      >
+                        <Avatar name={person.name} size={26} />
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: 13, fontWeight: 700, color: "var(--fg-1)" }}>
+                            {person.name}
+                            <span style={{ fontWeight: 500, color: "var(--fg-4)", marginLeft: 6 }}>
+                              claimed {c.at}
+                            </span>
+                          </div>
+                          {c.reason && (
+                            <div style={{ fontSize: 11.5, color: tone, marginTop: 2 }}>
+                              {c.standing === "lapsed"
+                                ? `No longer eligible — ${c.reason}`
+                                : c.reason}
+                            </div>
+                          )}
+                        </div>
+                        {c.standing === "open" ? (
+                          <div style={{ display: "flex", gap: 6 }}>
+                            <Button
+                              size="sm"
+                              variant="sec"
+                              onClick={() => decline(matching, c.did, person.name)}
+                            >
+                              Decline
+                            </Button>
+                            <Button
+                              size="sm"
+                              icon="user-plus"
+                              onClick={() => assign(matching, c.did, person.name)}
+                            >
+                              Assign
+                            </Button>
+                          </div>
+                        ) : (
+                          <Badge tone={c.standing === "lapsed" ? "danger" : "neutral"}>
+                            {c.standing === "lapsed"
+                              ? "Cannot be assigned"
+                              : c.standing === "assigned"
+                                ? "On this shift"
+                                : "Declined"}
+                          </Badge>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            <div style={{ fontSize: 12, fontWeight: 700, color: "var(--fg-2)", marginBottom: 8 }}>
+              Everyone eligible, ranked
+            </div>
             <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
               {result.candidates.map((c, i) => (
                 <div key={c.did} style={{ border: "1px solid var(--border)", borderRadius: 12, padding: 12 }}>

@@ -67,7 +67,13 @@ export const POSTINGS: ShiftPosting[] = [
       { skill: "plated_events", level: "solid" },
       { skill: "wine_service", level: "basic" },
     ],
-    claims: [{ did: W["Mitch Egan"], at: "2024-05-16" }],
+    claims: [
+      { did: W["Mitch Egan"], at: "2024-05-16" },
+      // claimed while his RSA was good; it was revoked afterwards. The request
+      // was fine when made — the facts moved, which is the case the review
+      // exists to surface rather than leave sitting in the queue.
+      { did: W["Michael Tan"], at: "2024-05-10" },
+    ],
     assigned: [W["Priya Sharma"]],
     status: "open",
   },
