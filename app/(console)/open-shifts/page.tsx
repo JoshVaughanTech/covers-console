@@ -11,22 +11,44 @@
    the manager's view and the worker's view cannot disagree.
    ============================================================ */
 
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import {
   Avatar,
   Badge,
   Button,
   Card,
+  Field,
   Icon,
   MetricCard,
   Modal,
+  Select,
   Tabs,
+  TextField,
   useToast,
 } from "@/components/ui";
 import { PageHead, CardHead } from "@/components/screen/page-head";
-import { useIdara, decideMember, LocalCredentialVerifier, type Decision } from "@/lib/idara";
-import { SKILLS, profileOf } from "@/lib/people";
-import { POSTINGS, seatsLeft, openClaims, type ShiftPosting } from "@/lib/shifts";
+import {
+  useIdara,
+  decideMember,
+  LocalCredentialVerifier,
+  ALL_WORK_FUNCTIONS,
+  ROLE_FUNCTIONS,
+  type Decision,
+  type WorkFunction,
+} from "@/lib/idara";
+import { SKILLS, profileOf, type SkillId, type SkillLevel } from "@/lib/people";
+import {
+  POSTINGS,
+  seatsLeft,
+  openClaims,
+  claimShift,
+  hasClaimed,
+  buildPosting,
+  emptyDraft,
+  dutiesForRole,
+  type PostingDraft,
+  type ShiftPosting,
+} from "@/lib/shifts";
 import { rankForShift, WEIGHTS, type MatchResult, type ScoreReason } from "@/lib/matching";
 
 const STATUS_TONE = {
@@ -35,6 +57,13 @@ const STATUS_TONE = {
   needs_review: "warning",
   filled: "success",
 } as const;
+
+const DUTY_LABEL: Record<WorkFunction, string> = {
+  serve_alcohol: "Serve alcohol",
+  handle_food: "Handle food",
+  gaming: "Gaming",
+  supervise: "Supervise",
+};
 
 const STATUS_LABEL = {
   draft: "Draft",
@@ -73,12 +102,15 @@ function ScoreChip({ reason }: { reason: ScoreReason }) {
 
 export default function OpenShiftsPage() {
   const toast = useToast();
-  const { workers, credentials, site, today, recordEvent, worker } = useIdara();
+  const { workers, credentials, site, sites, today, recordEvent, worker } = useIdara();
   const verifier = useMemo(() => new LocalCredentialVerifier(), []);
 
   const [postings, setPostings] = useState<ShiftPosting[]>(POSTINGS);
   const [view, setView] = useState<"Manage" | "Staff view">("Manage");
   const [matching, setMatching] = useState<ShiftPosting | null>(null);
+  const [postOpen, setPostOpen] = useState(false);
+  const [draft, setDraft] = useState<PostingDraft>(emptyDraft);
+  const [draftErrors, setDraftErrors] = useState<string[]>([]);
   const [staffDid, setStaffDid] = useState(
     () => workers.find((w) => w.name === "Jake Morrison")?.did ?? workers[0].did,
   );
@@ -139,40 +171,133 @@ export default function OpenShiftsPage() {
     });
   };
 
+  /* One answer to "can this person take this shift?", used both to render
+     the row and to enforce the claim. Hiding a button is presentation, and
+     presentation is not a gate — so the claim re-runs this rather than
+     trusting the control that was rendered. */
+  const blockReasonFor = useCallback(
+    (p: ShiftPosting, did: string): string | null => {
+      const person = worker(did);
+      const s = site(p.siteId);
+      if (!person || !s) return "Not eligible";
+
+      const decision: Decision = decideMember({
+        person,
+        credentials: credentials.filter((c) => c.subject === did),
+        action: "be_rostered",
+        site: s,
+        at: today,
+        verifier,
+        shifts: [{ id: p.shiftId, duties: p.duties }],
+      });
+
+      // two refusals from different layers, deliberately kept apart:
+      // a credential fact, and a commercial one
+      if (!decision.allowed) {
+        return decision.reasons.find((r) => r.outcome === "fail")?.detail ?? "Not eligible";
+      }
+      if (p.client && profileOf(did)?.excludedClients?.includes(p.client)) {
+        return "Not available for this client";
+      }
+      return null;
+    },
+    [worker, site, credentials, today, verifier],
+  );
+
+  /* ---- posting a shift ----
+     The duty chips default to what the role implies and stay editable,
+     because duties are per-shift: a Bartender covering the gaming room on
+     Saturday is doing different regulated work from the same person behind
+     the main bar on Tuesday. */
+  const openPostModal = () => {
+    setDraft(emptyDraft());
+    setDraftErrors([]);
+    setPostOpen(true);
+  };
+
+  const setRole = (role: string) =>
+    setDraft((d) => ({ ...d, role, duties: dutiesForRole(role) }));
+
+  /* Skills are stored in catalogue order rather than click order, so the
+     chips on the board read the same way for every posting. */
+  const setSkill = (skill: SkillId, level: string) =>
+    setDraft((d) => {
+      const held = new Map(d.requires.map((r) => [r.skill, r.level]));
+      if (level) held.set(skill, level as SkillLevel);
+      else held.delete(skill);
+      return {
+        ...d,
+        requires: (Object.keys(SKILLS) as SkillId[])
+          .filter((s) => held.has(s))
+          .map((s) => ({ skill: s, level: held.get(s)! })),
+      };
+    });
+
+  const toggleDuty = (fn: WorkFunction) =>
+    setDraft((d) => ({
+      ...d,
+      duties: d.duties.includes(fn) ? d.duties.filter((x) => x !== fn) : [...d.duties, fn],
+    }));
+
+  const submitPosting = () => {
+    const id = `sp-new-${postings.length + 1}`;
+    const result = buildPosting(draft, id, draft.day.trim().slice(0, 3) || "Shift");
+    if (!result.ok) {
+      setDraftErrors(result.errors);
+      return;
+    }
+    setPostings((prev) => [result.posting, ...prev]);
+    setPostOpen(false);
+    toast(
+      result.posting.status === "open"
+        ? `Posted — ${result.posting.role} · ${result.posting.functionName}`
+        : `Saved as draft — ${result.posting.role}`,
+      { tone: "success", icon: "plus" },
+    );
+  };
+
   /* ---- what one person sees ---- */
   const staffView = useMemo(() => {
-    const person = worker(staffDid);
-    if (!person) return [];
-    const creds = credentials.filter((c) => c.subject === staffDid);
-    const profile = profileOf(staffDid);
-
+    if (!worker(staffDid)) return [];
     return postings
       .filter((p) => p.status !== "draft" && !p.assigned.includes(staffDid))
-      .map((p) => {
-        const s = site(p.siteId);
-        const decision: Decision | null = s
-          ? decideMember({
-              person,
-              credentials: creds,
-              action: "be_rostered",
-              site: s,
-              at: today,
-              verifier,
-              shifts: [{ id: p.shiftId, duties: p.duties }],
-            })
-          : null;
+      .map((p) => ({
+        posting: p,
+        blocked: blockReasonFor(p, staffDid),
+        claimed: hasClaimed(p, staffDid),
+      }));
+  }, [staffDid, postings, worker, blockReasonFor]);
 
-        // two refusals from different layers, deliberately kept apart:
-        // a credential fact, and a commercial one
-        const blocked = decision && !decision.allowed
-          ? decision.reasons.find((r) => r.outcome === "fail")?.detail ?? "Not eligible"
-          : p.client && profile?.excludedClients?.includes(p.client)
-            ? "Not available for this client"
-            : null;
+  /* ---- claiming ----
+     A claim is a request, never a roster change: it adds the person to the
+     manager's queue and nothing more. The assignment that may follow is a
+     separate decision, separately audited. */
+  const claim = (p: ShiftPosting) => {
+    const person = worker(staffDid);
+    if (!person) return;
 
-        return { posting: p, blocked, profile };
+    const result = claimShift(p, staffDid, today, blockReasonFor(p, staffDid));
+    if (!result.ok) {
+      toast(result.reason, {
+        tone: result.kind === "blocked" ? "danger" : "info",
+        ...(result.kind === "blocked" ? { icon: "shield-alert" as const } : {}),
       });
-  }, [staffDid, postings, credentials, site, today, verifier, worker]);
+      return;
+    }
+
+    setPostings((prev) => prev.map((x) => (x.id === p.id ? result.posting : x)));
+
+    recordEvent({
+      type: "shift.claimed",
+      at: today,
+      actor: person.name,
+      subject: staffDid,
+      summary: `${person.name} claimed ${p.role} on ${p.functionName}`,
+      data: { postingId: p.id, siteId: p.siteId, role: p.role },
+    });
+
+    toast(`Claim submitted — ${p.role} · ${p.functionName}`, { tone: "success", icon: "hand" });
+  };
 
   const staffProfile = profileOf(staffDid);
   const staffPerson = worker(staffDid);
@@ -189,7 +314,7 @@ export default function OpenShiftsPage() {
               value={view}
               onChange={(v) => setView(v as "Manage" | "Staff view")}
             />
-            <Button size="sm" icon="plus" onClick={() => toast("Post a shift — coming soon", { tone: "info" })}>
+            <Button size="sm" icon="plus" onClick={openPostModal}>
               Post a shift
             </Button>
           </div>
@@ -290,7 +415,7 @@ export default function OpenShiftsPage() {
                 ))}
               </select>
             </div>
-            {staffView.map(({ posting: p, blocked }) => (
+            {staffView.map(({ posting: p, blocked, claimed }) => (
               <div key={p.id} style={{ borderTop: "1px solid var(--border)", padding: "14px 16px" }}>
                 <div style={{ display: "flex", alignItems: "flex-start", gap: 12 }}>
                   <div style={{ flex: 1 }}>
@@ -317,8 +442,10 @@ export default function OpenShiftsPage() {
                   <div style={{ textAlign: "right" }}>
                     {blocked ? (
                       <Badge tone="neutral">Not available</Badge>
+                    ) : claimed ? (
+                      <Badge tone="teal" icon="hand">Claim submitted</Badge>
                     ) : (
-                      <Button size="sm" icon="hand" onClick={() => toast(`Claim submitted for ${p.role}`, { tone: "success", icon: "hand" })}>
+                      <Button size="sm" icon="hand" onClick={() => claim(p)}>
                         Claim
                       </Button>
                     )}
@@ -446,6 +573,180 @@ export default function OpenShiftsPage() {
             </div>
           </div>
         )}
+      </Modal>
+
+      {/* ---- Post a shift ---- */}
+      <Modal
+        open={postOpen}
+        onClose={() => setPostOpen(false)}
+        title="Post a shift"
+        size="md"
+        footer={
+          <>
+            <Button variant="sec" size="sm" onClick={() => setPostOpen(false)}>Cancel</Button>
+            <Button size="sm" icon="plus" onClick={submitPosting}>
+              {draft.publish ? "Post it" : "Save draft"}
+            </Button>
+          </>
+        }
+      >
+        <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+          {draftErrors.length > 0 && (
+            <div style={{ background: "var(--danger-bg)", color: "var(--danger-fg)", borderRadius: 10, padding: "10px 12px", fontSize: 12.5 }}>
+              {draftErrors.map((e) => (
+                <div key={e} style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                  <Icon name="triangle-alert" size={13} />
+                  {e}
+                </div>
+              ))}
+            </div>
+          )}
+
+          <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: 12 }}>
+            <Field label="Role">
+              <Select
+                value={draft.role}
+                onChange={setRole}
+                options={Object.keys(ROLE_FUNCTIONS).map((r) => ({ label: r, value: r }))}
+                placeholder="Pick a role"
+              />
+            </Field>
+            <Field label="Seats">
+              <TextField
+                value={draft.seats}
+                onChange={(v) => setDraft((d) => ({ ...d, seats: v }))}
+                placeholder="1"
+                icon="users"
+              />
+            </Field>
+          </div>
+
+          <Field label="Event or function">
+            <TextField
+              value={draft.functionName}
+              onChange={(v) => setDraft((d) => ({ ...d, functionName: v }))}
+              placeholder="e.g. Brightwater Friday Live"
+              icon="calendar"
+            />
+          </Field>
+
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+            <Field label="Reference" hint="Optional — in-house shifts have none.">
+              <TextField
+                value={draft.functionRef}
+                onChange={(v) => setDraft((d) => ({ ...d, functionRef: v }))}
+                placeholder="e.g. FN-2038"
+                icon="hash"
+              />
+            </Field>
+            <Field label="Client" hint="Leave blank for in-house work.">
+              <TextField
+                value={draft.client}
+                onChange={(v) => setDraft((d) => ({ ...d, client: v }))}
+                placeholder="e.g. Meridian Group"
+                icon="briefcase"
+              />
+            </Field>
+          </div>
+
+          <Field label="Site" hint="Decides which credentials the shift is gated on.">
+            <Select
+              value={draft.siteId}
+              onChange={(v) => setDraft((d) => ({ ...d, siteId: v }))}
+              options={sites.map((s) => ({ label: `${s.name} · ${s.region}`, value: s.id }))}
+              placeholder="Pick a venue or catering site"
+            />
+          </Field>
+
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+            <Field label="Day">
+              <TextField
+                value={draft.day}
+                onChange={(v) => setDraft((d) => ({ ...d, day: v }))}
+                placeholder="e.g. Fri, 17 May"
+                icon="calendar"
+              />
+            </Field>
+            <Field label="Window">
+              <TextField
+                value={draft.window}
+                onChange={(v) => setDraft((d) => ({ ...d, window: v }))}
+                placeholder="e.g. 17:00–01:00"
+                icon="clock"
+              />
+            </Field>
+          </div>
+
+          <Field
+            label="Duties on this shift"
+            hint="Prefilled from the role, and editable — the same person does different regulated work on different nights. This is what the shift is gated on."
+          >
+            <div style={{ display: "flex", gap: 6, flexWrap: "wrap", paddingTop: 2 }}>
+              {ALL_WORK_FUNCTIONS.map((fn) => {
+                const on = draft.duties.includes(fn);
+                return (
+                  <button
+                    key={fn}
+                    type="button"
+                    onClick={() => toggleDuty(fn)}
+                    style={{
+                      font: "inherit",
+                      fontSize: 12,
+                      fontWeight: 600,
+                      cursor: "pointer",
+                      padding: "6px 11px",
+                      borderRadius: 999,
+                      border: `1px solid ${on ? "var(--fs-teal)" : "var(--border-2)"}`,
+                      background: on ? "var(--fs-teal-tint)" : "transparent",
+                      color: on ? "var(--fs-teal-700)" : "var(--fg-3)",
+                    }}
+                  >
+                    {on && "✓ "}
+                    {DUTY_LABEL[fn]}
+                  </button>
+                );
+              })}
+            </div>
+          </Field>
+
+          <Field
+            label="Skills wanted"
+            hint="Scored, never gated — a missing skill costs points, it does not block. Leave a skill unset if it does not matter for this shift."
+          >
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, paddingTop: 2 }}>
+              {(Object.keys(SKILLS) as SkillId[]).map((s) => (
+                <div key={s} style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <span style={{ flex: 1, fontSize: 12.5, color: "var(--fg-2)" }}>
+                    {SKILLS[s].label}
+                  </span>
+                  <div style={{ width: 104 }}>
+                    <Select
+                      value={draft.requires.find((r) => r.skill === s)?.level ?? ""}
+                      onChange={(v) => setSkill(s, v)}
+                      options={[
+                        { label: "—", value: "" },
+                        { label: "Basic", value: "basic" },
+                        { label: "Solid", value: "solid" },
+                        { label: "Lead", value: "lead" },
+                      ]}
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </Field>
+
+          <Field label="Publish">
+            <Select
+              value={draft.publish ? "open" : "draft"}
+              onChange={(v) => setDraft((d) => ({ ...d, publish: v === "open" }))}
+              options={[
+                { label: "Post it to the board now", value: "open" },
+                { label: "Keep as a draft", value: "draft" },
+              ]}
+            />
+          </Field>
+        </div>
       </Modal>
     </div>
   );
