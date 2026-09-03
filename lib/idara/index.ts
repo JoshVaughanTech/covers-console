@@ -15,6 +15,8 @@ export {
   functionsForRole,
 } from "./hospitality";
 export type { CredentialTypeMeta } from "./hospitality";
+export { shiftAssignment, checkDuties, roleCarriesNoDuties } from "./duties";
+export type { DutiedShift } from "./duties";
 export {
   decide,
   decideMember,

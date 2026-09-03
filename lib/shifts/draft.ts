@@ -6,16 +6,22 @@
    the thing Idara gates against, so a malformed one is a
    compliance problem, not a cosmetic one.
 
-   The rule worth stating: duties must not be empty. decideMember()
-   reads `input.duties ?? functionsForRole(person.role)`, so an
-   empty array is not a fallback to the job title — it is a claim
-   that the shift involves no regulated work at all, and every
-   duty-scoped requirement (RSG at a gaming room, for one) silently
-   stops applying. Absent duties over-gate, which is loud. Empty
-   duties under-gate, which is silent. So we refuse to create one.
+   The rule worth stating: an empty duty list is usually a mistake,
+   and a silent one. decideMember() reads
+   `input.duties ?? functionsForRole(person.role)`, so an empty array
+   is not a fallback to the job title — it claims the shift involves
+   no regulated work, and every duty-scoped requirement (RSG at a
+   gaming room, for one) stops applying with nothing to show for it.
+   Absent duties over-gate, which is loud. Empty duties under-gate,
+   which is not.
+
+   "Usually", because one role genuinely carries no duty: a glassy
+   clears tables and triggers no licence. So the test is not "are the
+   duties empty" but "are they empty for a role that implies some" —
+   which lives in lib/idara/duties.ts, shared with the schedule.
    ============================================================ */
 
-import { functionsForRole, type WorkFunction } from "@/lib/idara";
+import { functionsForRole, checkDuties, type WorkFunction } from "@/lib/idara";
 import type { ShiftPosting, SkillRequirement } from "./types";
 
 export interface PostingDraft {
@@ -71,10 +77,10 @@ export function validateDraft(d: PostingDraft): string[] {
   const seats = Number(d.seats);
   if (!Number.isInteger(seats) || seats < 1) errors.push("Seats must be a whole number, 1 or more");
 
-  // see the header: an empty duty list turns the gate off silently
-  if (d.duties.length === 0) {
-    errors.push("Pick at least one duty — a shift with none is not gated");
-  }
+  // see the header: an empty duty list turns the gate off silently — except
+  // for a role that carries none, where empty is the truth rather than a slip
+  const duties = checkDuties(d.role, d.duties);
+  if (duties) errors.push(duties);
   return errors;
 }
 

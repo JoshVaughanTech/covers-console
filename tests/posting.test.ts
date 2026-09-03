@@ -41,6 +41,19 @@ describe("duties", () => {
     expect(errors.some((e) => /duty/i.test(e))).toBe(true);
   });
 
+  it("allows none for a role that carries none — a glassy clears tables", () => {
+    // the rule is not "duties must be non-empty", it is "non-empty for a role
+    // that implies some". Getting this wrong makes a real shift unpostable.
+    expect(validateDraft(good({ role: "Glassy", duties: [] }))).toEqual([]);
+  });
+
+  it("builds that posting rather than only tolerating it", () => {
+    const r = buildPosting(good({ role: "Glassy", duties: [] }), "sp-g", "Fri");
+    expect(r.ok).toBe(true);
+    if (!r.ok) throw new Error("unreachable");
+    expect(r.posting.duties).toEqual([]);
+  });
+
   it("says why, in terms of the gate rather than the form", () => {
     const [msg] = validateDraft(good({ duties: [] })).filter((e) => /duty/i.test(e));
     expect(msg).toMatch(/not gated/i);
@@ -63,6 +76,13 @@ describe("duties", () => {
 
   it("has no duties before a role is picked", () => {
     expect(dutiesForRole("")).toEqual([]);
+  });
+
+  it("still requires a role, so an empty draft is not mistaken for a glassy", () => {
+    // "" is not a role that carries no duties, it is no role — and
+    // functionsForRole("") would otherwise return every function
+    const errors = validateDraft({ ...emptyDraft(), duties: [] });
+    expect(errors.some((e) => /role/i.test(e))).toBe(true);
   });
 });
 
