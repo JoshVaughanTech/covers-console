@@ -207,7 +207,13 @@ export type AuditEventType =
   | "shift.assigned"
   /** a worker putting their hand up for an open shift. A request, not a
       roster change — the assignment that may follow is a separate event. */
-  | "shift.claimed";
+  | "shift.claimed"
+  /**
+   * a manager opening a shift to be claimed. Carries the posting itself in
+   * `data`, because the board is rebuilt by folding this log over the seed —
+   * a posting whose creation went unrecorded could not survive a reload.
+   */
+  | "shift.posted";
 
 export interface AuditEvent {
   /** monotonic sequence number, 0-based. */

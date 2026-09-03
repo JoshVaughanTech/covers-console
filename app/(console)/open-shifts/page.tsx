@@ -39,12 +39,13 @@ import {
 import { SKILLS, profileOf, type SkillId, type SkillLevel } from "@/lib/people";
 import {
   POSTINGS,
+  replayPostings,
   seatsLeft,
   reviewClaims,
   actionableClaims,
   needsReview,
   standingFor,
-  declineClaim,
+
   claimShift,
   buildPosting,
   emptyDraft,
@@ -103,12 +104,24 @@ function ScoreChip({ reason }: { reason: ScoreReason }) {
 
 export default function OpenShiftsPage() {
   const toast = useToast();
-  const { workers, credentials, site, sites, today, recordEvent, worker } = useIdara();
+  const { workers, credentials, site, sites, today, recordEvent, worker, auditLog } = useIdara();
   const verifier = useMemo(() => new LocalCredentialVerifier(), []);
 
-  const [postings, setPostings] = useState<ShiftPosting[]>(POSTINGS);
+  /* The board is not held alongside the trail, it is read from it. Every
+     action here records an event and nothing else; what you see is the seed
+     with that log folded over it. Two stores of one fact can drift, and a
+     marketplace that disagrees with its own audit log after a reload is the
+     bug this shape removes rather than patches. */
+  const postings = useMemo(() => replayPostings(POSTINGS, auditLog), [auditLog]);
+
   const [view, setView] = useState<"Manage" | "Staff view">("Manage");
-  const [matching, setMatching] = useState<ShiftPosting | null>(null);
+  /* the id, not the posting: holding the object would pin a stale copy the
+     moment an event lands on it */
+  const [matchingId, setMatchingId] = useState<string | null>(null);
+  const matching = useMemo(
+    () => postings.find((p) => p.id === matchingId) ?? null,
+    [postings, matchingId],
+  );
   const [postOpen, setPostOpen] = useState(false);
   const [draft, setDraft] = useState<PostingDraft>(emptyDraft);
   const [draftErrors, setDraftErrors] = useState<string[]>([]);
@@ -141,42 +154,33 @@ export default function OpenShiftsPage() {
     .reduce((n, p) => n + seatsLeft(p), 0);
   const filledCount = postings.filter((p) => p.status === "filled").length;
 
-  /* ---- declining a claim ---- */
-  const decline = (posting: ShiftPosting, did: string, name: string) => {
-    const next = postings.map((p) =>
-      p.id === posting.id ? declineClaim(p, did, "Not needed for this shift") : p,
-    );
-    setPostings(next);
+  /* ---- declining a claim ----
+     A refused claim is not a new kind of thing — it is a decision, so it
+     writes as one rather than earning its own event type. The reason travels
+     in the event so a replay restores what the manager actually said. */
+  const DECLINE_REASON = "Not needed for this shift";
 
-    // a refused claim is not a new kind of thing — it is a decision, so it
-    // writes as one rather than earning its own event type
+  const decline = (posting: ShiftPosting, did: string, name: string) => {
     recordEvent({
       type: "decision",
       at: today,
       actor: "Emma Taylor",
       subject: did,
       summary: `${name}'s claim for ${posting.role} on ${posting.functionName} was declined`,
-      data: { postingId: posting.id, siteId: posting.siteId, outcome: "declined" },
+      data: {
+        postingId: posting.id,
+        siteId: posting.siteId,
+        outcome: "declined",
+        reason: DECLINE_REASON,
+      },
     });
-
-    setMatching(next.find((p) => p.id === posting.id) ?? null);
     toast(`Declined ${name}'s claim`, { tone: "info" });
   };
 
   /* ---- assigning ---- */
   const assign = (posting: ShiftPosting, did: string, name: string) => {
-    const next = postings.map((p) =>
-      p.id === posting.id
-        ? {
-            ...p,
-            assigned: [...p.assigned, did],
-            status: (p.assigned.length + 1 >= p.seats ? "filled" : p.status) as ShiftPosting["status"],
-          }
-        : p,
-    );
-    setPostings(next);
-
-    // the assignment lands on the same hash chain as publishes and revocations
+    // the assignment lands on the same hash chain as publishes and revocations,
+    // and the board picks it up from there rather than being told twice
     recordEvent({
       type: "shift.assigned",
       at: today,
@@ -185,8 +189,6 @@ export default function OpenShiftsPage() {
       summary: `${name} assigned to ${posting.role} on ${posting.functionName}`,
       data: { postingId: posting.id, siteId: posting.siteId, role: posting.role },
     });
-
-    setMatching(next.find((p) => p.id === posting.id) ?? null);
     toast(`${name} assigned to ${posting.role} · ${posting.functionName}`, {
       tone: "success",
       icon: "user-check",
@@ -268,8 +270,19 @@ export default function OpenShiftsPage() {
       setDraftErrors(result.errors);
       return;
     }
-    setPostings((prev) => [result.posting, ...prev]);
     setPostOpen(false);
+
+    // the posting carries itself into the event, because the board is rebuilt
+    // by folding this log over the seed — an unrecorded posting would not
+    // survive a reload, and the trail would then disagree with the screen
+    recordEvent({
+      type: "shift.posted",
+      at: today,
+      actor: "Emma Taylor",
+      summary: `${result.posting.role} · ${result.posting.functionName} posted (${result.posting.seats} seat${result.posting.seats === 1 ? "" : "s"})`,
+      data: { postingId: result.posting.id, posting: result.posting },
+    });
+
     toast(
       result.posting.status === "open"
         ? `Posted — ${result.posting.role} · ${result.posting.functionName}`
@@ -328,8 +341,6 @@ export default function OpenShiftsPage() {
       });
       return;
     }
-
-    setPostings((prev) => prev.map((x) => (x.id === p.id ? result.posting : x)));
 
     recordEvent({
       type: "shift.claimed",
@@ -392,7 +403,7 @@ export default function OpenShiftsPage() {
                   <tr
                     key={p.id}
                     style={{ borderTop: "1px solid var(--border)", cursor: p.status === "draft" ? "default" : "pointer" }}
-                    onClick={() => p.status !== "draft" && setMatching(p)}
+                    onClick={() => p.status !== "draft" && setMatchingId(p.id)}
                   >
                     <td style={{ padding: "12px 16px", minWidth: 220 }}>
                       <div style={{ fontWeight: 700, color: "var(--fg-1)", fontSize: 13.5 }}>
@@ -581,10 +592,10 @@ export default function OpenShiftsPage() {
       {/* ---- the matcher ---- */}
       <Modal
         open={matching !== null}
-        onClose={() => setMatching(null)}
+        onClose={() => setMatchingId(null)}
         title={matching ? `Who should work ${matching.role} · ${matching.functionName}?` : ""}
         size="lg"
-        footer={<Button variant="sec" size="sm" onClick={() => setMatching(null)}>Done</Button>}
+        footer={<Button variant="sec" size="sm" onClick={() => setMatchingId(null)}>Done</Button>}
       >
         {matching && result && (
           <div>
