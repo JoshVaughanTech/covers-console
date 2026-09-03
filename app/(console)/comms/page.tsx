@@ -246,7 +246,7 @@ export default function CommsPage() {
   const overview: [string, string, string, string, Tone][] = [
     ["Unread Messages", "18", "+6 new", "message-square", "info"],
     ["Urgent Alerts", "3", "Requires attention", "triangle-alert", "danger"],
-    ["Pending Acknowledgements", "12", "Function briefs & announcements", "clipboard-check", "warning"],
+    ["Pending Acknowledgements", "12", "Event briefs & announcements", "clipboard-check", "warning"],
     ["Handover Notes", "7", "Awaiting review", "notebook-pen", "teal"],
   ];
 
@@ -396,7 +396,7 @@ export default function CommsPage() {
 
   return (
     <div>
-      <PageHead title="Communications" sub="Function and venue communication, real-time updates and accountability." />
+      <PageHead title="Communications" sub="Event and venue communication, real-time updates and accountability." />
       <div style={{ display: "grid", gridTemplateColumns: "300px 1fr 318px", gap: 16, alignItems: "start" }}>
         {/* LEFT */}
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
@@ -456,7 +456,7 @@ export default function CommsPage() {
             <div style={{ display: "flex", alignItems: "center", gap: 14, fontSize: 12, color: "var(--fg-3)", marginTop: 7 }}>
               <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}><Icon name="map-pin" size={13} color="var(--fg-4)" />{active.site}</span>
               <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}><Icon name="clock" size={13} color="var(--fg-4)" />{active.time}</span>
-              <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}><Icon name="hash" size={13} color="var(--fg-4)" />Function #{active.jobNo}</span>
+              <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}><Icon name="hash" size={13} color="var(--fg-4)" />Event #{active.jobNo}</span>
             </div>
             <div style={{ display: "flex", gap: 18, marginTop: 12, fontSize: 13 }}>
               {CHANNELS.map((t) => {
@@ -565,7 +565,7 @@ export default function CommsPage() {
               </div>
               <div style={{ background: "#fff", border: "1px solid var(--border)", borderRadius: 12, padding: 14 }}>
                 <div style={{ fontSize: 12.5, fontWeight: 700, color: "var(--fg-1)", marginBottom: 6 }}>Shift details</div>
-                <div style={{ fontSize: 12.5, color: "var(--fg-3)" }}>{active.site} · {active.time} · Function #{active.jobNo}</div>
+                <div style={{ fontSize: 12.5, color: "var(--fg-3)" }}>{active.site} · {active.time} · Event #{active.jobNo}</div>
               </div>
             </div>
           )}
@@ -640,7 +640,7 @@ export default function CommsPage() {
             </div>
           </Card>
           <Card pad={16}>
-            <div style={{ display: "flex", alignItems: "center", marginBottom: 4 }}><h4 style={{ margin: 0, fontSize: 14, flex: 1 }}>Function Brief Acknowledgement</h4></div>
+            <div style={{ display: "flex", alignItems: "center", marginBottom: 4 }}><h4 style={{ margin: 0, fontSize: 14, flex: 1 }}>Event Brief Acknowledgement</h4></div>
             <div style={{ fontSize: 11.5, color: "var(--fg-3)", marginBottom: 8 }}>{ackdCount} / {ackTotal} acknowledged</div>
             <Bar value={ackPct} color="var(--success)" />
             <div style={{ display: "flex", flexDirection: "column", gap: 9, marginTop: 12 }}>

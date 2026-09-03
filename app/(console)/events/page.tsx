@@ -120,8 +120,8 @@ export default function JobsPage() {
 
   const resetToFirstPage = () => setPage(1);
 
-  function openEvent(job: EventBooking) {
-    setActive(job);
+  function openEvent(ev: EventBooking) {
+    setActive(ev);
   }
 
   const draftValid =
@@ -156,7 +156,7 @@ export default function JobsPage() {
     setTab("All");
     setQuery("");
     setPage(1);
-    toast(`Function ${next.id} created`, { tone: "success", icon: "circle-check" });
+    toast(`Event ${next.id} created`, { tone: "success", icon: "circle-check" });
   }
 
   return (
@@ -203,7 +203,7 @@ export default function JobsPage() {
             <span className="fs-tnum" style={{ fontSize: 34, fontWeight: 800, letterSpacing: "-.02em", color: "var(--fg-1)" }}>
               {metrics.unfilledRoles}
             </span>
-            <span style={{ fontSize: 14, color: "var(--fg-3)", fontWeight: 600 }}>functions</span>
+            <span style={{ fontSize: 14, color: "var(--fg-3)", fontWeight: 600 }}>events</span>
           </div>
           <div style={{ fontSize: 11.5, color: "var(--fg-4)", marginTop: 4 }}>Below required headcount</div>
         </Card>
@@ -249,7 +249,7 @@ export default function JobsPage() {
                 setQuery(v);
                 resetToFirstPage();
               }}
-              placeholder="Search functions, venues, clients…"
+              placeholder="Search events, venues, clients…"
             />
           </div>
         </div>
@@ -280,7 +280,7 @@ export default function JobsPage() {
           <table style={{ width: "100%", borderCollapse: "collapse" }}>
             <thead>
               <tr>
-                <th style={TH}>Function</th>
+                <th style={TH}>Event</th>
                 <th style={TH}>Client</th>
                 <th style={TH}>Status</th>
                 <th style={TH}>Dates</th>
@@ -364,7 +364,7 @@ export default function JobsPage() {
         )}
       </Card>
 
-      {/* Function detail modal */}
+      {/* Event detail modal */}
       <Modal
         open={active !== null}
         onClose={() => setActive(null)}
@@ -378,7 +378,7 @@ export default function JobsPage() {
               </Badge>
             </span>
           ) : (
-            "Function"
+            "Event"
           )
         }
         footer={
@@ -476,7 +476,7 @@ export default function JobsPage() {
               ) : (
                 <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12.5, color: "var(--fg-4)" }}>
                   <Avatar name="?" size={30} />
-                  No staff assigned yet — use Assign Staff to crew this function.
+                  No staff assigned yet — use Assign Staff to crew this event.
                 </div>
               )}
             </div>
@@ -525,13 +525,13 @@ export default function JobsPage() {
               Cancel
             </Button>
             <Button size="sm" icon="plus" onClick={createEvent}>
-              Create Function
+              Create Event
             </Button>
           </>
         }
       >
         <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-          <Field label="Function name">
+          <Field label="Event name">
             <TextField
               value={draft.name}
               onChange={(v) => setDraft((d) => ({ ...d, name: v }))}

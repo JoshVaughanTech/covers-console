@@ -305,7 +305,7 @@ export default function ProjectsPage() {
             <Card pad={16}><div style={{ display: "flex", justifyContent: "space-between" }}><span style={{ fontSize: 12.5, color: "var(--fg-3)", fontWeight: 600 }}>Open Issues</span><Icon name="shield-alert" size={16} color="var(--danger)" /></div><div className="fs-tnum" style={{ fontSize: 30, fontWeight: 800, margin: "4px 0 2px" }}>8</div><div style={{ fontSize: 11, color: "var(--fg-4)" }}>High: 2 · Medium: 6</div><div style={{ fontSize: 11, color: "var(--danger-fg)", marginTop: 4 }}>↓ 2 vs last 7 days</div></Card>
             <Card pad={16}><div style={{ display: "flex", justifyContent: "space-between" }}><span style={{ fontSize: 12.5, color: "var(--fg-3)", fontWeight: 600 }}>Labour Hours</span><Icon name="clock" size={16} color="var(--fs-teal)" /></div><div className="fs-tnum" style={{ fontSize: 30, fontWeight: 800, margin: "4px 0 2px" }}>1,248<span style={{ fontSize: 14, color: "var(--fg-4)" }}> hrs</span></div><div style={{ fontSize: 11, color: "var(--success-fg)", marginTop: 4 }}>↑ 9% vs last 7 days</div></Card>
             <Card pad={16}><div style={{ display: "flex", justifyContent: "space-between" }}><span style={{ fontSize: 12.5, color: "var(--fg-3)", fontWeight: 600 }}>Verified Sign-offs</span><Icon name="badge-check" size={16} color="var(--success)" /></div><div className="fs-tnum" style={{ fontSize: 30, fontWeight: 800, margin: "4px 0 2px" }}>36</div><div style={{ fontSize: 11, color: "var(--fg-4)" }}>This week</div><div style={{ fontSize: 11, color: "var(--success-fg)", marginTop: 4 }}>↑ 18% vs last 7 days</div></Card>
-            <Card pad={16}><div style={{ fontSize: 12.5, color: "var(--fg-3)", fontWeight: 600, marginBottom: 6 }}>Function Progress</div><div style={{ display: "flex", alignItems: "center", gap: 12 }}><Ring value={68} label="68%" size={66} color="var(--success)" /><div><div style={{ fontSize: 12.5, fontWeight: 700, color: "var(--fg-1)" }}>On track</div><div style={{ fontSize: 11, color: "var(--success-fg)", marginTop: 2 }}>↑ 6% vs last 7 days</div></div></div></Card>
+            <Card pad={16}><div style={{ fontSize: 12.5, color: "var(--fg-3)", fontWeight: 600, marginBottom: 6 }}>Event Progress</div><div style={{ display: "flex", alignItems: "center", gap: 12 }}><Ring value={68} label="68%" size={66} color="var(--success)" /><div><div style={{ fontSize: 12.5, fontWeight: 700, color: "var(--fg-1)" }}>On track</div><div style={{ fontSize: 11, color: "var(--success-fg)", marginTop: 2 }}>↑ 6% vs last 7 days</div></div></div></Card>
           </div>
 
           {/* main row */}
@@ -413,7 +413,7 @@ export default function ProjectsPage() {
           <EmptyState
             icon="shield-alert"
             title="8 open issues"
-            sub="2 high and 6 medium priority issues are being tracked for this function. The full issue tracker view is coming soon."
+            sub="2 high and 6 medium priority issues are being tracked for this event. The full issue tracker view is coming soon."
             action={<Button size="sm" icon="plus" onClick={() => toast("New issue form coming soon", { tone: "info", icon: "shield-alert" })}>Raise issue</Button>}
           />
         </Card>
@@ -422,7 +422,7 @@ export default function ProjectsPage() {
         <Card pad={18}>
           <EmptyState
             icon="chart-column"
-            title="Function reports"
+            title="Event reports"
             sub="Generate service, labour and compliance reports for the Werribee Park Wedding. Report builder is coming soon."
             action={<Button size="sm" icon="download" onClick={() => toast("Generating report…", { tone: "info", icon: "download" })}>Generate report</Button>}
           />
@@ -432,8 +432,8 @@ export default function ProjectsPage() {
         <Card pad={18}>
           <EmptyState
             icon="settings"
-            title="Function settings"
-            sub="Configure visibility, members, integrations and sign-off rules for this function. Settings are coming soon."
+            title="Event settings"
+            sub="Configure visibility, members, integrations and sign-off rules for this event. Settings are coming soon."
             action={<Button size="sm" variant="sec" icon="settings" onClick={() => toast("Settings coming soon", { tone: "info", icon: "settings" })}>Configure</Button>}
           />
         </Card>

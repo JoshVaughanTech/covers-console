@@ -54,13 +54,13 @@ const PEOPLE: RawPerson[] = [
 ];
 
 const JOBS: RawJob[] = [
-  { id: "j-brightwater-friday-live", name: "Brightwater Friday Live", kind: "Venue function" },
-  { id: "j-northside-long-lunch", name: "Northside Long Lunch", kind: "Venue function" },
+  { id: "j-brightwater-friday-live", name: "Brightwater Friday Live", kind: "Venue event" },
+  { id: "j-northside-long-lunch", name: "Northside Long Lunch", kind: "Venue event" },
   { id: "j-werribee-park-wedding", name: "Werribee Park Wedding", kind: "Off-premise catering" },
   { id: "j-docklands-corporate-lunch", name: "Docklands Corporate Lunch", kind: "Off-premise catering" },
   { id: "j-quayside-product-launch", name: "Quayside Product Launch", kind: "Off-premise catering" },
-  { id: "j-brightwater-gaming", name: "Brightwater Gaming Floor", kind: "Venue function" },
-  { id: "j-summer-function-pool", name: "Summer Function Pool", kind: "Venue function" },
+  { id: "j-brightwater-gaming", name: "Brightwater Gaming Floor", kind: "Venue event" },
+  { id: "j-summer-function-pool", name: "Summer Function Pool", kind: "Venue event" },
   { id: "j-spring-carnival-marquee", name: "Spring Carnival Marquee", kind: "Off-premise catering" },
 ];
 
