@@ -23,6 +23,7 @@ const site: Site = {
   id: "s-test",
   name: "Test Site",
   region: "Victoria",
+  kind: "venue",
   requires: BASE_REQUIREMENTS, // rsa + site_induction@site + food_handling
 };
 

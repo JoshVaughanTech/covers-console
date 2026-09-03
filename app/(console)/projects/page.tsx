@@ -91,7 +91,7 @@ export default function ProjectsPage() {
     ["Beverage Order – Confirmed.pdf", "PDF · May 12, 2024 · v1.0"],
   ];
   const team: [string, string, string][] = [
-    ["Priya Sharma", "Functions Coordinator", "32 hrs"],
+    ["Priya Sharma", "Events Coordinator", "32 hrs"],
     ["Hassan Ali", "Head Chef", "28 hrs"],
     ["Darie Roberts", "Bar Lead", "24 hrs"],
     ["Sophie Nguyen", "Venue Manager", "20 hrs"],

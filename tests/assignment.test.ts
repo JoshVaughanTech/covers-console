@@ -52,6 +52,7 @@ const venue: Site = {
   id: "s-venue",
   name: "Test Venue",
   region: "Victoria",
+  kind: "venue",
   requires: [{ type: "rsg", appliesTo: ["gaming"] }],
 };
 

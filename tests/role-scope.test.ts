@@ -51,6 +51,7 @@ const bar: Site = {
   id: "s-bar",
   name: "Test Bar",
   region: "Victoria",
+  kind: "venue",
   requires: [{ type: "rsa", appliesTo: ["serve_alcohol"] }],
 };
 

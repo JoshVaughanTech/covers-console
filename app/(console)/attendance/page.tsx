@@ -33,7 +33,7 @@ const INITIAL_ROWS: Row[] = [
   { person: "Liam O'Brien", role: "Barback", rostered: "7:00am – 3:00pm", clockIn: "7:18am", variance: "+18m", varianceTone: "warning", location: "Brightwater Hotel", status: "Late", statusTone: "warning" },
   { person: "Hassan Ali", role: "Head Chef", rostered: "6:30am – 3:00pm", clockIn: "6:28am", variance: "–2m", varianceTone: "success", location: "Brightwater Hotel", status: "On time", statusTone: "success" },
   { person: "Tahlia Johnson", role: "Wait Staff", rostered: "11:00am – 7:00pm", clockIn: "—", variance: "—", varianceTone: null, location: "Brightwater Hotel", status: "Absent", statusTone: "danger" },
-  { person: "Priya Sharma", role: "Functions Coordinator", rostered: "11:00am – 7:00pm", clockIn: "11:05am", variance: "+5m", varianceTone: "success", location: "Brightwater Hotel", status: "On time", statusTone: "success" },
+  { person: "Priya Sharma", role: "Events Coordinator", rostered: "11:00am – 7:00pm", clockIn: "11:05am", variance: "+5m", varianceTone: "success", location: "Brightwater Hotel", status: "On time", statusTone: "success" },
   { person: "Sophie Nguyen", role: "Venue Manager", rostered: "11:00am – 7:00pm", clockIn: "11:00am", variance: "On time", varianceTone: "success", location: "Northside Tavern", status: "On time", statusTone: "success" },
   { person: "Darie Roberts", role: "Bartender", rostered: "4:00pm – 12:00am", clockIn: "On break", variance: "8:15pm", varianceTone: "info", location: "Brightwater Hotel", status: "Break", statusTone: "info" },
   { person: "Mitch Egan", role: "Gaming Attendant", rostered: "4:00pm – 12:00am", clockIn: "4:11pm", variance: "+11m", varianceTone: "warning", location: "Brightwater Gaming Room", status: "Late", statusTone: "warning" },

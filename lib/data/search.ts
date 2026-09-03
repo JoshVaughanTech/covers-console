@@ -42,7 +42,7 @@ const PEOPLE: RawPerson[] = [
   { id: "p-jake-morrison", name: "Jake Morrison", role: "Bartender" },
   { id: "p-hassan-ali", name: "Hassan Ali", role: "Kitchen Hand" },
   { id: "p-james-carter", name: "James Carter", role: "Bar Supervisor" },
-  { id: "p-sarah-lee", name: "Sarah Lee", role: "Functions Manager" },
+  { id: "p-sarah-lee", name: "Sarah Lee", role: "Events Manager" },
   { id: "p-emma-wright", name: "Emma Wright", role: "Operations Lead" },
   { id: "p-alex-nguyen", name: "Alex Nguyen", role: "Sous Chef" },
   { id: "p-mia-anderson", name: "Mia Anderson", role: "Glassy" },
@@ -86,7 +86,7 @@ export const SEARCH_INDEX: SearchEntry[] = [
     type: "job",
     title: j.name,
     sub: j.kind,
-    href: "/jobs",
+    href: "/events",
     terms: `${j.name} ${j.kind} job room project`.toLowerCase(),
   })),
   ...SITES.map<SearchEntry>((s) => ({

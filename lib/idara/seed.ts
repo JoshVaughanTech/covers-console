@@ -47,6 +47,7 @@ export const SITES: Site[] = [
     id: "s-brightwater",
     name: "Brightwater Hotel",
     region: "Fitzroy",
+    kind: "venue",
     // the hotel has a gaming area of its own, so RSG binds to whoever is
     // rostered onto it — decided from the shift assignment, not the job title
     requires: [...BASE_REQUIREMENTS, { type: "rsg", appliesTo: ["gaming"] }],
@@ -57,6 +58,7 @@ export const SITES: Site[] = [
   {
     id: "s-brightwater-gaming",
     name: "Brightwater Gaming Room",
+    kind: "venue",
     region: "Fitzroy",
     // Same building as the hotel, separately licensed — RSG on top, and
     // deliberately NOT role-scoped: being rostered into the gaming room is
@@ -68,6 +70,7 @@ export const SITES: Site[] = [
   {
     id: "s-northside",
     name: "Northside Tavern",
+    kind: "venue",
     region: "Brunswick",
     requires: BASE_REQUIREMENTS,
     // Full kitchen. The FSS obligation belongs to the venue, not to each
@@ -78,12 +81,14 @@ export const SITES: Site[] = [
   {
     id: "s-quayside",
     name: "Quayside Bar & Kitchen",
+    kind: "venue",
     region: "Docklands",
     requires: BASE_REQUIREMENTS,
   },
   {
     id: "s-werribee-wedding",
     name: "Werribee Park Wedding",
+    kind: "catering",
     region: "Off-premise",
     // Plated event, declared dietaries, food transported to site. Allergen
     // training is genuinely per-person — anyone plating needs it — while the
@@ -97,6 +102,7 @@ export const SITES: Site[] = [
   {
     id: "s-docklands-lunch",
     name: "Docklands Corporate Lunch",
+    kind: "catering",
     region: "Off-premise",
     requires: [...BASE_REQUIREMENTS, { type: "allergen_management", appliesTo: ["handle_food"] }],
   },
@@ -112,7 +118,7 @@ export const WORKERS: Identity[] = [
   { did: "did:web:idara.app:w:jake-morrison", name: "Jake Morrison", role: "Bar Attendant", org: ORG },
   { did: "did:web:idara.app:w:hassan-ali", name: "Hassan Ali", role: "Head Chef", org: ORG },
   { did: "did:web:idara.app:w:liam-obrien", name: "Liam O'Brien", role: "Barback", org: ORG },
-  { did: "did:web:idara.app:w:priya-sharma", name: "Priya Sharma", role: "Functions Coordinator", org: ORG },
+  { did: "did:web:idara.app:w:priya-sharma", name: "Priya Sharma", role: "Events Coordinator", org: ORG },
   { did: "did:web:idara.app:w:michael-tan", name: "Michael Tan", role: "Wait Staff", org: ORG },
 ];
 

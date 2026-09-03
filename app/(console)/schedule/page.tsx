@@ -15,8 +15,10 @@ import {
   Field,
   useToast,
   useConfirm,
+  Tabs,
 } from "@/components/ui";
 import type { Tone } from "@/lib/status";
+import { SEED_EVENTS, type EventBooking } from "@/lib/events";
 import {
   useIdara,
   CREDENTIAL_TYPES,
@@ -93,15 +95,30 @@ const week = (
   special: Record<number, { duties: WorkFunction[]; label: string }> = {},
 ): Shift[] => times.map((time, i) => ({ time, ...(special[i] ?? {}) }));
 
-/* the location this roster is being built for */
-const SITE_ID = "s-brightwater";
+/* the week the roster grid displays, used to place catering engagements */
+const WEEK_START = new Date("May 12, 2026");
+const DAY_MS = 86400000;
 
 export default function SchedulePage() {
   const toast = useToast();
   const confirm = useConfirm();
-  const { workers, decideFor, evaluateRoster, recordPublish, site } = useIdara();
+  const { workers, decideFor, evaluateRoster, recordPublish, site, sites } = useIdara();
 
-  const siteName = site(SITE_ID)?.name ?? "Site";
+  /* Which site this roster is being built for. A venue trades on a standing
+     weekly roster; a catering operation exists only for its events, so the
+     week is filled with engagements instead of role-hour requirements. */
+  const [siteId, setSiteId] = useState("s-brightwater");
+  const activeSite = site(siteId);
+  const isCatering = activeSite?.kind === "catering";
+  /* org behaviour is derived, never stored — an operator whose sites are all
+     catering has no standing roster to show at all */
+  const allCatering = sites.every((s) => s.kind === "catering");
+  const siteName = activeSite?.name ?? "Site";
+
+  const weekEvents = useMemo(
+    () => SEED_EVENTS.filter((e) => e.siteId === siteId),
+    [siteId],
+  );
   const didOf = useMemo(() => Object.fromEntries(workers.map((w) => [w.name, w.did])), [workers]);
   const roleOf = useMemo(() => Object.fromEntries(workers.map((w) => [w.name, w.role])), [workers]);
 
@@ -111,7 +128,7 @@ export default function SchedulePage() {
     Bar: 64,
     "Wait Staff": 48,
     Kitchen: 40,
-    Functions: 36,
+    Events: 36,
     Gaming: 24,
   };
 
@@ -130,7 +147,7 @@ export default function SchedulePage() {
     { role: "Bar", req: "Req. 64h / day", vals: [64, 62, 64, 66, 70, 52, 44] },
     { role: "Wait Staff", req: "Req. 48h / day", vals: [48, 46, 44, 47, 48, 34, 28] },
     { role: "Kitchen", req: "Req. 40h / day", vals: [40, 38, 40, 42, 39, 30, 26] },
-    { role: "Functions", req: "Req. 36h / day", vals: [36, 34, 36, 33, 36, 24, 18] },
+    { role: "Events", req: "Req. 36h / day", vals: [36, 34, 36, 33, 36, 24, 18] },
     { role: "Gaming", req: "Req. 24h / day", vals: [24, 22, 24, 24, 20, 14, 12] },
   ]);
 
@@ -179,7 +196,7 @@ export default function SchedulePage() {
     { id: 4, role: "Gaming", day: "Sat, May 17", time: "4p – 12a", tone: "warning" },
     { id: 5, role: "Kitchen", day: "Sun, May 18", time: "7a – 3p", tone: "warning" },
     { id: 6, role: "Wait Staff", day: "Sun, May 18", time: "11a – 7p", tone: "info" },
-    { id: 7, role: "Functions", day: "Sat, May 17", time: "11a – 7p", tone: "info" },
+    { id: 7, role: "Events", day: "Sat, May 17", time: "11a – 7p", tone: "info" },
   ]);
 
   // headline metrics held in state so suggestions / scenarios can nudge them
@@ -251,7 +268,7 @@ export default function SchedulePage() {
   const decisionByName = useMemo(() => {
     const out: Record<string, Decision | null> = {};
     for (const c of crew) {
-      out[c.name] = decideFor(didOf[c.name], "be_rostered", SITE_ID, shiftsOf(c));
+      out[c.name] = decideFor(didOf[c.name], "be_rostered", siteId, shiftsOf(c));
     }
     return out;
   }, [crew, decideFor, didOf]);
@@ -307,11 +324,11 @@ export default function SchedulePage() {
 
   /* ---- actions ---- */
   const handlePublish = async () => {
-    const result = evaluateRoster(SITE_ID, assignmentsOf(crew));
+    const result = evaluateRoster(siteId, assignmentsOf(crew));
 
     // Idara gate: a non-compliant roster cannot be published.
     if (!result.published) {
-      recordPublish(SITE_ID, result); // the blocked attempt is itself audited
+      recordPublish(siteId, result); // the blocked attempt is itself audited
       setGate(result);
       toast(`Publish blocked — ${blockReasons(result)}`, {
         tone: "danger",
@@ -327,7 +344,7 @@ export default function SchedulePage() {
       tone: "teal",
     });
     if (!ok) return;
-    recordPublish(SITE_ID, result);
+    recordPublish(siteId, result);
     setPublished(nowLabel());
     toast(
       result.warnings.length
@@ -345,7 +362,7 @@ export default function SchedulePage() {
     const eligibleNames = new Set(gate.eligible.map((d) => d.context.subjectName));
     const removed = gate.blocked.length;
     const remaining = crew.filter((c) => eligibleNames.has(c.name));
-    const result = evaluateRoster(SITE_ID, assignmentsOf(remaining));
+    const result = evaluateRoster(siteId, assignmentsOf(remaining));
 
     if (!result.published) {
       setGate(result);
@@ -357,7 +374,7 @@ export default function SchedulePage() {
     }
 
     setCrew(remaining);
-    recordPublish(SITE_ID, result);
+    recordPublish(siteId, result);
     setPublished(nowLabel());
     setGate(null);
     toast(
@@ -435,7 +452,11 @@ export default function SchedulePage() {
             )}
           </span>
         }
-        sub="AI rostering balanced for fairness, coverage and cost — and credential-checked by Idara before every publish."
+        sub={
+          allCatering
+            ? "Engagement staffing across your catering operations — credential-checked by Idara before every publish."
+            : "AI rostering balanced for fairness, coverage and cost — and credential-checked by Idara before every publish."
+        }
         right={
           <div style={{ display: "flex", gap: 10 }}>
             <Button variant="sec" size="sm" icon="git-compare" onClick={() => setCompareOpen(true)}>
@@ -447,6 +468,19 @@ export default function SchedulePage() {
           </div>
         }
       />
+
+      <div style={{ marginBottom: 16 }}>
+        <Tabs
+          tabs={sites.map((x) => x.name)}
+          value={siteName}
+          onChange={(v) => setSiteId(sites.find((x) => x.name === v)?.id ?? siteId)}
+        />
+      </div>
+
+      {isCatering ? (
+        <CateringWeek siteName={siteName} events={weekEvents} />
+      ) : (
+      <>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 16, marginBottom: 16 }}>
         <Card pad={18}>
           <div style={{ fontSize: 13, color: "var(--fg-3)", fontWeight: 600, marginBottom: 8 }}>Roster Fairness Score</div>
@@ -628,6 +662,9 @@ export default function SchedulePage() {
           </Card>
         </div>
       </div>
+
+      </>
+      )}
 
       {/* ---- Publish gate modal (Idara) ---- */}
       <Modal
@@ -844,5 +881,100 @@ export default function SchedulePage() {
         </Field>
       </Modal>
     </div>
+  );
+}
+
+/* ============================================================
+   A catering operation has no standing week to grid — it exists for
+   its engagements. So the frame stays Mon–Sun, and what fills it
+   changes: one row per event, spanning the days it runs, showing
+   whether the crew is filled rather than whether a daily hour
+   requirement is met.
+   ============================================================ */
+const DAY_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+
+/** Where an engagement sits in the displayed week, or null if it misses it. */
+function weekSpan(ev: EventBooking): { from: number; to: number } | null {
+  const start = new Date(ev.start).getTime();
+  const end = new Date(ev.end).getTime();
+  if (Number.isNaN(start) || Number.isNaN(end)) return null;
+  const w0 = WEEK_START.getTime();
+  const w1 = w0 + 7 * DAY_MS - 1;
+  if (end < w0 || start > w1) return null;
+  return {
+    from: Math.max(0, Math.floor((start - w0) / DAY_MS)),
+    to: Math.min(6, Math.floor((end - w0) / DAY_MS)),
+  };
+}
+
+function CateringWeek({ siteName, events }: { siteName: string; events: EventBooking[] }) {
+  const rows = events
+    .map((e) => ({ ev: e, span: weekSpan(e) }))
+    .filter((r): r is { ev: EventBooking; span: { from: number; to: number } } => r.span !== null)
+    .sort((a, b) => a.span.from - b.span.from);
+
+  const staffed = rows.reduce((a, r) => a + r.ev.filled, 0);
+  const needed = rows.reduce((a, r) => a + r.ev.required, 0);
+
+  return (
+    <Card style={{ marginBottom: 16 }} pad={0}>
+      <CardHead
+        title={`${siteName} — this week`}
+        right={
+          <span className="fs-tnum" style={{ fontSize: 12, fontWeight: 700, color: needed && staffed < needed ? "var(--warning-fg)" : "var(--fg-3)" }}>
+            {rows.length} engagement{rows.length === 1 ? "" : "s"} · {staffed}/{needed} crew
+          </span>
+        }
+      />
+
+      {rows.length === 0 ? (
+        <div style={{ padding: 32, textAlign: "center", fontSize: 13.5, color: "var(--fg-4)" }}>
+          No engagements at {siteName} this week. A catering operation has no standing roster —
+          its week is whatever it is booked for.
+        </div>
+      ) : (
+        <div style={{ padding: "8px 20px 18px" }}>
+          <div style={{ display: "grid", gridTemplateColumns: "220px repeat(7,1fr)", gap: 6, alignItems: "center", paddingBottom: 8 }}>
+            <span />
+            {DAY_LABELS.map((d, i) => (
+              <span key={d} className="fs-tnum" style={{ fontSize: 11, color: "var(--fg-4)", textAlign: "center", fontWeight: 600 }}>
+                {d} {12 + i}
+              </span>
+            ))}
+          </div>
+
+          {rows.map(({ ev, span }) => {
+            const short = ev.filled < ev.required;
+            return (
+              <div key={ev.id} style={{ display: "grid", gridTemplateColumns: "220px repeat(7,1fr)", gap: 6, alignItems: "center", padding: "6px 0", borderTop: "1px solid var(--border)" }}>
+                <span style={{ minWidth: 0 }}>
+                  <div style={{ fontSize: 12.5, fontWeight: 600, color: "var(--fg-1)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{ev.name}</div>
+                  <div style={{ fontSize: 10.5, color: "var(--fg-4)" }}>{ev.client}</div>
+                </span>
+                <span
+                  style={{
+                    gridColumn: `${span.from + 2} / ${span.to + 3}`,
+                    background: short ? "var(--warning-bg)" : "var(--fs-teal-tint)",
+                    color: short ? "var(--warning-fg)" : "var(--fs-teal)",
+                    border: `1px solid ${short ? "var(--warning)" : "var(--fs-teal)"}`,
+                    borderRadius: 7,
+                    padding: "6px 10px",
+                    fontSize: 11.5,
+                    fontWeight: 600,
+                    display: "flex",
+                    justifyContent: "space-between",
+                    gap: 8,
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  <span>{ev.status}</span>
+                  <span className="fs-tnum">{ev.filled}/{ev.required} crew</span>
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </Card>
   );
 }

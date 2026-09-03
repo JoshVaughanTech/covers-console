@@ -33,7 +33,7 @@ export const DEMO_SESSIONS: ShiftSession[] = [
     clockIn: at(4, 10), plannedEnd: at(4, 10) + 7 * H,
     breaks: [{ kind: "meal", start: at(0, 12), end: null }] },
   // Window open — 3h in, 8h roster.
-  { userId: "w:priya-sharma", name: "Priya Sharma", role: "Functions Coordinator", siteName: "Werribee Park Wedding", employmentType: "part_time", ordinaryHourlyRate: 28.87,
+  { userId: "w:priya-sharma", name: "Priya Sharma", role: "Events Coordinator", siteName: "Werribee Park Wedding", employmentType: "part_time", ordinaryHourlyRate: 28.87,
     clockIn: at(3, 5), plannedEnd: at(3, 5) + 8 * H, breaks: [] },
   // Too early — 1h in.
   { userId: "w:jake-morrison", name: "Jake Morrison", role: "Bar Attendant", siteName: "Northside Tavern", employmentType: "casual", ordinaryHourlyRate: 31.23,
@@ -82,8 +82,8 @@ const clean = (
 
 export const DEMO_WEEK_SESSIONS: ShiftSession[] = [
   // ---- clean shifts: meal in window, no loading ----
-  clean("w:priya-sharma", "Priya Sharma", "Functions Coordinator", "Brightwater Hotel", 28.87, 0, 10, 8),
-  clean("w:priya-sharma", "Priya Sharma", "Functions Coordinator", "Brightwater Hotel", 28.87, 1, 10, 8),
+  clean("w:priya-sharma", "Priya Sharma", "Events Coordinator", "Brightwater Hotel", 28.87, 0, 10, 8),
+  clean("w:priya-sharma", "Priya Sharma", "Events Coordinator", "Brightwater Hotel", 28.87, 1, 10, 8),
   clean("w:michael-tan", "Michael Tan", "Wait Staff", "Brightwater Hotel", 25.8, 2, 11, 8),
   clean("w:jake-morrison", "Jake Morrison", "Bar Attendant", "Northside Tavern", 31.23, 3, 16, 8),
   clean("w:mitch-egan", "Mitch Egan", "Gaming Attendant", "Brightwater Gaming Room", 31.23, 4, 9, 9),

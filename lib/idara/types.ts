@@ -103,10 +103,22 @@ export interface RosterRequirement {
 }
 
 /** A physical place with its own eligibility rules. */
+export type SiteKind = "venue" | "catering";
+
 export interface Site {
   id: string;
   name: string;
   region: string;
+  /**
+   * A fixed venue trades on a standing weekly roster; a catering operation
+   * exists only for its events. The schedule reads this to decide its shape.
+   *
+   * Required rather than optional: an optional field would let a site exist in
+   * neither mode and force every consumer to guess a default. Whether the
+   * operator is a caterer is derived from these values, never stored
+   * separately, so the two can never disagree.
+   */
+  kind: SiteKind;
   /** checked against each person individually. */
   requires: CredentialRequirement[];
   /** checked against the roster as a whole; see RosterRequirement. */

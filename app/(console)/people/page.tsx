@@ -74,16 +74,16 @@ const SEED: Person[] = [
   { id: 6, name: "Sophie Nguyen", role: "Venue Manager", team: "Management", location: "Northside Tavern", status: "Active", type: "Full-time", phone: "0414 332 901", cred: "success", fairness: 95, onShift: true },
   { id: 7, name: "Jake Morrison", role: "Bartender", team: "Kitchen Team", location: "Brightwater Hotel", status: "Active", type: "Full-time", phone: "0417 660 224", cred: "danger", fairness: 66, onShift: true },
   { id: 8, name: "Hassan Ali", role: "Kitchen Hand", team: "Gaming Team", location: "Brightwater Hotel", status: "Active", type: "Casual", phone: "0402 778 116", cred: "warning", fairness: 79, onShift: true },
-  { id: 9, name: "Josh Williams", role: "Sous Chef", team: "Functions Team", location: "Quayside Bar & Kitchen", status: "Active", type: "Contractor", phone: "0419 445 027", cred: "success", fairness: 86, onShift: false },
+  { id: 9, name: "Josh Williams", role: "Sous Chef", team: "Events Team", location: "Quayside Bar & Kitchen", status: "Active", type: "Contractor", phone: "0419 445 027", cred: "success", fairness: 86, onShift: false },
   { id: 10, name: "Michael Tan", role: "Wait Staff", team: "Floor Team", location: "Quayside Bar & Kitchen", status: "Active", type: "Full-time", phone: "0421 003 558", cred: "success", fairness: 84, onShift: true },
-  { id: 11, name: "Priya Sharma", role: "Functions Coordinator", team: "Management", location: "Brightwater Hotel", status: "Active", type: "Full-time", phone: "0413 887 440", cred: "success", fairness: 93, onShift: true },
+  { id: 11, name: "Priya Sharma", role: "Events Coordinator", team: "Management", location: "Brightwater Hotel", status: "Active", type: "Full-time", phone: "0413 887 440", cred: "success", fairness: 93, onShift: true },
   { id: 12, name: "Liam O'Brien", role: "Barback", team: "Gaming Team", location: "Northside Tavern", status: "Inactive", type: "Casual", phone: "0406 220 119", cred: "danger", fairness: 58, onShift: false },
   { id: 13, name: "Chloe Davis", role: "Barista", team: "Kitchen Team", location: "Brightwater Hotel", status: "Active", type: "Part-time", phone: "0418 552 904", cred: "warning", fairness: 77, onShift: true },
   { id: 14, name: "Noah Wilson", role: "Bartender", team: "Bar Team", location: "Quayside Bar & Kitchen", status: "On Leave", type: "Full-time", phone: "0412 119 887", cred: "success", fairness: 89, onShift: false },
   { id: 15, name: "Emma Brooks", role: "Compliance Officer", team: "Management", location: "Brightwater Hotel", status: "Active", type: "Full-time", phone: "0415 660 332", cred: "success", fairness: 96, onShift: true },
   { id: 16, name: "Ryan Murphy", role: "Gaming Attendant", team: "Gaming Team", location: "Northside Tavern", status: "Active", type: "Casual", phone: "0407 884 551", cred: "warning", fairness: 72, onShift: true },
   { id: 17, name: "Olivia Chen", role: "Wait Staff", team: "Floor Team", location: "Brightwater Hotel", status: "Active", type: "Full-time", phone: "0419 220 663", cred: "success", fairness: 87, onShift: true },
-  { id: 18, name: "Daniel Kelly", role: "Sous Chef", team: "Functions Team", location: "Quayside Bar & Kitchen", status: "Inactive", type: "Contractor", phone: "0402 551 224", cred: "danger", fairness: 61, onShift: false },
+  { id: 18, name: "Daniel Kelly", role: "Sous Chef", team: "Events Team", location: "Quayside Bar & Kitchen", status: "Inactive", type: "Contractor", phone: "0402 551 224", cred: "danger", fairness: 61, onShift: false },
   { id: 19, name: "Grace Taylor", role: "Barback", team: "Kitchen Team", location: "Brightwater Hotel", status: "Active", type: "Casual", phone: "0414 905 117", cred: "success", fairness: 83, onShift: true },
   { id: 20, name: "Ethan Clarke", role: "Venue Manager", team: "Management", location: "Quayside Bar & Kitchen", status: "Active", type: "Full-time", phone: "0411 332 778", cred: "success", fairness: 94, onShift: true },
   { id: 21, name: "Isla Martin", role: "Bartender", team: "Bar Team", location: "Brightwater Hotel", status: "Active", type: "Part-time", phone: "0418 660 901", cred: "warning", fairness: 76, onShift: true },
@@ -102,7 +102,7 @@ const ROLE_OPTIONS = [
   "Barista",
   "Venue Manager",
   "Compliance Officer",
-  "Functions Coordinator",
+  "Events Coordinator",
 ];
 
 const TYPE_OPTIONS: EmploymentType[] = ["Full-time", "Part-time", "Casual", "Contractor"];

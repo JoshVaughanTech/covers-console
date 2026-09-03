@@ -148,7 +148,7 @@ export const ALL_WORK_FUNCTIONS: WorkFunction[] = [
 export const ROLE_FUNCTIONS: Record<string, WorkFunction[]> = {
   "Venue Manager": ALL_WORK_FUNCTIONS,
   "Duty Manager": ALL_WORK_FUNCTIONS,
-  "Functions Coordinator": ["serve_alcohol", "handle_food", "supervise"],
+  "Events Coordinator": ["serve_alcohol", "handle_food", "supervise"],
   Bartender: ["serve_alcohol", "handle_food"],
   "Bar Attendant": ["serve_alcohol", "handle_food"],
   "Bar Supervisor": ["serve_alcohol", "handle_food", "supervise"],

@@ -68,6 +68,7 @@ describe("the verifier seam", () => {
     id: "s-test",
     name: "Test Site",
     region: "Victoria",
+    kind: "venue",
     requires: [{ type: "first_aid" }],
   };
 

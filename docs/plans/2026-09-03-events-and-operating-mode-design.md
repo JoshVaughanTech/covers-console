@@ -33,9 +33,16 @@ role string as the **key**:
 ```
 
 Renaming the title means renaming that key and every seed record that references it, in
-lockstep, or Priya Sharma silently loses her duty mapping and with it her eligibility.
-Doable, but it is a data migration wearing a rename's clothes, and it must be done as
-one atomic change with the tests green either side.
+lockstep. It is a data migration wearing a rename's clothes, and must be done as one
+atomic change with the tests green either side.
+
+**Corrected during implementation.** An earlier draft of this doc claimed a missed key
+would leave Priya Sharma silently *under*-gated. It would not. `functionsForRole()`
+falls back to `ALL_WORK_FUNCTIONS` for a title it does not recognise — deliberately, so
+that an unmapped role "can only ever be asked for more than it needs, never less". A
+missed key therefore makes someone require *every* credential and show as **Blocked** on
+the roster: loud, not silent. The lockstep discipline still applies, but the cost of
+getting it wrong is visible rather than hidden. Pinned by a test.
 
 ---
 
@@ -107,9 +114,10 @@ Idara asks the same question either way, and `Site.requires` already differs per
   system enforces exhaustiveness rather than a test.
 - Derived org mode: all-catering hides the roster; mixed shows both; all-venue is today's
   behaviour unchanged.
-- The credential mapping survives the job-title rename — Priya Sharma keeps her duties
-  and her eligibility. This is the test that matters most, because the failure mode is
-  silent.
+- The credential mapping survives the job-title rename: the renamed role returns its
+  three specific duties rather than the fallback set, which is what proves the key moved
+  with the title. Paired with a test pinning the fail-safe itself, since that behaviour
+  is what makes the rename recoverable.
 - Route: `/events` serves the page; nothing still links to `/jobs`.
 - 183 existing tests stay green; the rename must not change a single eligibility outcome.
 

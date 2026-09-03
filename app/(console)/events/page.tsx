@@ -20,33 +20,18 @@ import {
   useToast,
 } from "@/components/ui";
 import type { Tone } from "@/lib/status";
+import { SEED_EVENTS, type EventBooking, type EventStatus } from "@/lib/events";
 import { PageHead, CardHead } from "@/components/screen/page-head";
 
 /* ============================================================
-   Functions & Events — hospitality engagements (a function groups
-   the shifts/roles for a venue or off-premise site over a date
-   range). Interactive: status tabs + search filter, paginated
-   table, row -> detail modal, and a New Function form modal.
+   Events — hospitality engagements (an event groups the
+   shifts/roles for a venue or off-premise site over a date range).
+   Interactive: status tabs + search filter, paginated table,
+   row -> detail modal, and a New Event form modal.
    ============================================================ */
 
-type JobStatus = "Active" | "Scheduled" | "On Hold" | "Completed";
 
-interface Job {
-  id: string;
-  name: string;
-  site: string;
-  client: string;
-  status: JobStatus;
-  start: string;
-  end: string;
-  filled: number;
-  required: number;
-  progress: number;
-  crew: string[];
-  requirements: string[];
-}
-
-const STATUS_TONE: Record<JobStatus, Tone> = {
+const STATUS_TONE: Record<EventStatus, Tone> = {
   Active: "success",
   Scheduled: "info",
   "On Hold": "warning",
@@ -55,204 +40,6 @@ const STATUS_TONE: Record<JobStatus, Tone> = {
 
 const STATUS_OPTIONS = ["Active", "Scheduled", "On Hold", "Completed"] as const;
 
-const SEED_JOBS: Job[] = [
-  {
-    id: "FN-2041",
-    name: "Werribee Park Wedding — Saturday",
-    site: "Werribee Park Mansion",
-    client: "Private — Nguyen & Cole",
-    status: "Active",
-    start: "May 16, 2026",
-    end: "May 17, 2026",
-    filled: 18,
-    required: 20,
-    progress: 64,
-    crew: ["Mia Anderson", "James Carter", "Sarah Bennett", "Alex Nguyen", "Priya Shah", "Tom Walker"],
-    requirements: ["RSA", "Allergen Management", "Food Safety Supervisor", "Event site briefing"],
-  },
-  {
-    id: "FN-2038",
-    name: "Docklands Corporate Lunch Series",
-    site: "Meridian Tower, Docklands",
-    client: "Meridian Group",
-    status: "Active",
-    start: "Apr 12, 2026",
-    end: "Oct 12, 2026",
-    filled: 11,
-    required: 14,
-    progress: 48,
-    crew: ["Daniel Lee", "Grace Kim", "Olivia Brown", "Ethan Park"],
-    requirements: ["RSA", "Food Handler Training", "Allergen Management", "Corporate presentation standards"],
-  },
-  {
-    id: "FN-2035",
-    name: "Brightwater Friday Live",
-    site: "Brightwater Hotel, Fitzroy",
-    client: "In-house",
-    status: "Active",
-    start: "Mar 03, 2026",
-    end: "Aug 30, 2026",
-    filled: 24,
-    required: 24,
-    progress: 81,
-    crew: ["Noah White", "Liam Scott", "Ava Turner", "Lucas Hall", "Chloe Green", "Mason Reed"],
-    requirements: ["RSA", "Late-night availability", "Crowd safety briefing"],
-  },
-  {
-    id: "FN-2033",
-    name: "Northside Long Lunch",
-    site: "Northside Tavern, Brunswick",
-    client: "In-house",
-    status: "Active",
-    start: "Feb 18, 2026",
-    end: "Dec 18, 2026",
-    filled: 30,
-    required: 36,
-    progress: 55,
-    crew: ["Isabella Cruz", "Henry Ford", "Zoe Adams", "Jack Morris", "Ruby Hayes"],
-    requirements: ["RSA", "Food Safety Supervisor", "Food Handler Training", "Venue induction"],
-  },
-  {
-    id: "FN-2055",
-    name: "Brightwater Gaming Floor — Winter Roster",
-    site: "Brightwater Gaming Room, Fitzroy",
-    client: "In-house",
-    status: "Active",
-    start: "May 20, 2026",
-    end: "Nov 20, 2026",
-    filled: 20,
-    required: 30,
-    progress: 42,
-    crew: ["Eli Stone", "Naomi Frost", "Pablo Diaz", "Greta Lund", "Sam Okafor"],
-    requirements: ["RSA", "RSG", "Venue induction", "Rotating roster availability"],
-  },
-  {
-    id: "FN-2052",
-    name: "Spring Carnival Marquee",
-    site: "Flemington — Marquee C",
-    client: "Halcyon Labs",
-    status: "Scheduled",
-    start: "Nov 03, 2026",
-    end: "Nov 07, 2026",
-    filled: 6,
-    required: 40,
-    progress: 12,
-    crew: ["Leo Bennett", "Maya Singh", "Owen Clark"],
-    requirements: ["RSA", "Allergen Management", "Marquee service experience", "Evening availability"],
-  },
-  {
-    id: "FN-2050",
-    name: "Summer Festival Bar Pool",
-    site: "Alexandra Gardens, Melbourne",
-    client: "City Events Co.",
-    status: "Scheduled",
-    start: "Dec 04, 2026",
-    end: "Feb 04, 2027",
-    filled: 9,
-    required: 50,
-    progress: 18,
-    crew: ["Cody Banks", "Nina Patel", "Riley Cooper"],
-    requirements: ["RSA", "Crowd control briefing", "Outdoor bar experience", "Shift-work availability"],
-  },
-  {
-    id: "FN-2048",
-    name: "School Presentation Night",
-    site: "Brunswick Grammar Hall",
-    client: "Brunswick Grammar",
-    status: "Scheduled",
-    start: "Sep 06, 2026",
-    end: "Sep 07, 2026",
-    filled: 4,
-    required: 22,
-    progress: 9,
-    crew: ["Hannah Lowe", "Ben Foster"],
-    requirements: ["Working with Children Check", "Food Handler Training", "Allergen Management"],
-  },
-  {
-    id: "FN-2058",
-    name: "Quayside Product Launch",
-    site: "Quayside Bar & Kitchen, Docklands",
-    client: "Aperture Studios",
-    status: "Scheduled",
-    start: "Sep 13, 2026",
-    end: "Sep 13, 2026",
-    filled: 3,
-    required: 18,
-    progress: 8,
-    crew: ["Owen Pratt", "Lara Webb"],
-    requirements: ["RSA", "Canapé service", "Allergen Management", "Event site briefing"],
-  },
-  {
-    id: "FN-2026",
-    name: "Peninsula Conference Catering",
-    site: "Peninsula Resort, Sorrento",
-    client: "Peninsula Resorts",
-    status: "On Hold",
-    start: "Jan 15, 2026",
-    end: "Apr 15, 2026",
-    filled: 7,
-    required: 16,
-    progress: 35,
-    crew: ["Ella Brooks", "Marco Rossi", "Sophie Dean"],
-    requirements: ["Food Safety Supervisor", "Allergen Management", "Early-start availability"],
-  },
-  {
-    id: "FN-2022",
-    name: "Corporate Gala Dinner",
-    site: "Royal Exhibition Building",
-    client: "Ardent Partners",
-    status: "On Hold",
-    start: "Dec 01, 2025",
-    end: "Jun 01, 2026",
-    filled: 12,
-    required: 18,
-    progress: 58,
-    crew: ["Aaron Cole", "Tara Mills", "Victor Ng", "Jade Reilly"],
-    requirements: ["RSA", "Banquet experience", "Allergen Management", "Black-tie presentation"],
-  },
-  {
-    id: "FN-2009",
-    name: "Summer Function Pool",
-    site: "Brightwater Hotel, Fitzroy",
-    client: "In-house",
-    status: "Completed",
-    start: "Nov 01, 2025",
-    end: "Feb 28, 2026",
-    filled: 28,
-    required: 28,
-    progress: 100,
-    crew: ["Ivy Chan", "Hugo Marsh", "Lily Quinn", "Felix Wood", "Amara Osei"],
-    requirements: ["RSA", "Food Handler Training", "Banquet experience"],
-  },
-  {
-    id: "FN-2004",
-    name: "New Year's Eve Service",
-    site: "Quayside Bar & Kitchen, Docklands",
-    client: "In-house",
-    status: "Completed",
-    start: "Dec 31, 2025",
-    end: "Jan 01, 2026",
-    filled: 15,
-    required: 15,
-    progress: 100,
-    crew: ["Dylan Ross", "Mila Vega", "Caleb Ortiz", "Hana Ito"],
-    requirements: ["RSA", "Late-night availability", "Crowd safety briefing"],
-  },
-  {
-    id: "FN-1998",
-    name: "Winter Wine Dinner Series",
-    site: "Northside Tavern, Brunswick",
-    client: "In-house",
-    status: "Completed",
-    start: "Jun 02, 2025",
-    end: "Aug 25, 2025",
-    filled: 32,
-    required: 32,
-    progress: 100,
-    crew: ["Ryan Pace", "Kira Holt", "Devon Lyle", "Asha Roy"],
-    requirements: ["RSA", "Wine service knowledge", "Allergen Management"],
-  },
-];
 
 const PAGE_SIZE = 6;
 
@@ -260,7 +47,7 @@ const blankDraft = () => ({
   name: "",
   site: "",
   client: "",
-  status: "Active" as JobStatus,
+  status: "Active" as EventStatus,
   start: "",
   end: "",
   required: "",
@@ -290,11 +77,11 @@ const TH: React.CSSProperties = {
 
 export default function JobsPage() {
   const toast = useToast();
-  const [jobs, setJobs] = useState<Job[]>(SEED_JOBS);
+  const [events, setEvents] = useState<EventBooking[]>(SEED_EVENTS);
   const [tab, setTab] = useState("All");
   const [query, setQuery] = useState("");
   const [page, setPage] = useState(1);
-  const [active, setActive] = useState<Job | null>(null);
+  const [active, setActive] = useState<EventBooking | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
   const [draft, setDraft] = useState(blankDraft);
 
@@ -302,7 +89,7 @@ export default function JobsPage() {
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return jobs.filter((j) => {
+    return events.filter((j) => {
       if (tab !== "All" && j.status !== tab) return false;
       if (!q) return true;
       return (
@@ -312,28 +99,28 @@ export default function JobsPage() {
         j.id.toLowerCase().includes(q)
       );
     });
-  }, [jobs, tab, query]);
+  }, [events, tab, query]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const safePage = Math.min(page, totalPages);
   const pageRows = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
 
   const metrics = useMemo(() => {
-    const activeJobs = jobs.filter((j) => j.status === "Active").length;
-    const openShifts = jobs.reduce(
+    const activeEvents = events.filter((j) => j.status === "Active").length;
+    const openShifts = events.reduce(
       (sum, j) => (j.status === "Active" || j.status === "Scheduled" ? sum + Math.max(0, j.required - j.filled) : sum),
       0
     );
-    const unfilledRoles = jobs.filter(
+    const unfilledRoles = events.filter(
       (j) => (j.status === "Active" || j.status === "Scheduled") && j.filled < j.required
     ).length;
-    const completed = jobs.filter((j) => j.status === "Completed").length;
-    return { activeJobs, openShifts, unfilledRoles, completed };
-  }, [jobs]);
+    const completed = events.filter((j) => j.status === "Completed").length;
+    return { activeEvents, openShifts, unfilledRoles, completed };
+  }, [events]);
 
   const resetToFirstPage = () => setPage(1);
 
-  function openJob(job: Job) {
+  function openEvent(job: EventBooking) {
     setActive(job);
   }
 
@@ -343,14 +130,14 @@ export default function JobsPage() {
     draft.client.trim() !== "" &&
     Number(draft.required) > 0;
 
-  function createJob() {
+  function createEvent() {
     if (!draftValid) {
       toast("Please complete the required fields", { tone: "warning", icon: "triangle-alert" });
       return;
     }
     const required = Math.max(1, Math.round(Number(draft.required)));
-    const next: Job = {
-      id: `JOB-${2060 + jobs.length}`,
+    const next: EventBooking = {
+      id: `EVT-${2060 + events.length}`,
       name: draft.name.trim(),
       site: draft.site.trim(),
       client: draft.client.trim(),
@@ -363,7 +150,7 @@ export default function JobsPage() {
       crew: [],
       requirements: [],
     };
-    setJobs((prev) => [next, ...prev]);
+    setEvents((prev) => [next, ...prev]);
     setCreateOpen(false);
     setDraft(blankDraft());
     setTab("All");
@@ -375,11 +162,11 @@ export default function JobsPage() {
   return (
     <div>
       <PageHead
-        title="Functions & Events"
-        sub="Functions and catering engagements across your venues and off-premise sites — coverage, staffing and progress at a glance."
+        title="Events"
+        sub="Events and catering engagements across your venues and off-premise sites — coverage, staffing and progress at a glance."
         right={
           <Button size="sm" icon="plus" onClick={() => setCreateOpen(true)}>
-            New Function
+            New Event
           </Button>
         }
       />
@@ -387,10 +174,10 @@ export default function JobsPage() {
       {/* Metric row */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 16, marginBottom: 16 }}>
         <Card pad={18}>
-          <div style={{ fontSize: 13, color: "var(--fg-3)", fontWeight: 600 }}>Active Functions</div>
+          <div style={{ fontSize: 13, color: "var(--fg-3)", fontWeight: 600 }}>Active Events</div>
           <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginTop: 4 }}>
             <span className="fs-tnum" style={{ fontSize: 34, fontWeight: 800, letterSpacing: "-.02em", color: "var(--fg-1)" }}>
-              {metrics.activeJobs}
+              {metrics.activeEvents}
             </span>
             <Badge tone="success" dot>
               Live
@@ -471,7 +258,7 @@ export default function JobsPage() {
           <div style={{ padding: 32 }}>
             <EmptyState
               icon="briefcase"
-              title="No functions match your filters"
+              title="No events match your filters"
               sub="Try a different status tab or clear the search."
               action={
                 <Button
@@ -509,7 +296,7 @@ export default function JobsPage() {
                   <tr
                     key={j.id}
                     className="hov-row"
-                    onClick={() => openJob(j)}
+                    onClick={() => openEvent(j)}
                     style={{ borderTop: "1px solid var(--border)", cursor: "pointer" }}
                   >
                     <td style={{ padding: "11px 14px" }}>
@@ -569,7 +356,7 @@ export default function JobsPage() {
           >
             <span style={{ fontSize: 12.5, color: "var(--fg-4)" }}>
               Showing <span className="fs-tnum">{pageRows.length}</span> of{" "}
-              <span className="fs-tnum">{filtered.length}</span> jobs
+              <span className="fs-tnum">{filtered.length}</span> events
             </span>
             <div style={{ flex: 1 }} />
             <Pagination page={safePage} total={filtered.length} pageSize={PAGE_SIZE} onChange={setPage} />
@@ -612,7 +399,7 @@ export default function JobsPage() {
                   size="sm"
                   icon="circle-check"
                   onClick={() => {
-                    setJobs((prev) =>
+                    setEvents((prev) =>
                       prev.map((j) =>
                         j.id === active.id ? { ...j, status: "Completed", progress: 100 } : j
                       )
@@ -727,17 +514,17 @@ export default function JobsPage() {
         )}
       </Modal>
 
-      {/* New Function modal */}
+      {/* New Event modal */}
       <Modal
         open={createOpen}
         onClose={() => setCreateOpen(false)}
-        title="New Function"
+        title="New Event"
         footer={
           <>
             <Button variant="sec" size="sm" onClick={() => setCreateOpen(false)}>
               Cancel
             </Button>
-            <Button size="sm" icon="plus" onClick={createJob}>
+            <Button size="sm" icon="plus" onClick={createEvent}>
               Create Function
             </Button>
           </>
@@ -774,7 +561,7 @@ export default function JobsPage() {
             <Field label="Status">
               <Select
                 value={draft.status}
-                onChange={(v) => setDraft((d) => ({ ...d, status: v as JobStatus }))}
+                onChange={(v) => setDraft((d) => ({ ...d, status: v as EventStatus }))}
                 options={STATUS_OPTIONS.map((s) => ({ label: s, value: s }))}
               />
             </Field>

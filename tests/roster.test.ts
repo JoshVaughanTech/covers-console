@@ -56,6 +56,7 @@ const kitchen: Site = {
   id: "s-kitchen",
   name: "Test Kitchen",
   region: "Victoria",
+  kind: "venue",
   requires: [{ type: "site_induction", siteScoped: true }],
   requiresOnRoster: [{ type: "food_safety_supervisor", minHolders: 1 }],
 };
@@ -157,7 +158,7 @@ describe("decideRoster — collective requirements", () => {
   });
 
   it("treats a site with no requiresOnRoster as having no coverage duty", () => {
-    const plain: Site = { id: "s-p", name: "Plain", region: "Vic", requires: [] };
+    const plain: Site = { id: "s-p", name: "Plain", region: "Vic", kind: "venue", requires: [] };
     const r = run([member("Ada", "Kitchen Hand")], plain);
     expect(r.coverage).toHaveLength(0);
     expect(r.allowed).toBe(true);
