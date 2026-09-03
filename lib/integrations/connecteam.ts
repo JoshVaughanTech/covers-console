@@ -19,6 +19,27 @@ import type { ShiftSession, EmploymentType, BreakKind } from "@/lib/awards";
 
 const BASE = "https://api.connecteam.com";
 
+/**
+ * Raised when the integration is authenticated but not permitted. Distinct from
+ * an outage: the fix is granting a scope in Connecteam, not retrying.
+ */
+export class ConnecteamScopeError extends Error {
+  constructor(readonly scope: string, readonly status: number, readonly path: string) {
+    super(`Connecteam ${status} ${path}: the integration is missing the "${scope}" scope`);
+    this.name = "ConnecteamScopeError";
+  }
+}
+
+/** Seconds until a JWT lapses, or null if it cannot be read. */
+function jwtExpiry(token: string): number | null {
+  try {
+    const claims = JSON.parse(Buffer.from(token.split(".")[1], "base64url").toString()) as { exp?: number };
+    return claims.exp ? claims.exp - Date.now() / 1000 : null;
+  } catch {
+    return null;
+  }
+}
+
 interface TimePoint { timestamp: number; timezone?: string }
 interface CtShift { id: string; start: TimePoint; end: TimePoint | null; schedulerShiftId?: string | null }
 interface CtBreak { id?: string; manualBreakId?: string; start: TimePoint; end: TimePoint | null }
@@ -28,7 +49,18 @@ export interface CtManualBreak { id: string; name?: string; isPaid?: boolean; du
 interface CtUser { userId?: number; id?: number; firstName?: string; lastName?: string; employmentType?: string; customFields?: Record<string, string> }
 
 export interface ConnecteamConfig {
-  apiKey: string;
+  /**
+   * OAuth2 client credentials, as issued under Settings → Integrations. This
+   * is what a Connecteam integration is given today.
+   */
+  clientId?: string;
+  clientSecret?: string;
+  /**
+   * Legacy Open API key, sent as X-API-KEY. A client id/secret pair is NOT an
+   * API key — passing one here returns 403 "Invalid API key". Supply either
+   * this or the client pair.
+   */
+  apiKey?: string;
   timeClockId: string;
   schedulerId?: string | null;
   timezone?: string;
@@ -64,7 +96,54 @@ export function classifyBreak(b: CtManualBreak): BreakKind {
 export class ConnecteamClient {
   private users: Map<number, CtUser> | null = null;
   private breakKinds: Map<string, BreakKind> | null = null;
-  constructor(private cfg: ConnecteamConfig) {}
+  /** cached bearer token; refreshed a minute before it lapses */
+  private token: { value: string; expiresAt: number } | null = null;
+  /**
+   * The exchange in flight, if any. sessions() issues its three reads in
+   * parallel, so without this each one sees an empty cache and mints its own
+   * token — three exchanges where one was needed, on every cold call.
+   */
+  private tokenInflight: Promise<string> | null = null;
+  constructor(private cfg: ConnecteamConfig) {
+    if (!cfg.apiKey && !(cfg.clientId && cfg.clientSecret)) {
+      throw new Error("ConnecteamClient needs either apiKey or clientId + clientSecret");
+    }
+  }
+
+  /**
+   * OAuth2 client_credentials, exchanged over HTTP Basic. The token lasts about
+   * a day, so it is cached rather than re-minted per request; a minute of slack
+   * avoids using one that expires mid-flight.
+   */
+  private async accessToken(): Promise<string> {
+    const now = Date.now() / 1000;
+    if (this.token && this.token.expiresAt - 60 > now) return this.token.value;
+    // concurrent callers share one exchange rather than racing to mint
+    this.tokenInflight ??= this.exchange().finally(() => { this.tokenInflight = null; });
+    return this.tokenInflight;
+  }
+
+  private async exchange(): Promise<string> {
+    const now = Date.now() / 1000;
+    const basic = Buffer.from(`${this.cfg.clientId}:${this.cfg.clientSecret}`).toString("base64");
+    const res = await fetch(BASE + "/oauth/v1/token", {
+      method: "POST",
+      headers: { authorization: `Basic ${basic}`, "content-type": "application/x-www-form-urlencoded" },
+      body: "grant_type=client_credentials",
+      cache: "no-store",
+    });
+    if (!res.ok) throw new Error(`Connecteam token exchange ${res.status}: ${await res.text()}`);
+    const body = (await res.json()) as { access_token?: string; expires_in?: number };
+    if (!body.access_token) throw new Error("Connecteam token exchange returned no access_token");
+
+    this.token = { value: body.access_token, expiresAt: now + (body.expires_in ?? jwtExpiry(body.access_token) ?? 3600) };
+    return this.token.value;
+  }
+
+  private async authHeaders(): Promise<Record<string, string>> {
+    if (this.cfg.apiKey) return { "X-API-KEY": this.cfg.apiKey };
+    return { Authorization: `Bearer ${await this.accessToken()}` };
+  }
 
   private async get<T>(path: string, params: Record<string, string | string[] | undefined> = {}): Promise<T> {
     const url = new URL(BASE + path);
@@ -73,8 +152,14 @@ export class ConnecteamClient {
       if (Array.isArray(v)) v.forEach((x) => url.searchParams.append(k, x));
       else url.searchParams.set(k, v);
     }
-    const res = await fetch(url, { headers: { "X-API-KEY": this.cfg.apiKey, accept: "application/json" }, cache: "no-store" });
-    if (!res.ok) throw new Error(`Connecteam ${res.status} ${path}: ${await res.text()}`);
+    const res = await fetch(url, { headers: { ...(await this.authHeaders()), accept: "application/json" }, cache: "no-store" });
+    if (!res.ok) {
+      const text = await res.text();
+      // a scope failure is a configuration problem, not an outage — say so
+      const scope = text.match(/required scope: ([\w.]+)/)?.[1];
+      if (scope) throw new ConnecteamScopeError(scope, res.status, path);
+      throw new Error(`Connecteam ${res.status} ${path}: ${text}`);
+    }
     return (await res.json()).data as T;
   }
 
@@ -82,10 +167,24 @@ export class ConnecteamClient {
     return new Date((ts + offsetDays * 86400) * 1000).toLocaleDateString("en-CA", { timeZone: this.cfg.timezone ?? "Australia/Melbourne" });
   }
 
+  /**
+   * Names and employment type, when the integration is allowed to read them.
+   *
+   * An integration granted only time_clock.read still gets every punch, and the
+   * punches are the compliance data — a name is a label on top of them. So a
+   * users.read refusal degrades to an empty map rather than taking the whole
+   * board down, and people appear by id until the scope is granted. Any other
+   * failure still throws: an outage is not the same as a permission.
+   */
   private async loadUsers(): Promise<Map<number, CtUser>> {
     if (!this.users) {
-      const d = await this.get<{ users?: CtUser[] }>("/users/v1/users", { limit: "200" });
-      this.users = new Map((d.users ?? []).map((u) => [(u.userId ?? u.id) as number, u]));
+      try {
+        const d = await this.get<{ users?: CtUser[] }>("/users/v1/users", { limit: "200" });
+        this.users = new Map((d.users ?? []).map((u) => [(u.userId ?? u.id) as number, u]));
+      } catch (e) {
+        if (!(e instanceof ConnecteamScopeError)) throw e;
+        this.users = new Map();
+      }
     }
     return this.users;
   }

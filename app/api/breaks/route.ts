@@ -11,20 +11,30 @@ import { ConnecteamClient } from "@/lib/integrations/connecteam";
 export const dynamic = "force-dynamic";
 
 let client: ConnecteamClient | null = null;
+
+const CT = {
+  clientId: process.env.CONNECTEAM_CLIENT_ID,
+  clientSecret: process.env.CONNECTEAM_CLIENT_SECRET,
+  apiKey: process.env.CONNECTEAM_API_KEY,
+  timeClockId: process.env.CONNECTEAM_TIME_CLOCK_ID,
+};
+/** Live needs a time clock plus one of the two credential shapes. */
+const isLive = Boolean(CT.timeClockId && (CT.apiKey || (CT.clientId && CT.clientSecret)));
 let cache: { at: number; sessions: unknown[] } = { at: 0, sessions: [] };
 const TTL_MS = Number(process.env.CONNECTEAM_POLL_SECONDS ?? 30) * 1000;
 
 export async function GET() {
-  const key = process.env.CONNECTEAM_API_KEY;
-  const live = Boolean(key && process.env.CONNECTEAM_TIME_CLOCK_ID);
+  const live = isLive;
 
   if (!live) {
     return NextResponse.json({ mode: "demo", asOf: demoNow(), sessions: DEMO_SESSIONS });
   }
 
   client ??= new ConnecteamClient({
-    apiKey: key as string,
-    timeClockId: process.env.CONNECTEAM_TIME_CLOCK_ID as string,
+    clientId: CT.clientId,
+    clientSecret: CT.clientSecret,
+    apiKey: CT.apiKey,
+    timeClockId: CT.timeClockId as string,
     schedulerId: process.env.CONNECTEAM_SCHEDULER_ID ?? null,
     timezone: process.env.TZ_VENUE ?? "Australia/Melbourne",
     siteName: process.env.CONNECTEAM_SITE_NAME ?? "",

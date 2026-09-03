@@ -16,6 +16,15 @@ export const dynamic = "force-dynamic";
 
 let client: ConnecteamClient | null = null;
 
+const CT = {
+  clientId: process.env.CONNECTEAM_CLIENT_ID,
+  clientSecret: process.env.CONNECTEAM_CLIENT_SECRET,
+  apiKey: process.env.CONNECTEAM_API_KEY,
+  timeClockId: process.env.CONNECTEAM_TIME_CLOCK_ID,
+};
+/** Live needs a time clock plus one of the two credential shapes. */
+const isLive = Boolean(CT.timeClockId && (CT.apiKey || (CT.clientId && CT.clientSecret)));
+
 export async function GET(req: Request) {
   const url = new URL(req.url);
   const now = Math.floor(Date.now() / 1000);
@@ -23,8 +32,7 @@ export async function GET(req: Request) {
   const start = Number(url.searchParams.get("start")) || fallback.start;
   const end = Number(url.searchParams.get("end")) || fallback.end;
 
-  const key = process.env.CONNECTEAM_API_KEY;
-  const live = Boolean(key && process.env.CONNECTEAM_TIME_CLOCK_ID);
+  const live = isLive;
 
   if (!live) {
     // the seed covers exactly one week; asking for another returns an honest empty
@@ -33,8 +41,10 @@ export async function GET(req: Request) {
   }
 
   client ??= new ConnecteamClient({
-    apiKey: key as string,
-    timeClockId: process.env.CONNECTEAM_TIME_CLOCK_ID as string,
+    clientId: CT.clientId,
+    clientSecret: CT.clientSecret,
+    apiKey: CT.apiKey,
+    timeClockId: CT.timeClockId as string,
     schedulerId: process.env.CONNECTEAM_SCHEDULER_ID ?? null,
     timezone: process.env.TZ_VENUE ?? "Australia/Melbourne",
     siteName: process.env.CONNECTEAM_SITE_NAME ?? "",
