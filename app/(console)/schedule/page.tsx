@@ -19,6 +19,7 @@ import {
 } from "@/components/ui";
 import type { Tone } from "@/lib/status";
 import { SEED_EVENTS, type EventBooking } from "@/lib/events";
+import { DAY_IDS, OFF, shiftsOf, week, type CrewRow } from "./roster";
 import {
   useIdara,
   CREDENTIAL_TYPES,
@@ -64,37 +65,6 @@ interface Scenario {
   coverage: number;
   overtime: string;
 }
-/* one shift in the week: when it is, and what it is */
-interface Shift {
-  /** display time, or "—" for a day off. */
-  time: string;
-  /**
-   * What this shift actually is, when it isn't what the job title implies.
-   * Idara checks the assignment, and it checks it per shift — someone can be
-   * fine behind the bar all week and ineligible for Saturday's gaming shift.
-   */
-  duties?: WorkFunction[];
-  label?: string;
-}
-
-/* a rostered staff member, keyed by the name Idara knows them by */
-interface CrewRow {
-  name: string;
-  shifts: Shift[];
-  total: string;
-}
-
-/** shift ids, used when a reason needs to name the day it came from */
-const DAY_IDS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
-
-const OFF = "—";
-
-/** a week of shifts from display times, with per-day assignment overrides */
-const week = (
-  times: string[],
-  special: Record<number, { duties: WorkFunction[]; label: string }> = {},
-): Shift[] => times.map((time, i) => ({ time, ...(special[i] ?? {}) }));
-
 /* the week the roster grid displays, used to place catering engagements */
 const WEEK_START = new Date("May 12, 2026");
 const DAY_MS = 86400000;
@@ -235,14 +205,6 @@ export default function SchedulePage() {
     "11a – 7p": ["#E8F1FC", "#1E5FB0"], // day
     "4p – 12a": ["#EDEAFB", "#5B4BC4"], // evening / close
   };
-
-  /* the roster as Idara sees it: who, and which shifts they're on. Days off
-     are dropped — an unworked shift can't make anyone ineligible. */
-  const shiftsOf = (c: CrewRow) =>
-    c.shifts
-      .map((sh, i) => ({ id: DAY_IDS[i], duties: sh.duties, off: sh.time === OFF }))
-      .filter((sh) => !sh.off)
-      .map(({ id, duties }) => ({ id, duties }));
 
   const assignmentsOf = (rows: CrewRow[]): RosterAssignment[] =>
     rows
