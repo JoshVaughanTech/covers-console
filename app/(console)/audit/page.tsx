@@ -11,12 +11,7 @@ import {
   type AuditEvent,
 } from "@/lib/idara";
 import { PageHead } from "@/components/screen/page-head";
-
-const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-function fmtDate(iso: string): string {
-  const [y, m, d] = iso.split("-");
-  return `${Number(d)} ${MONTHS[Number(m) - 1]} ${y}`;
-}
+import { fmtDate } from "./format";
 
 interface EventMeta {
   icon: string;
