@@ -118,7 +118,17 @@ export default function MobileBreaksPage() {
           overdue: p.severity === 3,
           // survives a retry: the same decision must not send twice
           clientRef: `${p.userId}-${Math.floor(Date.now() / 1000)}`,
-          data: { award: HIGA.awardId, role: p.role, siteName: p.siteName },
+          data: {
+            award: HIGA.awardId,
+            role: p.role,
+            siteName: p.siteName,
+            // AuditEvent.actor is a display string, so the identifier rides
+            // alongside it. Two supervisors can share a name; a DID is the
+            // only thing that says which one, and the chain is append-only —
+            // an ambiguous actor stays ambiguous forever.
+            actorDid: me.did,
+            via: "mobile",
+          },
         }),
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
