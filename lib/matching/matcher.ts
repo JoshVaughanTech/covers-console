@@ -77,7 +77,7 @@ function scoreRating(profile: StaffProfile): ScoreReason {
 /** Fairness: spare capacity scores; a full week already worked does not. */
 function scoreFairness(profile: StaffProfile): ScoreReason {
   const h = profile.hoursThisWeek;
-  if (h <= FULL_WEEK_HOURS) {
+  if (h < FULL_WEEK_HOURS) {
     return {
       component: "fairness",
       points: Math.round(WEIGHTS.fairness * (1 - h / FULL_WEEK_HOURS)),
@@ -86,7 +86,7 @@ function scoreFairness(profile: StaffProfile): ScoreReason {
   }
   return {
     component: "fairness",
-    points: -Math.round((h - FULL_WEEK_HOURS) * 1.5),
+    points: -Math.round((h - FULL_WEEK_HOURS) * 1.5) || 0,
     detail: `${h}h already this week — overtime risk`,
   };
 }

@@ -182,6 +182,19 @@ describe("the scoring components", () => {
     expect(fairness.detail).toContain("overtime risk");
   });
 
+  it("treats exactly a full week as no room left, not room for more", () => {
+    // Leanne sits on exactly FULL_WEEK_HOURS. The boundary belongs to the
+    // overtime branch: at a full week there is no spare capacity to reward,
+    // and reading "room for more" there would invite the extra shift.
+    const leanne = run("sp-fridaylive-bar").candidates.find((c) => c.name === "Leanne Vidal")!;
+    const fairness = leanne.reasons.find((x) => x.component === "fairness")!;
+    expect(fairness.detail).toContain("overtime risk");
+    expect(fairness.detail).not.toContain("room for more");
+    expect(fairness.points).toBe(0);
+    // and never -0, which Object.is separates from 0
+    expect(Object.is(fairness.points, -0)).toBe(false);
+  });
+
   it("rewards spare capacity", () => {
     const aaron = run("sp-fridaylive-bar").candidates.find((c) => c.name === "Aaron Patel")!;
     const fairness = aaron.reasons.find((x) => x.component === "fairness")!;
