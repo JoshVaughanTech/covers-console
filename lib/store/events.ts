@@ -173,6 +173,20 @@ export class EventStore {
   }
 
   /**
+   * Chain a starting set, but only into an empty chain.
+   *
+   * Demo data has to survive the move from memory to disk or every screen
+   * comes up blank on a fresh database. Guarded on emptiness rather than a
+   * flag: seeding twice would append the same history a second time, and the
+   * chain would faithfully record that we did.
+   */
+  seedIfEmpty(orgId: string, events: NewAuditEvent[]): number {
+    if (this.head(orgId)) return 0;
+    for (const ev of events) this.append(orgId, ev);
+    return events.length;
+  }
+
+  /**
    * Events after `seq`, oldest first. `since = -1` returns the whole chain.
    * Returns exactly what was hashed, so verifyChain() applies directly.
    */

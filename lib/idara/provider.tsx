@@ -19,6 +19,8 @@ import {
   useContext,
   useMemo,
   useState,
+  useEffect,
+  useRef,
   type ReactNode,
 } from "react";
 import { LocalCredentialVerifier } from "./verifier";
@@ -113,7 +115,61 @@ const IdaraContext = createContext<IdaraState | null>(null);
 
 export function IdaraProvider({ children }: { children: ReactNode }) {
   const [credentials, setCredentials] = useState<Credential[]>(CREDENTIALS);
+  /*
+   * The chain is durable now: the server owns it, this holds a replica.
+   *
+   * SEED_AUDIT is the starting value rather than the source of truth, so the
+   * screens render immediately and are replaced by the server's chain on the
+   * first read. If the API is unreachable the seed simply stays, which keeps
+   * the console working offline as a demo instead of showing an empty log.
+   */
   const [auditLog, setAuditLog] = useState<AuditEvent[]>(SEED_AUDIT);
+  const [durable, setDurable] = useState(false);
+  /** highest seq folded in, so a reconnect resumes rather than replays */
+  const cursor = useRef(-1);
+
+  /** Fold events in by seq, ignoring any we already hold. */
+  const fold = useCallback((incoming: AuditEvent[]) => {
+    if (incoming.length === 0) return;
+    setAuditLog((log) => {
+      const seen = new Set(log.map((e) => e.seq));
+      const added = incoming.filter((e) => !seen.has(e.seq));
+      if (added.length === 0) return log;
+      return [...log, ...added].sort((a, b) => a.seq - b.seq);
+    });
+    cursor.current = Math.max(cursor.current, ...incoming.map((e) => e.seq));
+  }, []);
+
+  useEffect(() => {
+    let live = true;
+    (async () => {
+      try {
+        const res = await fetch("/api/events");
+        if (!res.ok) throw new Error(String(res.status));
+        const body = (await res.json()) as { events: AuditEvent[] };
+        if (!live) return;
+        // the server's chain replaces the seed wholesale — mixing the two would
+        // interleave two different genesis chains and fail verification
+        setAuditLog(body.events);
+        cursor.current = body.events.at(-1)?.seq ?? -1;
+        setDurable(true);
+      } catch {
+        // no backend: stay on the seed and keep working
+      }
+    })();
+    return () => { live = false; };
+  }, []);
+
+  /* Live appends from other devices. Only once the chain is durable — with no
+     backend there is nothing to stream, and EventSource would retry forever. */
+  useEffect(() => {
+    if (!durable) return;
+    const es = new EventSource(`/api/events/stream?since=${cursor.current}`);
+    es.onmessage = (m) => {
+      try { fold([JSON.parse(m.data) as AuditEvent]); } catch { /* ignore a partial frame */ }
+    };
+    return () => es.close();
+  }, [durable, fold]);
 
   const verifier = useMemo(() => new LocalCredentialVerifier(), []);
 
@@ -128,9 +184,43 @@ export function IdaraProvider({ children }: { children: ReactNode }) {
     [credentials],
   );
 
-  const record = useCallback((ev: NewAuditEvent) => {
-    setAuditLog((log) => appendEvent(log, ev));
-  }, []);
+  /*
+   * Append.
+   *
+   * With a backend, the server is the only writer: it holds the lock that
+   * decides seq and prevHash, so the client cannot know either until it
+   * answers. An optimistic local append would have to guess a seq, and a guess
+   * that differs from the server's leaves a phantom entry no reconciliation
+   * can match. The round trip is a few milliseconds against a log view.
+   *
+   * Without a backend it appends locally, which is what keeps the console
+   * usable as a demo with no server behind it.
+   */
+  const record = useCallback(
+    (ev: NewAuditEvent) => {
+      if (!durable) {
+        setAuditLog((log) => appendEvent(log, ev));
+        return;
+      }
+      void (async () => {
+        try {
+          const res = await fetch("/api/events", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ ...ev, clientRef: crypto.randomUUID() }),
+          });
+          if (!res.ok) throw new Error(String(res.status));
+          const { event } = (await res.json()) as { event: AuditEvent };
+          fold([event]);
+        } catch {
+          // the server refused or is unreachable. Recording locally would put
+          // an event in the log that no chain contains, so the log stays as it
+          // is and the next read reconciles from the server.
+        }
+      })();
+    },
+    [durable, fold],
+  );
 
   const decideFor = useCallback(
     (

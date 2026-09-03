@@ -8,6 +8,7 @@
    ============================================================ */
 import { NextResponse } from "next/server";
 import { eventStore } from "@/lib/store/events";
+import { SEED_AUDIT_EVENTS } from "@/lib/idara/seed";
 import type { NewAuditEvent } from "@/lib/idara/audit";
 
 export const dynamic = "force-dynamic";
@@ -18,6 +19,8 @@ const ORG = process.env.COVERS_ORG ?? "org-brightwater";
 export async function GET(req: Request) {
   const since = Number(new URL(req.url).searchParams.get("since") ?? -1);
   const store = eventStore();
+  // a fresh database would otherwise serve an empty audit screen
+  store.seedIfEmpty(ORG, SEED_AUDIT_EVENTS);
   return NextResponse.json({
     events: store.since(ORG, Number.isFinite(since) ? since : -1),
     head: store.head(ORG),

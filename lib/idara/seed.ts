@@ -242,7 +242,9 @@ export const CREDENTIALS: Credential[] = [
    load. Note the revocation of Michael's RSA on 2024-05-10 — it's the
    recorded reason he's blocked in today's roster. Live publish/block
    events append on top of this chain. */
-const SEED_AUDIT_EVENTS: NewAuditEvent[] = [
+/** The unchained seed. Exported so the durable store can chain it itself,
+ *  rather than importing a chain built against a different genesis. */
+export const SEED_AUDIT_EVENTS: NewAuditEvent[] = [
   {
     type: "credential.issued",
     at: "2024-01-15",
