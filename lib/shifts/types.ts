@@ -58,7 +58,8 @@ export function seatsLeft(p: ShiftPosting): number {
   return Math.max(0, p.seats - p.assigned.length);
 }
 
-/** Claims still awaiting a manager decision. */
-export function openClaims(p: ShiftPosting): Claim[] {
-  return p.claims.filter((c) => !c.refused && !p.assigned.includes(c.did));
-}
+/* Claims awaiting a decision are answered by reviewClaims() in review.ts,
+   not here. A filter on `refused` alone cannot see a claim whose holder has
+   become ineligible since making it, so it would report as work still to do
+   something the gate will refuse. Leaving that function exported alongside
+   the real one would be an invitation to pick the wrong answer. */

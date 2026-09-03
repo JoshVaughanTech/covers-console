@@ -17,6 +17,7 @@ import {
   reviewClaims,
   actionableClaims,
   needsReview,
+  standingFor,
   declineClaim,
 } from "../lib/shifts/review";
 import { POSTINGS } from "../lib/shifts/seed";
@@ -138,6 +139,92 @@ describe("declineClaim", () => {
     const once = declineClaim(posting("sp-2041-wait"), did("Mitch Egan"), "first");
     const twice = declineClaim(once, did("Mitch Egan"), "second");
     expect(twice.claims.find((c) => c.did === did("Mitch Egan"))?.refused).toBe("first");
+  });
+});
+
+describe("one row per person, not one per attempt", () => {
+  const mitch = () => did("Mitch Egan");
+
+  /** declined, then asked again — two claims on record, one position. */
+  const askedAgain = () => {
+    const declined = declineClaim(posting("sp-2041-wait"), mitch(), "Needed elsewhere");
+    return { ...declined, claims: [...declined.claims, { did: mitch(), at: "2024-05-17" }] };
+  };
+
+  it("does not list the same person twice", () => {
+    const rows = reviewClaims(askedAgain(), openGate);
+    expect(rows.filter((c) => c.did === mitch())).toHaveLength(1);
+  });
+
+  it("reports the later claim, so the queue shows what is unanswered", () => {
+    const row = reviewClaims(askedAgain(), openGate).find((c) => c.did === mitch());
+    expect(row?.standing).toBe("open");
+    expect(row?.at).toBe("2024-05-17");
+  });
+
+  it("counts them once as actionable, not twice", () => {
+    const actionable = actionableClaims(reviewClaims(askedAgain(), openGate));
+    expect(actionable.filter((c) => c.did === mitch())).toHaveLength(1);
+  });
+
+  it("agrees with what that worker is shown — the two views cannot diverge", () => {
+    // the manager's row and the worker's own standing come from the same call
+    const p = askedAgain();
+    const managerRow = reviewClaims(p, openGate).find((c) => c.did === mitch());
+    const workerRow = standingFor(p, mitch(), null);
+    expect(workerRow).toEqual(managerRow);
+  });
+
+  it("still reports declined when they have not asked again", () => {
+    const p = declineClaim(posting("sp-2041-wait"), mitch(), "Needed elsewhere");
+    expect(reviewClaims(p, openGate).find((c) => c.did === mitch())?.standing).toBe("declined");
+  });
+
+  it("leaves other claimants untouched", () => {
+    const rows = reviewClaims(askedAgain(), openGate);
+    expect(rows.some((c) => c.did === did("Michael Tan"))).toBe(true);
+  });
+});
+
+describe("what the worker who claimed sees", () => {
+  const mitch = () => did("Mitch Egan");
+
+  it("is nothing when they have not claimed", () => {
+    expect(standingFor(posting("sp-2041-wait"), did("Sophie Nguyen"), null)).toBeNull();
+  });
+
+  it("reports their claim as open while it stands", () => {
+    expect(standingFor(posting("sp-2041-wait"), mitch(), null)?.standing).toBe("open");
+  });
+
+  it("tells them they were declined, and why", () => {
+    // the whole point: before this, a refusal was visible to the manager and
+    // silently invisible to the person who asked
+    const p = declineClaim(posting("sp-2041-wait"), mitch(), "Needed at Brightwater");
+    const s = standingFor(p, mitch(), null);
+    expect(s?.standing).toBe("declined");
+    expect(s?.reason).toBe("Needed at Brightwater");
+  });
+
+  it("reports lapsed against their own eligibility today", () => {
+    const s = standingFor(posting("sp-2041-wait"), mitch(), "RSA: Expired 2024-05-01.");
+    expect(s?.standing).toBe("lapsed");
+    expect(s?.reason).toMatch(/2024-05-01/);
+  });
+
+  it("shows the fresh claim after they ask again, not the old refusal", () => {
+    // a refusal followed by a new claim means they have moved on from that
+    // state; reporting the older one would report a position they have left
+    const declined = declineClaim(posting("sp-2041-wait"), mitch(), "Needed elsewhere");
+    const asked = { ...declined, claims: [...declined.claims, { did: mitch(), at: "2024-05-17" }] };
+    const s = standingFor(asked, mitch(), null);
+    expect(s?.standing).toBe("open");
+    expect(s?.at).toBe("2024-05-17");
+  });
+
+  it("does not leak another person's standing", () => {
+    const p = declineClaim(posting("sp-2041-wait"), mitch(), "Needed elsewhere");
+    expect(standingFor(p, did("Michael Tan"), null)?.standing).not.toBe("declined");
   });
 });
 

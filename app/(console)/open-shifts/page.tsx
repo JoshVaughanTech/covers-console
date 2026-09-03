@@ -43,9 +43,9 @@ import {
   reviewClaims,
   actionableClaims,
   needsReview,
+  standingFor,
   declineClaim,
   claimShift,
-  hasClaimed,
   buildPosting,
   emptyDraft,
   dutiesForRole,
@@ -302,11 +302,16 @@ export default function OpenShiftsPage() {
     if (!worker(staffDid)) return [];
     return postings
       .filter((p) => p.status !== "draft" && !p.assigned.includes(staffDid))
-      .map((p) => ({
-        posting: p,
-        blocked: blockReasonFor(p, staffDid),
-        claimed: hasClaimed(p, staffDid),
-      }));
+      .map((p) => {
+        const blocked = blockReasonFor(p, staffDid);
+        return {
+          posting: p,
+          blocked,
+          // their own claim as it stands today, so a refusal is visible to
+          // the person who made it rather than only to the manager
+          standing: standingFor(p, staffDid, blocked),
+        };
+      });
   }, [staffDid, postings, worker, blockReasonFor]);
 
   /* ---- claiming ----
@@ -478,7 +483,7 @@ export default function OpenShiftsPage() {
                 ))}
               </select>
             </div>
-            {staffView.map(({ posting: p, blocked, claimed }) => (
+            {staffView.map(({ posting: p, blocked, standing }) => (
               <div key={p.id} style={{ borderTop: "1px solid var(--border)", padding: "14px 16px" }}>
                 <div style={{ display: "flex", alignItems: "flex-start", gap: 12 }}>
                   <div style={{ flex: 1 }}>
@@ -501,15 +506,21 @@ export default function OpenShiftsPage() {
                         {blocked}
                       </div>
                     )}
+                    {!blocked && standing?.standing === "declined" && (
+                      <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 8, fontSize: 12, color: "var(--fg-3)" }}>
+                        <Icon name="circle-x" size={13} color="var(--fg-4)" />
+                        Declined — {standing.reason}. You can ask again.
+                      </div>
+                    )}
                   </div>
                   <div style={{ textAlign: "right" }}>
                     {blocked ? (
                       <Badge tone="neutral">Not available</Badge>
-                    ) : claimed ? (
+                    ) : standing?.standing === "open" ? (
                       <Badge tone="teal" icon="hand">Claim submitted</Badge>
                     ) : (
                       <Button size="sm" icon="hand" onClick={() => claim(p)}>
-                        Claim
+                        {standing?.standing === "declined" ? "Ask again" : "Claim"}
                       </Button>
                     )}
                     <div style={{ fontSize: 11, color: "var(--fg-4)", marginTop: 6 }}>

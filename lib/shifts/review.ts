@@ -50,7 +50,16 @@ export function reviewClaims(
   p: ShiftPosting,
   gate: (did: string) => string | null,
 ): ReviewedClaim[] {
-  return p.claims.map((c): ReviewedClaim => {
+  // One row per person, not one per attempt. Someone declined who then asks
+  // again has two claims on record, but only one position: the later one.
+  // Showing both would put the same name in the queue twice, once answered
+  // and once not, and the manager's view would then disagree with what that
+  // worker sees — which the whole screen is built to prevent. The earlier
+  // attempt is not lost; it is in the audit log, which is where history goes.
+  const latest = new Map<string, Claim>();
+  for (const c of p.claims) latest.set(c.did, c);
+
+  return [...latest.values()].map((c): ReviewedClaim => {
     if (p.assigned.includes(c.did)) {
       return { did: c.did, at: c.at, standing: "assigned", reason: "Already on this shift" };
     }
@@ -61,6 +70,22 @@ export function reviewClaims(
     if (blocked) return { did: c.did, at: c.at, standing: "lapsed", reason: blocked };
     return { did: c.did, at: c.at, standing: "open" };
   });
+}
+
+/**
+ * How one person's own claim stands, for the worker's own view.
+ *
+ * `blocked` is that person's eligibility answer today — null when allowed.
+ * reviewClaims() already keeps only each person's latest claim, so a refusal
+ * followed by a fresh one reports as open: they have asked again, and the
+ * older refusal is a state they have left.
+ */
+export function standingFor(
+  p: ShiftPosting,
+  did: string,
+  blocked: string | null,
+): ReviewedClaim | null {
+  return reviewClaims(p, () => blocked).find((c) => c.did === did) ?? null;
 }
 
 /** Claims still genuinely awaiting a decision. */
