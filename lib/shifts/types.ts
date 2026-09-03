@@ -9,7 +9,16 @@
 import type { WorkFunction } from "@/lib/idara";
 import type { SkillId, SkillLevel } from "@/lib/people";
 
-export type PostingStatus = "draft" | "open" | "needs_review" | "filled";
+/**
+ * What the manager set this posting to. Authored, never derived.
+ *
+ * "Needs review" is deliberately not here. Whether a posting wants attention
+ * depends on the claims against it and on eligibility today, so it is
+ * computed by needsReview() in review.ts and never stored — a derived value
+ * kept in an authored field is one that can disagree with the thing it was
+ * derived from, and then there is no way to tell which is right.
+ */
+export type PostingStatus = "draft" | "open" | "filled";
 
 /** A skill the posting asks for, and the level it asks for it at. */
 export interface SkillRequirement {

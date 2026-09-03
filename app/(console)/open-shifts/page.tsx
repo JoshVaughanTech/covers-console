@@ -57,7 +57,6 @@ import { rankForShift, WEIGHTS, type MatchResult, type ScoreReason } from "@/lib
 const STATUS_TONE = {
   draft: "neutral",
   open: "info",
-  needs_review: "warning",
   filled: "success",
 } as const;
 
@@ -71,7 +70,6 @@ const DUTY_LABEL: Record<WorkFunction, string> = {
 const STATUS_LABEL = {
   draft: "Draft",
   open: "Open",
-  needs_review: "Needs review",
   filled: "Filled",
 } as const;
 
