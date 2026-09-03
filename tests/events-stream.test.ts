@@ -1,0 +1,125 @@
+import { describe, it, expect, beforeAll, afterEach } from "vitest";
+
+/* ============================================================
+   The SSE stream's lifecycle.
+
+   The interesting cases are all about the client going away.
+   controller.enqueue() throws once a stream is closed, and the
+   subscriber is invoked from a microtask inside the store — so an
+   unguarded write after a disconnect is an UNCAUGHT throw, not a
+   catchable one. React Strict Mode mounts twice in development, so
+   every page load disconnects a stream: this is the common path,
+   not a rare one.
+   ============================================================ */
+
+process.env.COVERS_DB = ":memory:";
+process.env.COVERS_ORG = "org-stream";
+
+let stream: typeof import("../app/api/events/stream/route");
+let store: import("../lib/store/events").EventStore;
+
+const ORG = "org-stream";
+
+const ev = (n: number) => ({
+  type: "break.decision" as const,
+  at: "2026-09-03T03:56:00.000Z",
+  actor: "Leanne Vidal",
+  summary: `event ${n}`,
+});
+
+beforeAll(async () => {
+  stream = await import("../app/api/events/stream/route");
+  store = (await import("../lib/store/events")).eventStore();
+});
+
+/** Any unhandled rejection here is the bug this file exists to catch. */
+const unhandled: unknown[] = [];
+process.on("unhandledRejection", (e) => unhandled.push(e));
+afterEach(() => { expect(unhandled).toEqual([]); });
+
+async function readFrames(res: Response, count: number, ms = 1500): Promise<string[]> {
+  const reader = res.body!.getReader();
+  const dec = new TextDecoder();
+  const frames: string[] = [];
+  const deadline = Date.now() + ms;
+  let buf = "";
+  while (frames.length < count && Date.now() < deadline) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    buf += dec.decode(value, { stream: true });
+    for (const part of buf.split("\n\n")) {
+      if (part.includes("data:")) frames.push(part);
+    }
+    buf = "";
+  }
+  reader.releaseLock();
+  return frames;
+}
+
+describe("replay on connect", () => {
+  it("sends what the client missed before going live", async () => {
+    store.append(ORG, ev(1));
+    store.append(ORG, ev(2));
+
+    const res = await stream.GET(new Request("http://x/api/events/stream?since=-1"));
+    expect(res.headers.get("content-type")).toContain("text/event-stream");
+
+    const frames = await readFrames(res, 2);
+    expect(frames.length).toBeGreaterThanOrEqual(2);
+    // the id: line is what a reconnect sends back as Last-Event-ID
+    expect(frames[0]).toMatch(/^id: 0\n/);
+  });
+
+  it("honours a cursor so a reconnect does not replay everything", async () => {
+    const res = await stream.GET(new Request("http://x/api/events/stream?since=0"));
+    const frames = await readFrames(res, 1);
+    expect(frames[0]).toMatch(/^id: 1\n/);
+  });
+
+  it("reads the cursor from Last-Event-ID, which is what EventSource sends", async () => {
+    const res = await stream.GET(
+      new Request("http://x/api/events/stream", { headers: { "last-event-id": "0" } }),
+    );
+    const frames = await readFrames(res, 1);
+    expect(frames[0]).toMatch(/^id: 1\n/);
+  });
+});
+
+describe("when the client goes away", () => {
+  it("does not throw when an event arrives after a disconnect", async () => {
+    const ctl = new AbortController();
+    const res = await stream.GET(new Request("http://x/api/events/stream", { signal: ctl.signal }));
+    await readFrames(res, 1, 400);
+
+    ctl.abort();
+    await new Promise((r) => setTimeout(r, 50));
+
+    // the append that would previously have thrown from inside a microtask
+    expect(() => store.append(ORG, ev(99))).not.toThrow();
+    await new Promise((r) => setTimeout(r, 50));
+    // afterEach asserts nothing was left unhandled
+  });
+
+  it("survives many connect/disconnect cycles, as Strict Mode produces", async () => {
+    for (let i = 0; i < 10; i++) {
+      const ctl = new AbortController();
+      const res = await stream.GET(new Request("http://x/api/events/stream", { signal: ctl.signal }));
+      await readFrames(res, 1, 200);
+      ctl.abort();
+    }
+    await new Promise((r) => setTimeout(r, 50));
+
+    // appends still work and the chain is untouched by all that churn
+    expect(() => store.append(ORG, ev(100))).not.toThrow();
+    expect(store.verify(ORG).ok).toBe(true);
+  });
+
+  it("handles a request that is already aborted before the stream starts", async () => {
+    const ctl = new AbortController();
+    ctl.abort();
+    const res = await stream.GET(new Request("http://x/api/events/stream", { signal: ctl.signal }));
+    expect(res.status).toBe(200);
+    await new Promise((r) => setTimeout(r, 50));
+    expect(() => store.append(ORG, ev(101))).not.toThrow();
+  });
+});
