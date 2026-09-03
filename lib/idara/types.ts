@@ -196,8 +196,18 @@ export type AuditEventType =
   | "roster.published"
   /** a supervisor acting on an award break entitlement (Break Compliance). */
   | "break.decision"
+  /**
+   * Whether that decision reached Connecteam's timesheet. Separate events
+   * rather than a field on the decision: resolving pending by rewriting the
+   * original would break the chain, which is the point of having one.
+   */
+  | "break.pushed"
+  | "break.push_failed"
   /** a manager assigning someone to an open shift (Open Shifts). */
-  | "shift.assigned";
+  | "shift.assigned"
+  /** a worker putting their hand up for an open shift. A request, not a
+      roster change — the assignment that may follow is a separate event. */
+  | "shift.claimed";
 
 export interface AuditEvent {
   /** monotonic sequence number, 0-based. */

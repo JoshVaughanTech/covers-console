@@ -35,3 +35,6 @@ next-env.d.ts
 
 # claude code local config
 /.claude/
+
+# local event store (SQLite)
+.data/

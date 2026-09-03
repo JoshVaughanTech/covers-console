@@ -163,6 +163,41 @@ export class ConnecteamClient {
     return (await res.json()).data as T;
   }
 
+  private async post<T>(path: string, body: unknown): Promise<T> {
+    const res = await fetch(BASE + path, {
+      method: "POST",
+      headers: { ...(await this.authHeaders()), accept: "application/json", "content-type": "application/json" },
+      body: JSON.stringify(body),
+      cache: "no-store",
+    });
+    if (!res.ok) {
+      const text = await res.text();
+      const scope = text.match(/required scope: ([w.]+)/)?.[1];
+      if (scope) throw new ConnecteamScopeError(scope, res.status, path);
+      throw new Error(`Connecteam ${res.status} ${path}: ${text}`);
+    }
+    return ((await res.json()) as { data?: T }).data as T;
+  }
+
+  /**
+   * Start a manual break for one user — the write that makes a supervisor's
+   * decision real in the customer's timesheet rather than only in ours.
+   *
+   * Needs time_clock.write. Without it this throws ConnecteamScopeError, which
+   * the caller records as a failed push rather than swallowing.
+   */
+  async startBreak(manualBreakId: string, userRef: string, at: string): Promise<{ ctBreakId: string }> {
+    // subjects are DIDs in Covers; Connecteam wants its own numeric user id
+    const userId = Number(userRef.split(":").pop());
+    if (!Number.isFinite(userId)) throw new Error(`cannot map "${userRef}" to a Connecteam userId`);
+
+    const r = await this.post<{ id?: string; manualBreakId?: string }>(
+      `/time-clock/v1/time-clocks/${this.cfg.timeClockId}/manual-breaks/${manualBreakId}/clock-in`,
+      { userId, timestamp: Math.floor(Date.parse(at) / 1000) },
+    );
+    return { ctBreakId: r?.id ?? r?.manualBreakId ?? manualBreakId };
+  }
+
   private localDate(ts: number, offsetDays = 0): string {
     return new Date((ts + offsetDays * 86400) * 1000).toLocaleDateString("en-CA", { timeZone: this.cfg.timezone ?? "Australia/Melbourne" });
   }
