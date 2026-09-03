@@ -108,6 +108,23 @@ export const SITES: Site[] = [
   },
 ];
 
+/**
+ * Whoever is signed into the console.
+ *
+ * Kept out of WORKERS because she is not rostered — the matcher must not
+ * consider her, and the staff view must not offer her shifts. She exists so
+ * that a console action can name its actor the way the phone already does:
+ * every decision the console writes carries this DID, not just "Emma Taylor".
+ *
+ * A real session replaces where this comes from, not what the chain records.
+ */
+export const CONSOLE_OPERATOR: Identity = {
+  did: "did:web:idara.app:u:emma-taylor",
+  name: "Emma Taylor",
+  role: "Operations Manager",
+  org: ORG,
+};
+
 /* ---------- staff ---------- */
 export const WORKERS: Identity[] = [
   { did: "did:web:idara.app:w:darie-roberts", name: "Darie Roberts", role: "Bartender", org: ORG },

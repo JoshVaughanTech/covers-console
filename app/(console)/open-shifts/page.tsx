@@ -32,6 +32,7 @@ import {
   decideMember,
   LocalCredentialVerifier,
   ALL_WORK_FUNCTIONS,
+  CONSOLE_OPERATOR,
   ROLE_FUNCTIONS,
   type Decision,
   type WorkFunction,
@@ -164,7 +165,8 @@ export default function OpenShiftsPage() {
     recordEvent({
       type: "decision",
       at: today,
-      actor: "Emma Taylor",
+      actor: CONSOLE_OPERATOR.name,
+      actorDid: CONSOLE_OPERATOR.did,
       subject: did,
       summary: `${name}'s claim for ${posting.role} on ${posting.functionName} was declined`,
       data: {
@@ -184,7 +186,8 @@ export default function OpenShiftsPage() {
     recordEvent({
       type: "shift.assigned",
       at: today,
-      actor: "Emma Taylor",
+      actor: CONSOLE_OPERATOR.name,
+      actorDid: CONSOLE_OPERATOR.did,
       subject: did,
       summary: `${name} assigned to ${posting.role} on ${posting.functionName}`,
       data: { postingId: posting.id, siteId: posting.siteId, role: posting.role },
@@ -278,7 +281,8 @@ export default function OpenShiftsPage() {
     recordEvent({
       type: "shift.posted",
       at: today,
-      actor: "Emma Taylor",
+      actor: CONSOLE_OPERATOR.name,
+      actorDid: CONSOLE_OPERATOR.did,
       summary: `${result.posting.role} · ${result.posting.functionName} posted (${result.posting.seats} seat${result.posting.seats === 1 ? "" : "s"})`,
       data: { postingId: result.posting.id, posting: result.posting },
     });
@@ -346,6 +350,7 @@ export default function OpenShiftsPage() {
       type: "shift.claimed",
       at: today,
       actor: person.name,
+      actorDid: person.did,
       subject: staffDid,
       summary: `${person.name} claimed ${p.role} on ${p.functionName}`,
       data: { postingId: p.id, siteId: p.siteId, role: p.role },

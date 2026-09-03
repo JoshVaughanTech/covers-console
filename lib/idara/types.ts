@@ -221,8 +221,20 @@ export interface AuditEvent {
   id: string;
   type: AuditEventType;
   at: ISODate;
-  /** who triggered it — a manager, or "system". */
+  /** who triggered it, for display — a person's name, or "system". */
   actor: string;
+  /**
+   * Who triggered it, identified. A display name is neither unique nor stable
+   * across a rename, so a log that answers "who did this" only by name answers
+   * it weakly — two people called Sam Taylor are indistinguishable in it.
+   *
+   * Optional because "system" has no DID and pre-existing events have none.
+   * It must be `undefined` rather than `null` when absent: canonicalJson drops
+   * undefined keys and keeps null ones, so a null here would change the digest
+   * of every event written before this field existed and read as tampering.
+   */
+  actorDid?: DID;
+  /** who it was about. */
   subject?: DID;
   summary: string;
   data: Record<string, unknown>;

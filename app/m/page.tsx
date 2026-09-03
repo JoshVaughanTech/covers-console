@@ -122,6 +122,11 @@ export default function MobileBreaksPage() {
           kind,
           at: new Date().toISOString(),
           actor: me.name,
+          // AuditEvent.actorDid now, rather than riding in data. Two
+          // supervisors can share a name; a DID is the only thing that says
+          // which one, and the chain is append-only — an ambiguous actor
+          // stays ambiguous forever.
+          actorDid: me.did,
           overdue: p.severity === 3,
           // survives a retry: the same decision must not send twice
           clientRef: `${p.userId}-${Math.floor(Date.now() / 1000)}`,
@@ -129,11 +134,6 @@ export default function MobileBreaksPage() {
             award: HIGA.awardId,
             role: p.role,
             siteName: p.siteName,
-            // AuditEvent.actor is a display string, so the identifier rides
-            // alongside it. Two supervisors can share a name; a DID is the
-            // only thing that says which one, and the chain is append-only —
-            // an ambiguous actor stays ambiguous forever.
-            actorDid: me.did,
             via: "mobile",
           },
         }),

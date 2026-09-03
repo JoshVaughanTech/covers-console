@@ -30,6 +30,7 @@ CREATE TABLE IF NOT EXISTS audit_event (
   at          TEXT    NOT NULL,
   recorded_at TEXT    NOT NULL,
   actor       TEXT    NOT NULL,
+  actor_did   TEXT,
   subject     TEXT,
   summary     TEXT    NOT NULL,
   data        TEXT    NOT NULL,
@@ -64,9 +65,34 @@ export interface AppendResult {
   created: boolean;
 }
 
+/**
+ * Bring an existing database up to the current schema.
+ *
+ * CREATE TABLE IF NOT EXISTS is silent on a table that already exists, so a
+ * database written before a column was added never receives it — and every
+ * insert afterwards fails against a column list that no longer matches. That
+ * is invisible in development, where the file gets deleted between runs, and
+ * total in a deployment, where it does not.
+ *
+ * Each step checks the live schema rather than a stored version number, so it
+ * stays correct for a database that has been through an unusual path, and is
+ * safe to run on every open. Added columns must be nullable: existing rows get
+ * NULL, which toEvent maps to undefined, so their digests are unchanged and
+ * the chain keeps verifying.
+ */
+function migrate(db: DatabaseSync): void {
+  const columns = (db.prepare("PRAGMA table_info(audit_event)").all() as { name: string }[]).map(
+    (c) => c.name,
+  );
+  if (!columns.includes("actor_did")) {
+    db.exec("ALTER TABLE audit_event ADD COLUMN actor_did TEXT");
+  }
+}
+
 type Row = {
   seq: number; id: string; type: string; at: string; recorded_at: string;
-  actor: string; subject: string | null; summary: string; data: string;
+  actor: string; actor_did: string | null; subject: string | null;
+  summary: string; data: string;
   prev_hash: string; hash: string;
 };
 
@@ -88,6 +114,10 @@ function toEvent(r: Row): AuditEvent {
     type: r.type as AuditEvent["type"],
     at: r.at,
     actor: r.actor,
+    // ?? undefined, never null: canonicalJson drops undefined keys and keeps
+    // null ones, so a null here would re-hash every pre-existing event
+    // differently and verifyChain would call the whole chain tampered
+    actorDid: (r.actor_did ?? undefined) as AuditEvent["actorDid"],
     subject: (r.subject ?? undefined) as AuditEvent["subject"],
     summary: r.summary,
     data: JSON.parse(r.data) as Record<string, unknown>,
@@ -107,6 +137,7 @@ export class EventStore {
     if (path !== ":memory:") this.db.exec("PRAGMA journal_mode = WAL");
     this.db.exec("PRAGMA foreign_keys = ON");
     this.db.exec(DDL);
+    migrate(this.db);
     this.bus.setMaxListeners(0);
   }
 
@@ -150,10 +181,11 @@ export class EventStore {
       this.db
         .prepare(
           `INSERT INTO audit_event
-             (org_id, seq, id, type, at, recorded_at, actor, subject, summary, data, prev_hash, hash, client_ref)
-           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+             (org_id, seq, id, type, at, recorded_at, actor, actor_did, subject, summary, data, prev_hash, hash, client_ref)
+           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
         )
         .run(orgId, next.seq, next.id, next.type, next.at, recordedAt, next.actor,
+             next.actorDid ?? null,
              next.subject ?? null, next.summary, JSON.stringify(next.data), next.prevHash, next.hash, ref);
 
       this.db

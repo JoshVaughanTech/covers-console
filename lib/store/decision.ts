@@ -30,6 +30,8 @@ export interface BreakDecisionInput {
   /** when the supervisor acted — not when we recorded it */
   at: string;
   actor: string;
+  /** who acted, identified. AuditEvent.actorDid, not payload. */
+  actorDid?: string;
   /** past the 6h mark, so cl 16.6 loading was already accruing */
   overdue?: boolean;
   /** idempotency: minted by the client, survives its retries */
@@ -73,6 +75,7 @@ export async function sendOnBreak(
       type: "break.decision",
       at: input.at,
       actor: input.actor,
+      actorDid: input.actorDid,
       subject: input.subject,
       summary:
         `${input.name} sent on ${input.kind} break at ${clock(input.at)}` +

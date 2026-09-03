@@ -40,4 +40,4 @@ export { sha256Hex, canonicalJson } from "./hash";
 export type { NewAuditEvent } from "./audit";
 export { IdaraProvider, useIdara } from "./provider";
 export type { PublishResult, RosterAssignment } from "./provider";
-export { TODAY, SITES, WORKERS, CREDENTIALS, ISSUERS } from "./seed";
+export { TODAY, SITES, WORKERS, CREDENTIALS, ISSUERS, CONSOLE_OPERATOR } from "./seed";

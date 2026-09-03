@@ -36,6 +36,9 @@ export interface NewAuditEvent {
   type: AuditEventType;
   at: ISODate;
   actor: string;
+  /** who acted, identified. Omitted for "system" and for callers that
+      have no session — never null, which would alter the digest. */
+  actorDid?: DID;
   subject?: DID;
   summary: string;
   data?: Record<string, unknown>;
@@ -52,6 +55,7 @@ export function appendEvent(log: AuditEvent[], ev: NewAuditEvent): AuditEvent[] 
     type: ev.type,
     at: ev.at,
     actor: ev.actor,
+    actorDid: ev.actorDid,
     subject: ev.subject,
     summary: ev.summary,
     data: ev.data ?? {},
