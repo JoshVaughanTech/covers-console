@@ -271,7 +271,7 @@ export default function SchedulePage() {
       out[c.name] = decideFor(didOf[c.name], "be_rostered", siteId, shiftsOf(c));
     }
     return out;
-  }, [crew, decideFor, didOf]);
+  }, [crew, decideFor, didOf, siteId]);
 
   const eligibleCount = useMemo(
     () => crew.filter((c) => decisionByName[c.name]?.allowed).length,

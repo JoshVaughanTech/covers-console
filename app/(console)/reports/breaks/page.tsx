@@ -66,7 +66,8 @@ export default function BreakLoadingPage() {
     };
   }, [window.start, window.end]);
 
-  const sessions = payload?.sessions ?? [];
+  // stable identity: a fresh array each render would defeat the memos below
+  const sessions = useMemo(() => payload?.sessions ?? [], [payload]);
 
   const sites = useMemo(() => {
     const names = [...new Set(sessions.map((s) => s.siteName))].sort();
