@@ -244,6 +244,18 @@ export type AuditEventType =
    * that let them in does not, and never leaves lib/store/auth.ts.
    */
   | "auth.signed_in"
+  /**
+   * A shift was put in front of a set of people. The cause of a claim, where
+   * shift.claimed is the effect, and the answer to "I was never told about
+   * that shift" — which is only answerable if the offer was recorded when it
+   * happened, rather than reconstructed afterwards from who was eligible.
+   *
+   * Carries the audience as dids and the refusals as counts, never as names.
+   * "Six would qualify with a current RSA" is what a manager can act on;
+   * naming who is short of what turns a posting record into a roster of
+   * everybody's credential problems.
+   */
+  | "shift.offered"
   /** a manager assigning someone to an open shift (Open Shifts). */
   | "shift.assigned"
   /** a worker putting their hand up for an open shift. A request, not a

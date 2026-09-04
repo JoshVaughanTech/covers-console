@@ -94,12 +94,26 @@ export default function MobileShiftsPage() {
     })();
   }, []);
 
+  /* What this phone has been told about, and how much of it is new.
+
+     Kept separate from the board rather than derived from it. "New since you
+     last looked" is a fact about this person's attention, not about the
+     shifts — two workers opening the same board should not see the same
+     things marked new, and the board cannot know the difference. */
+  const [unseen, setUnseen] = useState<Set<string>>(new Set());
+
   const load = useCallback(async () => {
     try {
       const res = await fetch("/api/shifts");
       if (!res.ok) throw new Error((await res.json()).error ?? `HTTP ${res.status}`);
       setPayload(await res.json());
       setError(null);
+
+      const n = await fetch("/api/notifications");
+      if (n.ok) {
+        const body = (await n.json()) as { offers: { postingId: string; seenAt: string | null }[] };
+        setUnseen(new Set(body.offers.filter((o) => !o.seenAt).map((o) => o.postingId)));
+      }
     } catch (e) {
       // a board that fails to load must say so; a silent empty list reads as
       // "no work going", which is a different and wrong answer
@@ -118,10 +132,13 @@ export default function MobileShiftsPage() {
       // shift they never claimed, and that person is just as on it
       yours: all.filter((s) => s.rostered),
       waiting: all.filter((s) => !s.rostered && s.standing?.standing === "open"),
-      available: all.filter((s) => s.claimable),
+      available: all
+        .filter((s) => s.claimable)
+        // new first: the whole point of being told is not having to hunt
+        .sort((a, b) => Number(unseen.has(b.id)) - Number(unseen.has(a.id))),
       blocked: all.filter((s) => s.blockReason && !s.rostered),
     };
-  }, [payload]);
+  }, [payload, unseen]);
 
   async function claim(s: Shift) {
     if (!me) return;
@@ -183,6 +200,29 @@ export default function MobileShiftsPage() {
         <span style={tabStyle(true)}>Shifts</span>
       </nav>
 
+      {unseen.size > 0 && (
+        <button
+          onClick={() => {
+            /* Marked when they act, not when the list renders. A badge that
+               clears itself on load tells you something arrived and then
+               removes the only way to find out what — and on a phone that
+               woke up in a pocket, nobody saw it at all. */
+            void fetch("/api/notifications", { method: "POST" }).finally(() => setUnseen(new Set()));
+          }}
+          style={{
+            width: "100%", marginBottom: 14, padding: "11px 13px", borderRadius: 12,
+            border: "1px solid var(--info)", background: "var(--info-bg)",
+            color: "var(--info-fg)", fontSize: 13.5, fontWeight: 600,
+            textAlign: "left", cursor: "pointer",
+          }}
+        >
+          {unseen.size} new shift{unseen.size === 1 ? "" : "s"} for you
+          <span style={{ display: "block", fontWeight: 400, fontSize: 12.5, marginTop: 2, opacity: 0.85 }}>
+            Tap to mark as read
+          </span>
+        </button>
+      )}
+
       {error && <Banner tone="danger">{error}</Banner>}
 
       {!payload && !error && <p style={{ fontSize: 13, color: "var(--fg-4)" }}>Loading the board…</p>}
@@ -210,7 +250,7 @@ export default function MobileShiftsPage() {
       {groups.available.length > 0 && (
         <Section title={`Available to you (${groups.available.length})`}>
           {groups.available.map((s) => (
-            <Row key={s.id} s={s} sent={sent[s.id]} onTap={() => setOpen(s.id)} />
+            <Row key={s.id} s={s} sent={sent[s.id]} isNew={unseen.has(s.id)} onTap={() => setOpen(s.id)} />
           ))}
         </Section>
       )}
@@ -274,7 +314,7 @@ function Banner({ tone, children }: { tone: "danger" | "warn" | "success" | "inf
   );
 }
 
-function Row({ s, sent, onTap }: { s: Shift; sent?: Sent; onTap: () => void }) {
+function Row({ s, sent, isNew, onTap }: { s: Shift; sent?: Sent; isNew?: boolean; onTap: () => void }) {
   const blocked = Boolean(s.blockReason);
   return (
     <button
@@ -290,7 +330,20 @@ function Row({ s, sent, onTap }: { s: Shift; sent?: Sent; onTap: () => void }) {
       }}
     >
       <span style={{ display: "flex", justifyContent: "space-between", gap: 10 }}>
-        <span style={{ fontSize: 15, fontWeight: 600, color: "var(--fg-1)" }}>{s.role}</span>
+        <span style={{ fontSize: 15, fontWeight: 600, color: "var(--fg-1)" }}>
+          {s.role}
+          {isNew && (
+            <span
+              style={{
+                marginLeft: 8, fontSize: 10.5, fontWeight: 700, letterSpacing: ".06em",
+                textTransform: "uppercase", color: "var(--info-fg)", background: "var(--info-bg)",
+                borderRadius: 999, padding: "2px 7px", verticalAlign: "middle",
+              }}
+            >
+              New
+            </span>
+          )}
+        </span>
         <span style={{ fontSize: 12, color: "var(--fg-4)", whiteSpace: "nowrap" }}>{s.day}</span>
       </span>
       <span style={{ display: "block", fontSize: 12.5, color: "var(--fg-3)", marginTop: 2 }}>
