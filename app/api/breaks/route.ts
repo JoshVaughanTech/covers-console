@@ -5,6 +5,7 @@
    clocks tick every second without re-hitting Connecteam.
    ============================================================ */
 import { NextResponse } from "next/server";
+import { operatorOf, workerOf } from "@/lib/auth/session";
 import { DEMO_SESSIONS, demoNow } from "@/lib/awards";
 import { ConnecteamClient } from "@/lib/integrations/connecteam";
 
@@ -23,7 +24,24 @@ const isLive = Boolean(CT.timeClockId && (CT.apiKey || (CT.clientId && CT.client
 let cache: { at: number; sessions: unknown[] } = { at: 0, sessions: [] };
 const TTL_MS = Number(process.env.CONNECTEAM_POLL_SECONDS ?? 30) * 1000;
 
-export async function GET() {
+export async function GET(req: Request) {
+  /* Who is on the floor right now, which is live venue data: names, clock-in
+     times, and by extension who is overdue a break.
+  
+     Both kinds, and both named. A supervisor reads this on their phone and the
+     console reads it on the breaks board, so operator-only would break the
+     floor. Writing it as two calls rather than one "is anyone signed in" is the
+     distinction that matters: the dangerous question was the one a function
+     could answer without telling you the kind. This route means both, and says
+     so.
+  
+     Until now it asked nothing at all, and the middleware's redirect was the
+     only thing in front of it — which made a file documented as "not a gate"
+     into the gate for this data. */
+  if (!operatorOf(req) && !workerOf(req)) {
+    return NextResponse.json({ error: "not signed in" }, { status: 401 });
+  }
+
   const live = isLive;
 
   if (!live) {

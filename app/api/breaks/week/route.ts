@@ -9,6 +9,7 @@
    a completed week does not change — so there is no cache TTL.
    ============================================================ */
 import { NextResponse } from "next/server";
+import { operatorOf } from "@/lib/auth/session";
 import { DEMO_WEEK, DEMO_WEEK_SESSIONS, lastCompleteWeek } from "@/lib/awards";
 import { ConnecteamClient } from "@/lib/integrations/connecteam";
 
@@ -26,6 +27,15 @@ const CT = {
 const isLive = Boolean(CT.timeClockId && (CT.apiKey || (CT.clientId && CT.clientSecret)));
 
 export async function GET(req: Request) {
+  /* A whole week of the venue, priced: who missed breaks, what it costs, by
+     name. Only the console reads this — /reports/breaks — so unlike
+     /api/breaks it is operators alone, and there is no phone flow to keep
+     working.
+
+     It asked nothing until now, and the middleware redirect was the only
+     thing in front of it. */
+  if (!operatorOf(req)) return NextResponse.json({ error: "not signed in" }, { status: 401 });
+
   const url = new URL(req.url);
   const now = Math.floor(Date.now() / 1000);
   const fallback = lastCompleteWeek(now, process.env.TZ_VENUE ?? "Australia/Melbourne");
