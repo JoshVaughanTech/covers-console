@@ -299,12 +299,38 @@ The general form, from the session that found it: **a comment asserting a
 constraint is the cheapest thing in a codebase to write and the only thing
 nothing checks.**
 
-All four are the same failure: **an artefact carrying the authority of
-evidence without the substance of it.** A passing assertion, a familiar
-identifier, a rendered page and an absent name are all things we read as
-confirmation, and none of them was confirming anything.
+**An author field that names everybody.** Three Claude sessions worked this
+repo in one shared checkout on one branch, and every commit any of us made
+reads `Joshua Vaughan`. So `git log --format=%an` answers the attribution
+question with a name that is true, constant, and useless — the same value for
+every candidate you are trying to distinguish between.
 
-The third one adds a wrinkle worth keeping separate, because it is the one that
+What makes it belong here rather than in a footnote about git: **"check who
+wrote it" is the natural response to an attribution doubt, and here the check
+runs, succeeds, and returns something answer-shaped that answers nothing.** A
+missing author field would have sent you looking elsewhere. A present one ends
+the search.
+
+It cost three misattributions between two sessions in a single day, each caught
+only because somebody read the change rather than the metadata: in-flight
+`PayPanel` work assigned to the wrong session, award-rates work assigned to the
+session that had not written it, and a `.gitignore` commit assigned by topical
+proximity to whoever had last mentioned TLS certificates. None of the three was
+careless. All three were an assumption standing where a thirty-second read of
+the diff belonged.
+
+The same shape has a harder version. When a push made six commits and one
+deliberately-withheld commit public at once, no session had issued a push and
+git records nothing about who did — a push leaves no reflog entry to attribute.
+There the metadata is not misleading, it is simply absent, and absence at least
+announces itself. The author field is worse precisely because it responds.
+
+All five are the same failure: **an artefact carrying the authority of
+evidence without the substance of it.** A passing assertion, a familiar
+identifier, a rendered page, an absent name and a present one are all things we
+read as confirmation, and none of them was confirming anything.
+
+The screen adds a wrinkle worth keeping separate, because it is the one that
 generalises furthest. The test and the mock were *wrong about this tree*. The
 page was *right about a different one*. Correctness does not travel with
 relevance: a thing can be entirely accurate and still be no evidence at all
@@ -322,7 +348,7 @@ past the answer when the answer is what you hoped for. What is this test
 asserting, rather than does it pass. Which module does this identifier come
 from, rather than does the name match. Which server is answering, rather than
 does the page load. Whether the barrel re-exports it, rather than whether the
-barrel mentions it. Every instance here was found by someone who had a reason
+barrel mentions it. What the commit changed, rather than whose name is on it. Every instance here was found by someone who had a reason
 to look at the thing rather than at its result.
 
 From the session that found the second of these, and it covers all three:
