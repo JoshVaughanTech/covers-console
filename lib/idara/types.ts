@@ -262,6 +262,15 @@ export type AuditEventType =
       roster change — the assignment that may follow is a separate event. */
   | "shift.claimed"
   /**
+   * a worker taking that request back down, before anyone acted on it.
+   *
+   * Recorded rather than erased. The claim leaves the posting so nobody is
+   * held in a queue they have left, which means the chain is the only place
+   * the request ever existed — and "I did apply for that" has to stay
+   * answerable after the applying stops being visible.
+   */
+  | "shift.withdrawn"
+  /**
    * a manager opening a shift to be claimed. Carries the posting itself in
    * `data`, because the board is rebuilt by folding this log over the seed —
    * a posting whose creation went unrecorded could not survive a reload.

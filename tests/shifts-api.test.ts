@@ -24,11 +24,13 @@ process.env.COVERS_ORG = "org-test";
 
 let shifts: typeof import("../app/api/shifts/route");
 let claim: typeof import("../app/api/shifts/claim/route");
+let withdraw: typeof import("../app/api/shifts/withdraw/route");
 let store: typeof import("../lib/store/events");
 
 beforeAll(async () => {
   shifts = await import("../app/api/shifts/route");
   claim = await import("../app/api/shifts/claim/route");
+  withdraw = await import("../app/api/shifts/withdraw/route");
   store = await import("../lib/store/events");
 });
 
@@ -52,6 +54,16 @@ const board = async (who: string) => {
 const putHandUp = async (who: string, postingId: string, clientRef?: string) => {
   const res = await claim.POST(
     asCaller(as(who), "http://x/api/shifts/claim", {
+      method: "POST",
+      body: JSON.stringify({ postingId, clientRef }),
+    }),
+  );
+  return { res, body: await res.json() };
+};
+
+const takeHandDown = async (who: string, postingId: string, clientRef?: string) => {
+  const res = await withdraw.POST(
+    asCaller(as(who), "http://x/api/shifts/withdraw", {
       method: "POST",
       body: JSON.stringify({ postingId, clientRef }),
     }),
@@ -263,5 +275,114 @@ describe("what the phone cannot talk its way past", () => {
       }),
     );
     expect(missing.status).toBe(400);
+  });
+});
+
+describe("taking a hand back down", () => {
+  /* The claim route has had this coverage since it was written; the withdraw
+     route is newer and had none, which is the only reason this block exists.
+     It is the same round trip in reverse: an event that the fold cannot read
+     leaves the claim on the board, and the screen looks broken when the event
+     is what is wrong. */
+  it("removes the claim and takes it off the board", async () => {
+    const who = await findClaimant(BAR);
+    const put = await putHandUp(who, BAR);
+    expect(put.res.status).toBe(201);
+
+    const claimed = await board(who);
+    expect(claimed.body.shifts.find((x: { id: string }) => x.id === BAR).standing.standing).toBe("open");
+
+    const { res, body } = await takeHandDown(who, BAR);
+    expect(res.status).toBe(200);
+    expect(body.withdrawn).toBe(true);
+
+    // rebuilt from the chain: if the event were the wrong shape the claim
+    // would still be standing here
+    const after = await board(who);
+    const now = after.body.shifts.find((x: { id: string }) => x.id === BAR);
+    expect(now.standing).toBeNull();
+  });
+
+  it("lets them put their hand up again", async () => {
+    // the whole argument for making this easy: a claim you cannot take back
+    // is one people hesitate to make
+    const who = await findClaimant(BAR);
+    expect((await putHandUp(who, BAR)).res.status).toBe(201);
+    expect((await takeHandDown(who, BAR)).res.status).toBe(200);
+    expect((await putHandUp(who, BAR)).res.status).toBe(201);
+    await takeHandDown(who, BAR);
+  });
+
+  it("writes an event the board can be rebuilt from, and keeps the chain", async () => {
+    const events = store.eventStore().all("org-test").filter((e) => e.type === "shift.withdrawn");
+    expect(events.length).toBeGreaterThan(0);
+
+    const e = events[events.length - 1];
+    // replayPostings() folds on exactly these two
+    expect(e.data.postingId).toBe(BAR);
+    expect(e.subject).toMatch(/^did:web:idara\.app:/);
+    expect(e.actorDid).toBe(e.subject);
+
+    /* The chain check this route did not have. canonicalJson() hashes null and
+       drops undefined, so an optional field sent as null re-hashes every prior
+       event as tampered — a payload mistake here breaks the whole log, not
+       just this row. */
+    expect(store.eventStore().verify("org-test").ok).toBe(true);
+  });
+
+  it("refuses when there is no claim to withdraw", async () => {
+    const { res, body } = await takeHandDown("Darie Roberts", DRAFT);
+    expect(res.status).toBe(409);
+    expect(body.kind).toBe("none");
+  });
+
+  it("refuses an unknown posting", async () => {
+    expect((await takeHandDown("Darie Roberts", "sp-nope")).res.status).toBe(404);
+  });
+
+  it("refuses with no session at all", async () => {
+    // the did is not in the body and cannot be put there
+    const res = await withdraw.POST(
+      new Request("http://x/api/shifts/withdraw", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ did: "did:web:idara.app:w:darie-roberts", postingId: BAR }),
+      }),
+    );
+    expect(res.status).toBe(401);
+  });
+
+  it("rejects a malformed body rather than guessing", async () => {
+    const bad = await withdraw.POST(
+      asCaller(as("Darie Roberts"), "http://x/api/shifts/withdraw", { method: "POST", body: "not json" }),
+    );
+    expect(bad.status).toBe(400);
+    const missing = await withdraw.POST(
+      asCaller(as("Darie Roberts"), "http://x/api/shifts/withdraw", {
+        method: "POST",
+        body: JSON.stringify({}),
+      }),
+    );
+    expect(missing.status).toBe(400);
+  });
+
+  it("treats a retry with the same client ref as one withdrawal", async () => {
+    const who = await findClaimant(BAR);
+    await putHandUp(who, BAR);
+
+    const before = store.eventStore().all("org-test").filter((e) => e.type === "shift.withdrawn").length;
+    const ref = `withdraw:${did(who)}:${BAR}`;
+    const first = await takeHandDown(who, BAR, ref);
+    const retry = await takeHandDown(who, BAR, ref);
+
+    expect(first.res.status).toBe(200);
+    /* Without the ref this retry is a 409 "no claim to withdraw" — a failure
+       reported for a write that succeeded, which is the exact shape the claim
+       route's idempotency exists to avoid. */
+    expect(retry.res.status).toBe(200);
+    expect(retry.body.created).toBe(false);
+
+    const after = store.eventStore().all("org-test").filter((e) => e.type === "shift.withdrawn").length;
+    expect(after).toBe(before + 1);
   });
 });
