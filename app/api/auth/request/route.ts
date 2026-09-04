@@ -43,7 +43,17 @@ export async function POST(req: Request) {
     return NextResponse.json({ sent: true, via: sink.describe(), outOfBand: true });
   }
 
-  const grant = authStore().issue(did);
+  const issued = authStore().issue(did);
+
+  /* Refused for asking too often. Answered exactly like a success, because the
+     difference is not the caller’s business and telling them apart would say
+     which names are being hammered. The code already outstanding is untouched,
+     so the one the manager is reading out still works. */
+  if (!issued.ok) {
+    return NextResponse.json({ sent: true, via: sink.describe(), outOfBand: true });
+  }
+
+  const grant = issued.grant;
   const origin = new URL(req.url).origin;
   const link = `${origin}/api/auth/link?t=${encodeURIComponent(grant.token)}`;
 

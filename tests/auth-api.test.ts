@@ -32,8 +32,18 @@ beforeAll(async () => {
   store = await import("../lib/store/events");
 });
 
-const DARIE = WORKERS.find((w) => w.name === "Darie Roberts")!.did;
-const MITCH = WORKERS.find((w) => w.name === "Mitch Egan")!.did;
+/* A different worker per test.
+
+   Not fastidiousness: issuing is rate-limited per person, so a file that asked
+   for six codes for Darie would start failing on the sixth — correctly, and
+   for a reason that has nothing to do with what the test is checking. One
+   worker each is also closer to what a venue looks like. */
+let nextWorker = 0;
+/* Wraps when the seed runs out, which is safe: with ten workers and a dozen
+   allocations each person is asked for at most two codes, well inside the
+   five-per-window limit. */
+const someone = (): string => WORKERS[nextWorker++ % WORKERS.length].did;
+const nameOf = (did: string): string => WORKERS.find((w) => w.did === did)!.name;
 
 const json = (url: string, body: unknown, headers: Record<string, string> = {}) =>
   new Request(url, {
@@ -57,6 +67,7 @@ const cookieFrom = (res: Response): string | null => {
 
 describe("asking for a code", () => {
   it("returns the code only because nothing else can carry it, and says so", async () => {
+    const DARIE = someone();
     const { res, body } = await askFor(DARIE);
     expect(res.status).toBe(200);
     expect(body.sent).toBe(true);
@@ -67,6 +78,7 @@ describe("asking for a code", () => {
   });
 
   it("answers the same way for somebody who does not work here", async () => {
+    const DARIE = someone();
     const known = await askFor(DARIE);
     const unknown = await askFor("did:web:idara.app:w:not-a-real-person");
     // a different answer here is a way to find out who works at the venue
@@ -82,6 +94,7 @@ describe("asking for a code", () => {
 
 describe("redeeming a code", () => {
   it("sets a session cookie the browser will keep to itself", async () => {
+    const DARIE = someone();
     const { body } = await askFor(DARIE);
     const res = await redeem.POST(json("http://x/api/auth/redeem", { did: DARIE, code: body.code }));
     expect(res.status).toBe(200);
@@ -96,6 +109,7 @@ describe("redeeming a code", () => {
   });
 
   it("refuses the wrong code without saying how wrong", async () => {
+    const DARIE = someone();
     await askFor(DARIE);
     const res = await redeem.POST(json("http://x/api/auth/redeem", { did: DARIE, code: "AAAA-AAAA" }));
     expect(res.status).toBe(401);
@@ -103,12 +117,15 @@ describe("redeeming a code", () => {
   });
 
   it("will not let one person redeem another's code", async () => {
+    const DARIE = someone();
+    const MITCH = someone();
     const { body } = await askFor(DARIE);
     const res = await redeem.POST(json("http://x/api/auth/redeem", { did: MITCH, code: body.code }));
     expect(res.status).toBe(401);
   });
 
   it("records that somebody signed in, without recording what let them", async () => {
+    const DARIE = someone();
     const { body } = await askFor(DARIE);
     await redeem.POST(json("http://x/api/auth/redeem", { did: DARIE, code: body.code }));
 
@@ -126,9 +143,12 @@ describe("redeeming a code", () => {
 
 describe("the link", () => {
   it("signs in and redirects, leaving no secret in the destination", async () => {
+    const DARIE = someone();
     // the link is minted by the request route; take it from the store's grant
     const { authStore } = await import("../lib/store/auth");
-    const grant = authStore().issue(DARIE);
+    const issued = authStore().issue(DARIE);
+    if (!issued.ok) throw new Error("rate limited");
+    const grant = issued.grant;
 
     const res = await link.GET(new Request(`http://x/api/auth/link?t=${encodeURIComponent(grant.token)}`));
     expect(res.status).toBe(307);
@@ -155,16 +175,18 @@ describe("the session", () => {
   };
 
   it("says who you are, and says nobody when you are nobody", async () => {
+    const DARIE = someone();
     const cookie = await signedIn(DARIE);
 
     const mine = await session.GET(new Request("http://x/api/auth/session", { headers: { cookie } }));
-    expect((await mine.json()).worker.name).toBe("Darie Roberts");
+    expect((await mine.json()).worker.name).toBe(nameOf(DARIE));
 
     const anon = await session.GET(new Request("http://x/api/auth/session"));
     expect((await anon.json()).signedIn).toBe(false);
   });
 
   it("ends on sign-out, on the server and not only on the device", async () => {
+    const DARIE = someone();
     const cookie = await signedIn(DARIE);
     await session.DELETE(new Request("http://x/api/auth/session", { method: "DELETE", headers: { cookie } }));
 
@@ -181,6 +203,8 @@ describe("what the board will now answer", () => {
   });
 
   it("ignores a did in the URL entirely", async () => {
+    const DARIE = someone();
+    const MITCH = someone();
     const { body } = await askFor(MITCH);
     const cookie = cookieFrom(
       await redeem.POST(json("http://x/api/auth/redeem", { did: MITCH, code: body.code })),
@@ -192,6 +216,6 @@ describe("what the board will now answer", () => {
     );
     expect(res.status).toBe(200);
     // the query string is not an identity and is not consulted
-    expect((await res.json()).worker.name).toBe("Mitch Egan");
+    expect((await res.json()).worker.name).toBe(nameOf(MITCH));
   });
 });
