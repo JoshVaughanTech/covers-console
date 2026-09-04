@@ -106,7 +106,22 @@ export interface Session {
 
 const now = () => Math.floor(Date.now() / 1000);
 
-/** Throttle window, and how many failures one caller gets inside it. */
+/**
+ * Throttle window, and how many failures one bucket gets inside it.
+ *
+ * The bucket is per caller AND per person, not per caller alone. A venue is
+ * one IP: bucketing on the address alone means four people fumbling their five
+ * attempts locks out everyone behind that NAT, and eight characters read aloud
+ * across a bar makes that an ordinary Friday rather than an attack. The people
+ * locked out did nothing.
+ *
+ * The address half is also weaker than it looks — x-forwarded-for is
+ * client-supplied unless a trusted proxy overwrites it, so a caller can mint a
+ * fresh bucket per request. That is survivable because it is not the control
+ * doing the work: redeeming requires the did, and each person has their own
+ * five attempts. This is a flood ceiling, documented as one rather than
+ * relied on as a gate.
+ */
 const THROTTLE_WINDOW_SECONDS = 15 * 60;
 const MAX_FAILURES_PER_WINDOW = 20;
 

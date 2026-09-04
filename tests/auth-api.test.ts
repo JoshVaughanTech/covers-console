@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll } from "vitest";
+import { describe, it, expect, beforeAll, vi } from "vitest";
 import { COOKIE } from "../lib/auth/session";
 import { WORKERS } from "../lib/idara/seed";
 
@@ -217,5 +217,60 @@ describe("what the board will now answer", () => {
     expect(res.status).toBe(200);
     // the query string is not an identity and is not consulted
     expect((await res.json()).worker.name).toBe(nameOf(MITCH));
+  });
+});
+
+describe("the default when nothing is configured", () => {
+  /* The inline sink returns the code in the response body. As a silent
+     production default that is an oracle, not a demo affordance: a POST with a
+     guessable did — and a did is derivable from a name on the roster — hands a
+     live sign-in code to anyone who can reach the server. The warning on the
+     sign-in screen mitigates nothing, because an attacker is running curl and
+     no screen is involved. */
+
+  it("refuses to deliver at all in production rather than answering with a code", async () => {
+    vi.stubEnv("NODE_ENV", "production");
+    try {
+      const res = await request.POST(json("http://x/api/auth/request", { did: someone() }));
+      expect(res.status).toBe(503);
+      const body = await res.json();
+      expect(body.code).toBeUndefined();
+      expect(body.sent).toBeUndefined();
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+
+  it("still allows it when somebody has said so out loud", async () => {
+    vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv("AUTH_CODES_INLINE", "1");
+    try {
+      const res = await request.POST(json("http://x/api/auth/request", { did: someone() }));
+      expect(res.status).toBe(200);
+      expect((await res.json()).code).toBeTruthy();
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+});
+
+describe("one person's fumbling", () => {
+  it("does not lock out a colleague at the same venue", async () => {
+    const clumsy = someone();
+    const colleague = someone();
+    const venue = { "x-forwarded-for": "203.0.113.7" };
+
+    await request.POST(json("http://x/api/auth/request", { did: clumsy }));
+    // a code read aloud across a bar, mistyped repeatedly
+    for (let i = 0; i < 25; i++) {
+      await redeem.POST(json("http://x/api/auth/redeem", { did: clumsy, code: "AAAA-AAAA" }, venue));
+    }
+
+    const { body } = await askFor(colleague);
+    const res = await redeem.POST(
+      json("http://x/api/auth/redeem", { did: colleague, code: body.code }, venue),
+    );
+    // same NAT, same window, and they did nothing
+    expect(res.status).toBe(200);
   });
 });

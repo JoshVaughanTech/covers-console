@@ -35,6 +35,18 @@ export async function POST(req: Request) {
   if (!did) return NextResponse.json({ error: "did is required" }, { status: 400 });
 
   const sink = sinkFromEnv();
+
+  /* Refuse before minting anything. A sink that cannot deliver would otherwise
+     throw after the grant was issued, spending the person’s issue budget on a
+     code nobody could ever receive — and returning a 500 that reads like a bug
+     rather than the configuration problem it is. */
+  if (!sink.configured) {
+    return NextResponse.json(
+      { error: "No sign-in delivery channel is configured on this server." },
+      { status: 503 },
+    );
+  }
+
   const person = workerIndex.get(did);
 
   /* Same shape of answer either way. An unknown did costs a round trip and
