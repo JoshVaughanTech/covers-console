@@ -38,3 +38,6 @@ next-env.d.ts
 
 # local event store (SQLite)
 .data/
+
+# local TLS certificates for testing push on a phone (never committed)
+/.certs
