@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { createServer } from "node:http";
-import { createDecipheriv, createECDH, hkdfSync, generateKeyPairSync, randomBytes } from "node:crypto";
+import { createDecipheriv, createECDH, hkdfSync, randomBytes } from "node:crypto";
 import { sendPush } from "../lib/push/send";
 import { generateVapidKeys } from "../lib/push/vapid";
 

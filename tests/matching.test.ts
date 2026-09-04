@@ -17,7 +17,7 @@ import { LocalCredentialVerifier } from "../lib/idara/verifier";
 import { CREDENTIALS, SITES, TODAY, WORKERS } from "../lib/idara/seed";
 import { PROFILES, profileOf } from "../lib/people/seed";
 import { POSTINGS } from "../lib/shifts/seed";
-import type { Identity, Site } from "../lib/idara/types";
+import type { Site } from "../lib/idara/types";
 import type { ShiftPosting } from "../lib/shifts/types";
 
 const verifier = new LocalCredentialVerifier();
@@ -32,12 +32,6 @@ const posting = (id: string): ShiftPosting => {
   const p = POSTINGS.find((x) => x.id === id);
   if (!p) throw new Error(`no posting ${id}`);
   return p;
-};
-
-const didOf = (name: string) => {
-  const w = WORKERS.find((x) => x.name === name);
-  if (!w) throw new Error(`no worker ${name}`);
-  return w.did;
 };
 
 /** Everyone, as the manage view would pass them in. */
@@ -96,6 +90,9 @@ describe("the Idara gate", () => {
             homeSiteId: p.siteId,
             skills: { cocktails: "lead", till_pos: "lead" },
             hoursThisWeek: 0,
+            // the matcher does not read this; StaffProfile requires it because
+            // a person the business employs always has a classification
+            award: { level: 2, employment: "casual" },
           },
         },
       ],

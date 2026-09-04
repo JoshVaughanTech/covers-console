@@ -5,6 +5,11 @@
     "allowJs": true,
     "skipLibCheck": true,
     "strict": true,
+    /* Unused symbols are a build failure, so tsc has to be the one to say so.
+       next lint catches them in app code and does not reach tests/ at all,
+       which made this a coverage gap rather than the timing gap it looked
+       like — see docs/green-tests-broken-build.md, entry 1. */
+    "noUnusedLocals": true,
     "noEmit": true,
     "esModuleInterop": true,
     "module": "esnext",
