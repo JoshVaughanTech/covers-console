@@ -85,6 +85,11 @@ export class FileSink implements CodeSink {
     }
     this.configured = ok;
     this.reason = why;
+    /* Checked here, used in deliver(): a directory that becomes unwritable in
+       between reverts to throwing after the mint. The window is one request
+       and the failure is no worse than before this check existed, so it is
+       left alone — but it stops being one request if sink construction ever
+       moves out of the request path, and that is when it would need closing. */
   }
 
   describe(): string {
@@ -150,28 +155,34 @@ export class NoSink implements CodeSink {
 /**
  * The sink this deployment should use.
  *
- * Fails CLOSED in production, and that is the whole point of the ordering.
- * InlineSink returns the code in the response body, so with it as a silent
- * default a POST to /api/auth/request with a guessable did — and a did is
- * derivable from a name on the roster — hands a live sign-in code to anyone
- * who can reach the server. The sign-in screen carries a warning about this,
- * which mitigates nothing, because an attacker is running curl and there is no
- * screen involved.
+ * Fails CLOSED, and the ordering is the whole point. InlineSink returns the
+ * code in the response body, so with it as a silent default a POST to
+ * /api/auth/request with a guessable did — and a did is derivable from a name
+ * on the roster — hands a live sign-in code to anyone who can reach the
+ * server. The sign-in screen carries a warning about this, which mitigates
+ * nothing, because an attacker is running curl and there is no screen
+ * involved.
  *
- * So: a real channel if one is configured, the insecure one only when somebody
- * has said so out loud or the environment says what it is, and otherwise
- * nothing. A sign-in that refuses is a bad demo; a sign-in that hands out
- * credentials to strangers is a bad product.
+ * Why an unusable AUTH_CODES_DIR refuses rather than falling back to inline,
+ * recorded so it is not re-litigated from first principles:
  *
- * The safe case is asserted positively, and that is a correction rather than a
- * style. This read `NODE_ENV !== "production"` for twenty minutes, which infers
- * "safe to expose codes" from the ABSENCE of a danger marker — and absence is
- * the default state of an unconfigured environment. Unset fell through to
- * inline. So did "staging", which is exactly where real rosters and real names
- * sit while everyone is still calling it not-production-yet, and the least
- * likely place for anyone to be checking whether an endpoint returns
- * credentials. Naming the two environments that may see a code means unset,
- * staging, preview and anything misspelled all fail closed.
+ * The two states are not the same request. An unset variable says nobody asked
+ * for a file. A bad path says somebody asked and got it wrong, and falling
+ * back answers the second as though it were the first, discarding the only
+ * thing the operator actually told us.
+ *
+ * The deciding reason is visibility rather than severity. Failing closed costs
+ * availability, and availability failures announce themselves — sign-in is
+ * down, people ring the venue, somebody reads an error that names the bad
+ * path, and it is fixed within the hour. Failing open costs confidentiality,
+ * and confidentiality failures are silent by construction: nobody notices a
+ * working system that is also handing out credentials. That is not a
+ * hypothetical here. It is what happened twice in one morning in this file,
+ * and what let it survive both times was that everything looked fine.
+ *
+ * So a typo taking sign-in down entirely is the good failure. A credential
+ * channel that degrades to exposure when misconfigured has chosen the failure
+ * nobody will find.
  */
 export function sinkFromEnv(): CodeSink {
   const dir = process.env.AUTH_CODES_DIR;
