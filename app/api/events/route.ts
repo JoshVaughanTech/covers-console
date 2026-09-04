@@ -20,6 +20,8 @@ import { NextResponse } from "next/server";
 import { eventStore } from "@/lib/store/events";
 import { SEED_AUDIT_EVENTS } from "@/lib/idara/seed";
 import { operatorOf } from "@/lib/auth/session";
+import { notificationStore } from "@/lib/store/notifications";
+import { offerPosting } from "@/lib/notify/offer";
 import type { NewAuditEvent } from "@/lib/idara/audit";
 
 export const dynamic = "force-dynamic";
@@ -43,22 +45,37 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
   // appending to the chain is a console act; the phone appends through the
   // endpoints that know what it is allowed to say
-  if (!operatorOf(req)) return NextResponse.json({ error: "not signed in" }, { status: 401 });
+  const caller = operatorOf(req);
+  if (!caller) return NextResponse.json({ error: "not signed in" }, { status: 401 });
 
   const body = (await req.json().catch(() => null)) as
     | (NewAuditEvent & { clientRef?: string })
     | null;
 
-  if (!body?.type || !body.at || !body.actor || !body.summary) {
-    return NextResponse.json(
-      { error: "type, at, actor and summary are required" },
-      { status: 400 },
-    );
+  if (!body?.type || !body.at || !body.summary) {
+    return NextResponse.json({ error: "type, at and summary are required" }, { status: 400 });
   }
 
-  const { clientRef, ...ev } = body;
+  const { clientRef, ...rest } = body;
+  /* The actor is the session, not the body. Screens used to send
+     CONSOLE_OPERATOR because there was nothing better to send; now there is,
+     and a body that named somebody would be describing an operator nobody
+     checked. Overriding here means no screen has to be updated to stop
+     lying. */
+  const ev: NewAuditEvent = {
+    ...rest,
+    actor: caller.operator.name,
+    actorDid: caller.operator.did,
+  };
   const r = eventStore().append(ORG, ev, { clientRef });
-  // 200 rather than 201 on a replay, so a retrying client can tell the
-  // difference without it being an error
-  return NextResponse.json(r, { status: r.created ? 201 : 200 });
+
+  /* A posting nobody hears about fills as slowly as no posting at all.
+
+     Here rather than at the call site so every posting notifies, including
+     one made by a screen nobody has written yet. Only on a genuinely new
+     append: a replayed clientRef must not re-offer, or a retrying client
+     would put the same shift on ten phones twice. */
+  const offer = r.created ? offerPosting(eventStore(), notificationStore(), ORG, r.event) : null;
+
+  return NextResponse.json({ ...r, ...(offer ? { offered: offer } : {}) }, { status: r.created ? 201 : 200 });
 }
