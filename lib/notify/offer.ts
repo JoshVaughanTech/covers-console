@@ -15,15 +15,15 @@
    whether somebody has read it is mutable, and mutable state has no
    business in an append-only log.
 
-   What this is NOT is delivery. Nothing here reaches a phone that is
-   not already open — there is no push service, no SMS and no mail
-   transport configured, the same wall the payroll report and the
-   sign-in codes hit. What it does is make the offer a fact the
-   moment it happens, so a transport added later has something true
-   to send rather than a guess reconstructed from who happens to be
-   eligible at the time it runs.
+   Delivery goes out from here when push is configured, and is
+   deliberately not awaited: the offer is already a fact in the
+   chain, and a push service having a slow afternoon must not fail
+   the posting that caused it. With no VAPID keys set, nothing is
+   attempted and the phone shows the offer the next time it is
+   opened — the same behaviour this had before push existed.
    ============================================================ */
 import { audienceFor } from "./audience";
+import { pushOffer } from "@/lib/push/deliver";
 import { credentialsNow } from "@/lib/shifts";
 import type { ShiftPosting } from "@/lib/shifts";
 import type { EventStore } from "@/lib/store/events";
@@ -102,6 +102,24 @@ export function offerPosting(
     // one offer per posting however many times an append is retried
     { clientRef: `offer:${posting.id}` },
   );
+
+  /* Carry it to phones that are not open.
+
+     Deliberately not awaited. The posting is the consequential act and it is
+     already in the chain; a notification is a convenience on top, and a
+     manager whose posting failed because a push service was slow would
+     reasonably conclude the product is broken. Errors are swallowed for the
+     same reason and reported nowhere the poster can see, which is the honest
+     trade — the offer is recorded either way, and the phone will show it the
+     next time it is opened. */
+  void pushOffer(orgId, audience.eligible, {
+    postingId: posting.id,
+    role: posting.role,
+    functionName: posting.functionName,
+    day: posting.day,
+    window: posting.window,
+    siteName,
+  }).catch(() => {});
 
   return { postingId: posting.id, told: audience.eligible.length, blocked: audience.blocked };
 }

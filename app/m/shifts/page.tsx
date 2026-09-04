@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { SignIn, type Signed } from "../sign-in";
+import { PushToggle } from "../push";
 
 /* ============================================================
    Open shifts, in the hand of the person who would work them.
@@ -222,6 +223,8 @@ export default function MobileShiftsPage() {
           </span>
         </button>
       )}
+
+      <PushToggle />
 
       {error && <Banner tone="danger">{error}</Banner>}
 
