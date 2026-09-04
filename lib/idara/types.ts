@@ -219,6 +219,25 @@ export type AuditEventType =
    * about whether a report was sent.
    */
   | "report.delivered"
+  /**
+   * A sign-in code was minted for somebody — the cause, where auth.signed_in
+   * is the effect, and the two are not always the same person's doing.
+   *
+   * A worker requesting their own code and an operator minting one for them
+   * are different facts, told apart by the actor: "system" for the first,
+   * because nobody authorised it, and the operator for the second. A disputed
+   * claim turns on which of those happened, and only this event can say.
+   *
+   * It closes attribution, not impersonation. While the console has no login
+   * of its own, "an operator minted this" means whoever could open the
+   * console — which is worth recording precisely because it is not yet worth
+   * trusting.
+   *
+   * Carries the grant id, never the code nor a hash of it. The audit screen is
+   * readable by anyone who can reach it, so a secret in the chain would be a
+   * credential published to the surface it protects.
+   */
+  | "auth.code_issued"
   /** a manager assigning someone to an open shift (Open Shifts). */
   | "shift.assigned"
   /** a worker putting their hand up for an open shift. A request, not a
