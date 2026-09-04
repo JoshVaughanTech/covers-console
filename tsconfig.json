@@ -5,10 +5,15 @@
     "allowJs": true,
     "skipLibCheck": true,
     "strict": true,
-    /* Unused symbols are a build failure, so tsc has to be the one to say so.
-       next lint catches them in app code and does not reach tests/ at all,
-       which made this a coverage gap rather than the timing gap it looked
-       like — see docs/green-tests-broken-build.md, entry 1. */
+    /* For app code this is only an earlier warning: next lint already flags
+       an unused symbol and next build fails on it, so this moves the news into
+       the check people run mid-edit.
+
+       For tests/ it is the only check there is, from any tool, at any point.
+       next lint does not reach test files, and next build type-checks the app
+       graph, which tests are not part of. Verified rather than assumed: at
+       52db7c2, on one checkout, tsc --noEmit exited 1 on tests/matching.test.ts
+       while next build exited 0. See docs/green-tests-broken-build.md, 1 and 7. */
     "noUnusedLocals": true,
     "noEmit": true,
     "esModuleInterop": true,

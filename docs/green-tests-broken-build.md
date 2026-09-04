@@ -4,42 +4,64 @@
 
 Two different failures, and they are opposites.
 
-**Six disagreements.** A check says sound, another says broken, and only one of
-them is right. In five of these a passing test suite — usually with a clean
+**Seven disagreements.** A check says sound, another says broken, and only one
+of them is right. In five of these a passing test suite — usually with a clean
 `tsc` — sat over a tree that `next build` refuses. The sixth runs the other way:
-`tsc` fails on code nobody wrote, and the build is fine.
+`tsc` fails on code nobody wrote, and the build is fine. The seventh runs a
+third way, and is the one that undoes the tidy version of the rule: the build
+passes over a file `tsc` rejects, because the build never reads it.
 
 **One false agreement.** Every check passes and they are all wrong together,
 because the thing being consulted is not evidence. That section is at the
-bottom; it is not a seventh case and numbering it as one would flatten it.
+bottom; it is not an eighth case and numbering it as one would flatten it.
 
 Everything below was hit for real in this repo, not imagined.
 
-The reason there are six disagreements and not one is that these checks have
-**different and partly disjoint coverage**. `vitest` runs through esbuild, which
-strips types without checking them. `tsc` checks types but is configured without
-`noUnusedLocals`. `next lint` runs ESLint but not the route-contract checks.
-Only `next build` runs the type checker, ESLint, *and* Next's own validation of
-what a route module is allowed to export.
+The reason there are seven disagreements and not one is that these checks have
+**different and partly disjoint coverage** — and the coverage differs by
+directory, not only by tool.
 
-> **The rule:** run a build before saying "clean". Tests and typecheck together
-> are not a substitute, and neither is `next lint`. And when a check tells you
-> what you hoped to hear, read what it actually asserts.
+| | `vitest` | `tsc` | `next lint` | `next build` |
+|---|---|---|---|---|
+| app code | no types | yes | yes | yes |
+| `tests/` | no types | **yes** | no | **no** |
+
+`vitest` runs through esbuild, which strips types without checking them. `tsc`
+reads everything `tsconfig.json` includes, which is `**/*.ts`. `next lint` runs
+ESLint over the app and does not reach test files. `next build` runs the type
+checker, ESLint and Next's own route-contract validation — over the graph it can
+reach from the app's entry points, which nothing under `tests/` is part of.
+
+> **The rule:** run a build before saying "clean" — tests and typecheck together
+> are not a substitute, and neither is `next lint`. Then run `tsc` too, because
+> for anything the app does not import, the build is the weaker check and not
+> the stronger one. And when a check tells you what you hoped to hear, read what
+> it actually asserts.
 
 ---
 
 ## 1. Unused import
 
-| check | result |
-|---|---|
-| `vitest` | passes |
-| `tsc --noEmit` | **silent** |
-| `eslint` | error |
-| `next build` | **fails** |
+| check | result, before 52db7c2 | after |
+|---|---|---|
+| `vitest` | passes | passes |
+| `tsc --noEmit` | **silent** | error |
+| `eslint` | error | error |
+| `next build` | **fails** | fails |
 
-`tsconfig.json` sets `strict: true` but not `noUnusedLocals`, so the type checker
-has nothing to say. ESLint carries `@typescript-eslint/no-unused-vars` via
+`tsconfig.json` set `strict: true` but not `noUnusedLocals`, so the type checker
+had nothing to say. ESLint carries `@typescript-eslint/no-unused-vars` via
 `next/typescript`, and `next build` treats it as an error rather than a warning.
+
+**Closed by 52db7c2**, which turned `noUnusedLocals` on. The measurement is the
+part worth keeping: switching it on flagged exactly four symbols and **all four
+were in `tests/`**. For app code this was a timing gap — lint would have caught
+it, just later than you needed. For test files it was a coverage gap wearing a
+timing gap's clothes: nothing checked them, ever, by any tool. Entry 7 is why
+the build could never have.
+
+One of the four was not an import at all but a whole unused helper, `didOf` in
+`tests/matching.test.ts` — dead code that had been sitting in plain sight.
 
 Verified by adding an unused `Credential` import to `lib/shifts/replay.ts`: 20
 tests passed, `tsc` exited 0, the build failed with
@@ -154,9 +176,56 @@ that route still exists before changing anything.
 
 ---
 
+## 7. `next build` passing on a tree `tsc` rejects
+
+| check | result |
+|---|---|
+| `vitest` | passes — it never typechecks |
+| `next build` | **passes** |
+| `tsc --noEmit` | **fails, on a test file** |
+
+Entry 3 says a clean `next lint` tells you nothing about the type checker, and
+the fix there is to run a build before claiming clean. For anything under
+`tests/`, that advice points at the weaker check.
+
+Measured on one checkout, minutes apart, at 52db7c2:
+
+    npx tsc --noEmit   ->  exit 1
+      tests/matching.test.ts(95,13): error TS2353: Object literal may only
+      specify known properties, and 'award' does not exist in type 'StaffProfile'
+
+    npx next build     ->  exit 0
+      22/22 static pages, no warnings
+
+Both results are correct. `tsconfig.json` has `"include": ["**/*.ts", ...]` and
+excludes only `node_modules`, so test files are in the program `tsc` reads.
+Next builds its own graph from the app's entry points, type-checks that, and
+never reaches a file nothing imports. **The build is not a superset of `tsc`.**
+
+So for test files there are three checkers and none of them is the safety net
+you would guess. `vitest` runs the code through esbuild and strips types
+without checking them, which is entry 2. `next lint` does not reach `tests/`.
+`next build` compiles a graph they are not in. `tsc` is the only one that reads
+them, and it is the one people skip because the build is assumed to include it.
+
+**How it arises:** treating "the build passed" as the strongest claim available.
+It is the strongest claim about what ships. It is not a claim about the repo,
+and a test fixture that no longer typechecks is exactly the kind of thing that
+lives in the gap — invisible to the build forever, because nothing in the app
+imports a test.
+
+This one cost something real. Two sessions ran isolated builds of the same
+commit, both got exit 0, and both reported main healthy while main had not
+typechecked for an hour. The disagreement was found by a third check nobody had
+thought to run, on a checkout with no uncommitted work in it — which is the only
+place it was visible, since every working tree in play had the missing field
+sitting in it uncommitted.
+
+---
+
 ## A different failure: things that look like evidence
 
-The six above are all **checks disagreeing about one tree** — one says sound,
+The seven above are all **checks disagreeing about one tree** — one says sound,
 another says broken, and the disagreement is the signal. These are the
 opposite and deserve separating rather than numbering: **every check agrees,
 confidently, on the wrong answer.**
