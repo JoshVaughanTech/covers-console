@@ -1,0 +1,172 @@
+import { describe, it, expect, beforeAll, vi, afterEach } from "vitest";
+import { WORKERS, CONSOLE_OPERATOR } from "../lib/idara/seed";
+
+/* ============================================================
+   POST /api/auth/issue — an operator minting a code for somebody
+   else.
+
+   The sibling of /api/auth/request, and the differences are the
+   point. This one is done ON BEHALF OF a worker, so the chain gets
+   the cause and not only the effect; it tells the operator the truth
+   about an unknown name and about a refusal, where the phone
+   endpoint deliberately hides both; and it must not become a new way
+   to read a credential off the server, which is the bug closed twice
+   already this morning.
+   ============================================================ */
+
+process.env.COVERS_DB = ":memory:";
+process.env.COVERS_ORG = "org-test";
+
+let issue: typeof import("../app/api/auth/issue/route");
+let store: typeof import("../lib/store/events");
+
+beforeAll(async () => {
+  issue = await import("../app/api/auth/issue/route");
+  store = await import("../lib/store/events");
+});
+
+afterEach(() => vi.unstubAllEnvs());
+
+let nextWorker = 0;
+/** A different person per test: issuing is rate-limited per worker. */
+const someone = () => WORKERS[nextWorker++ % WORKERS.length];
+
+const post = (body: unknown) =>
+  new Request("http://x/api/auth/issue", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(body),
+  });
+
+const issueFor = async (did: string) => {
+  const res = await issue.POST(post({ did }));
+  return { res, body: await res.json() };
+};
+
+describe("minting for somebody", () => {
+  it("returns the code to read aloud when nothing else can carry it", async () => {
+    const w = someone();
+    const { res, body } = await issueFor(w.did);
+
+    expect(res.status).toBe(200);
+    expect(body.worker.name).toBe(w.name);
+    expect(body.code).toMatch(/^[A-HJ-NP-Z2-9]{4}-[A-HJ-NP-Z2-9]{4}$/);
+    expect(body.expiresAt).toBeGreaterThan(Math.floor(Date.now() / 1000));
+  });
+
+  it("names the identity it wrote into the chain, so the screen can show it", async () => {
+    const { body } = await issueFor(someone().did);
+    // no console sign-in exists, so this is whoever opened the page — and
+    // saying the name is what makes that legible rather than reassuring
+    expect(body.recordedAs.name).toBe(CONSOLE_OPERATOR.name);
+    expect(body.recordedAs.did).toBe(CONSOLE_OPERATOR.did);
+  });
+
+  it("tells an operator plainly that a name is not one of ours", async () => {
+    const res = await issue.POST(post({ did: "did:web:idara.app:w:nobody" }));
+    // unlike the phone endpoint, there is nobody to protect from enumeration
+    // here — the caller is looking at the list — and a mistype needs saying
+    expect(res.status).toBe(404);
+  });
+
+  it("wants a did, and a body it can read", async () => {
+    expect((await issue.POST(post({}))).status).toBe(400);
+    expect(
+      (
+        await issue.POST(
+          new Request("http://x/api/auth/issue", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: "not json",
+          }),
+        )
+      ).status,
+    ).toBe(400);
+  });
+});
+
+describe("the cause, recorded", () => {
+  it("writes who decided and who it was about", async () => {
+    const w = someone();
+    await issueFor(w.did);
+
+    const e = store.eventStore().all("org-test").filter((x) => x.type === "auth.code_issued").at(-1)!;
+    expect(e.actor).toBe(CONSOLE_OPERATOR.name);
+    expect(e.actorDid).toBe(CONSOLE_OPERATOR.did);
+    expect(e.subject).toBe(w.did);
+    expect(e.summary).toContain(w.name);
+    expect(store.eventStore().verify("org-test").ok).toBe(true);
+  });
+
+  it("carries the grant id and no secret whatsoever", async () => {
+    const w = someone();
+    const { body } = await issueFor(w.did);
+
+    const e = store.eventStore().all("org-test").filter((x) => x.type === "auth.code_issued").at(-1)!;
+    expect(e.data.grantId).toMatch(/^sg-[0-9a-f]{16}$/);
+
+    /* The audit screen is readable by anyone who can reach it, so a code in
+       the chain would be a credential published to the surface it protects. */
+    const serialised = JSON.stringify(e);
+    const bare = (body.code as string).replace("-", "");
+    expect(serialised).not.toContain(bare);
+    expect(serialised).not.toContain(bare.slice(0, 4));
+  });
+});
+
+describe("refusing, and saying so", () => {
+  it("tells the operator when nothing was minted rather than staying quiet", async () => {
+    const w = someone();
+    for (let i = 0; i < 5; i++) await issueFor(w.did);
+
+    const { res, body } = await issueFor(w.did);
+    expect(res.status).toBe(429);
+    expect(body.reason).toBe("rate_limited");
+    expect(body.code).toBeUndefined();
+    // silence here has somebody read out a code that does not exist
+    expect(body.error).toContain(w.name);
+    expect(body.detail).toMatch(/still valid/i);
+  });
+
+  it("records nothing when nothing was issued", async () => {
+    const w = someone();
+    for (let i = 0; i < 5; i++) await issueFor(w.did);
+    const before = store.eventStore().all("org-test").filter((x) => x.type === "auth.code_issued").length;
+
+    await issueFor(w.did);
+
+    const after = store.eventStore().all("org-test").filter((x) => x.type === "auth.code_issued").length;
+    // an issuance that did not happen is worse in the log than no entry at all
+    expect(after).toBe(before);
+  });
+
+  it("refuses before minting when the server has no delivery channel", async () => {
+    vi.stubEnv("AUTH_CODES_DIR", "");
+    vi.stubEnv("AUTH_CODES_INLINE", "");
+    vi.stubEnv("NODE_ENV", "production");
+
+    const w = someone();
+    const { res, body } = await issueFor(w.did);
+    expect(res.status).toBe(503);
+    expect(body.detail).toMatch(/AUTH_CODES_DIR/);
+
+    // and no budget was spent on a code nobody could have received
+    vi.unstubAllEnvs();
+    expect((await issueFor(w.did)).res.status).toBe(200);
+  });
+});
+
+describe("not becoming a new way to read a credential", () => {
+  it("does not answer with the code when a real channel is configured", async () => {
+    const dir = `${process.env.TEMP ?? "/tmp"}/covers-issue-test`;
+    vi.stubEnv("AUTH_CODES_DIR", dir);
+
+    const { res, body } = await issueFor(someone().did);
+    expect(res.status).toBe(200);
+    // the operator is told where it went, not what it is: an operator surface
+    // answering with a live credential is the oracle in a nicer interface
+    expect(body.code).toBeUndefined();
+    expect(body.outOfBand).toBe(true);
+    expect(body.via).toContain("covers-issue-test");
+  });
+});

@@ -21,6 +21,7 @@ export const NAV: NavItem[] = [
   { id: "people", label: "People", icon: "users", href: "/people" },
   { id: "comms", label: "Communications", icon: "message-square", href: "/comms" },
   { id: "credentials", label: "Credentials", icon: "badge-check", href: "/credentials", idara: true },
+  { id: "sign-in-codes", label: "Phone Sign-in", icon: "key-round", href: "/sign-in-codes", idara: true },
   { id: "audit", label: "Audit Log", icon: "scroll-text", href: "/audit", idara: true },
   { id: "reports", label: "Reports", icon: "bar-chart-3", href: "/reports" },
   { id: "settings", label: "Settings", icon: "settings", href: "/settings" },

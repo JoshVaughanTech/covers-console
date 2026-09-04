@@ -39,6 +39,11 @@ function eventMeta(e: AuditEvent): EventMeta {
       return { icon: "hand", tone: "info", kind: "Shift claimed" };
     case "shift.posted":
       return { icon: "megaphone", tone: "neutral", kind: "Shift posted" };
+    /* The cause, next to the effect. Without a label of its own it renders
+       as a generic "Event", which is exactly the distinction the pair exists
+       to draw. */
+    case "auth.code_issued":
+      return { icon: "key-round", tone: "info", kind: "Code issued" };
     case "auth.signed_in":
       return { icon: "log-in", tone: "neutral", kind: "Signed in" };
     case "report.delivered":
