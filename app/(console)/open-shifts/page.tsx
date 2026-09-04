@@ -31,6 +31,7 @@ import {
   useIdara,
   LocalCredentialVerifier,
   ALL_WORK_FUNCTIONS,
+  calendarDate,
   CONSOLE_OPERATOR,
   ROLE_FUNCTIONS,
   type WorkFunction,
@@ -631,8 +632,13 @@ export default function OpenShiftsPage() {
                         <div style={{ flex: 1, minWidth: 0 }}>
                           <div style={{ fontSize: 13, fontWeight: 700, color: "var(--fg-1)" }}>
                             {person.name}
+                            {/* narrowed to the day: a claim from the console
+                                carries a date and one from a phone carries a
+                                full timestamp, and both are right to. This is
+                                the manager's decision surface, so they read
+                                the same way here. */}
                             <span style={{ fontWeight: 500, color: "var(--fg-4)", marginLeft: 6 }}>
-                              claimed {c.at}
+                              claimed {calendarDate(c.at)}
                             </span>
                           </div>
                           {c.reason && (
