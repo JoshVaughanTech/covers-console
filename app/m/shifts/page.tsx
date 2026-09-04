@@ -2,8 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { WORKERS } from "@/lib/idara/seed";
-import { currentPerson, setPerson, clearPerson, type Person } from "@/lib/mobile/identity";
+import { SignIn, type Signed } from "../sign-in";
 
 /* ============================================================
    Open shifts, in the hand of the person who would work them.
@@ -71,23 +70,33 @@ const DUTY_LABEL: Record<string, string> = {
 };
 
 export default function MobileShiftsPage() {
-  const [me, setMe] = useState<Person | null>(null);
+  const [me, setMe] = useState<Signed | null>(null);
   const [ready, setReady] = useState(false);
   const [payload, setPayload] = useState<Payload | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [open, setOpen] = useState<string | null>(null);
   const [sent, setSent] = useState<Record<string, Sent>>({});
 
-  /* identity is read after mount: localStorage does not exist on the server,
-     and reading it during render would be a hydration mismatch */
+  /* Who is holding this phone is the server’s answer, not the device’s.
+     A name in localStorage was an assertion; a session cookie is a claim
+     something checked. */
   useEffect(() => {
-    setMe(currentPerson());
-    setReady(true);
+    void (async () => {
+      try {
+        const r = await fetch("/api/auth/session");
+        const b = await r.json();
+        if (b.signedIn) setMe(b.worker as Signed);
+      } catch {
+        /* offline: the sign-in screen is the honest thing to show */
+      } finally {
+        setReady(true);
+      }
+    })();
   }, []);
 
-  const load = useCallback(async (did: string) => {
+  const load = useCallback(async () => {
     try {
-      const res = await fetch(`/api/shifts?did=${encodeURIComponent(did)}`);
+      const res = await fetch("/api/shifts");
       if (!res.ok) throw new Error((await res.json()).error ?? `HTTP ${res.status}`);
       setPayload(await res.json());
       setError(null);
@@ -99,7 +108,7 @@ export default function MobileShiftsPage() {
   }, []);
 
   useEffect(() => {
-    if (me) void load(me.did);
+    if (me) void load();
   }, [me, load]);
 
   const groups = useMemo(() => {
@@ -124,13 +133,13 @@ export default function MobileShiftsPage() {
       const res = await fetch("/api/shifts/claim", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ did: me.did, postingId: s.id, clientRef }),
+        body: JSON.stringify({ postingId: s.id, clientRef }),
       });
       const body = await res.json();
       if (!res.ok) throw new Error(body.error ?? `HTTP ${res.status}`);
       setSent((x) => ({ ...x, [s.id]: { state: "ok" } }));
       setOpen(null);
-      await load(me.did);
+      await load();
     } catch (e) {
       setSent((x) => ({
         ...x,
@@ -140,7 +149,7 @@ export default function MobileShiftsPage() {
   }
 
   if (!ready) return null;
-  if (!me) return <SignIn onPick={(p) => { setPerson(p); setMe(p); }} />;
+  if (!me) return <SignIn onSignedIn={setMe} />;
 
   const active = open ? (payload?.shifts ?? []).find((s) => s.id === open) ?? null : null;
 
@@ -154,7 +163,12 @@ export default function MobileShiftsPage() {
           </p>
         </div>
         <button
-          onClick={() => { clearPerson(); setMe(null); setPayload(null); }}
+          onClick={() => {
+            void fetch("/api/auth/session", { method: "DELETE" }).finally(() => {
+              setMe(null);
+              setPayload(null);
+            });
+          }}
           style={{
             border: "1px solid var(--border-2)", background: "#fff", borderRadius: 999,
             padding: "6px 12px", fontSize: 12, fontWeight: 600, color: "var(--fg-2)", cursor: "pointer",
@@ -215,47 +229,6 @@ export default function MobileShiftsPage() {
           onClaim={() => claim(active)}
         />
       )}
-    </div>
-  );
-}
-
-/* ---------- sign in ---------- */
-
-function SignIn({ onPick }: { onPick: (p: Person) => void }) {
-  return (
-    <div style={{ padding: "28px 18px" }}>
-      <h1 style={{ margin: "0 0 4px", fontSize: 23, letterSpacing: "-.02em" }}>Who are you?</h1>
-      <p style={{ margin: "0 0 20px", fontSize: 13.5, color: "var(--fg-4)", lineHeight: 1.55 }}>
-        Shifts are offered against your credentials, and every claim is recorded against your
-        name. This device will remember you.
-      </p>
-      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-        {WORKERS.map((w) => (
-          <button
-            key={w.did}
-            onClick={() => onPick({ did: w.did, name: w.name, role: w.role })}
-            style={{
-              display: "flex", alignItems: "center", gap: 12, width: "100%", textAlign: "left",
-              minHeight: 56, padding: "10px 14px", borderRadius: 12,
-              border: "1px solid var(--border)", background: "#fff", cursor: "pointer",
-            }}
-          >
-            <span
-              style={{
-                width: 36, height: 36, borderRadius: 999, background: "var(--bg-2)",
-                display: "inline-flex", alignItems: "center", justifyContent: "center",
-                fontSize: 12.5, fontWeight: 700, color: "var(--fg-3)", flexShrink: 0,
-              }}
-            >
-              {w.name.split(" ").map((x) => x[0]).join("")}
-            </span>
-            <span style={{ minWidth: 0 }}>
-              <span style={{ display: "block", fontSize: 15, fontWeight: 600, color: "var(--fg-1)" }}>{w.name}</span>
-              <span style={{ display: "block", fontSize: 12, color: "var(--fg-4)" }}>{w.role}</span>
-            </span>
-          </button>
-        ))}
-      </div>
     </div>
   );
 }

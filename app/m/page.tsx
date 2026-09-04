@@ -12,8 +12,7 @@ import {
   type ShiftSession,
   type Severity,
 } from "@/lib/awards";
-import { WORKERS } from "@/lib/idara/seed";
-import { currentPerson, setPerson, clearPerson, type Person } from "@/lib/mobile/identity";
+import { SignIn, type Signed } from "./sign-in";
 
 /* ============================================================
    Break Compliance, on the floor.
@@ -57,18 +56,28 @@ interface Sent {
 }
 
 export default function MobileBreaksPage() {
-  const [me, setMe] = useState<Person | null>(null);
+  const [me, setMe] = useState<Signed | null>(null);
   const [ready, setReady] = useState(false);
   const [payload, setPayload] = useState<Payload | null>(null);
   const [now, setNow] = useState(() => Math.floor(Date.now() / 1000));
   const [open, setOpen] = useState<string | null>(null);
   const [sent, setSent] = useState<Record<string, Sent>>({});
 
-  /* identity is read after mount: localStorage does not exist on the server,
-     and reading it during render would be a hydration mismatch */
+  /* Who is holding this phone is the server’s answer now. The break the
+     chain records is attributed to the session, so this is display only —
+     but it must agree with the session or the screen lies about the trail. */
   useEffect(() => {
-    setMe(currentPerson());
-    setReady(true);
+    void (async () => {
+      try {
+        const r = await fetch("/api/auth/session");
+        const b = await r.json();
+        if (b.signedIn) setMe(b.worker as Signed);
+      } catch {
+        /* offline: show the sign-in screen rather than a name we cannot check */
+      } finally {
+        setReady(true);
+      }
+    })();
   }, []);
 
   useEffect(() => {
@@ -122,12 +131,9 @@ export default function MobileBreaksPage() {
           name: p.name,
           kind,
           at: new Date().toISOString(),
-          actor: me.name,
-          // AuditEvent.actorDid now, rather than riding in data. Two
-          // supervisors can share a name; a DID is the only thing that says
-          // which one, and the chain is append-only — an ambiguous actor
-          // stays ambiguous forever.
-          actorDid: me.did,
+          // actor and actorDid are NOT sent: the route takes them from the
+          // session. Two supervisors can share a name, so the chain needs a
+          // DID — and a DID the phone supplies is only as good as the phone.
           overdue: p.severity === 3,
           // survives a retry: the same decision must not send twice
           clientRef: `${p.userId}-${Math.floor(Date.now() / 1000)}`,
@@ -157,7 +163,7 @@ export default function MobileBreaksPage() {
   }
 
   if (!ready) return null;
-  if (!me) return <SignIn onPick={(s) => { setPerson(s); setMe(s); }} />;
+  if (!me) return <SignIn onSignedIn={setMe} />;
 
   const active = open ? staff.find((p) => p.userId === open) ?? null : null;
 
@@ -171,7 +177,9 @@ export default function MobileBreaksPage() {
           </p>
         </div>
         <button
-          onClick={() => { clearPerson(); setMe(null); }}
+          onClick={() => {
+            void fetch("/api/auth/session", { method: "DELETE" }).finally(() => setMe(null));
+          }}
           style={{
             border: "1px solid var(--border-2)", background: "#fff", borderRadius: 999,
             padding: "6px 12px", fontSize: 12, fontWeight: 600, color: "var(--fg-2)", cursor: "pointer",
@@ -235,48 +243,6 @@ const mTab = (on: boolean): React.CSSProperties => ({
   background: on ? "var(--accent-bg, var(--bg-2))" : "#fff",
   color: on ? "var(--accent-fg, var(--fg-1))" : "var(--fg-3)",
 });
-
-/* ---------- sign in ---------- */
-
-function SignIn({ onPick }: { onPick: (s: Person) => void }) {
-  return (
-    <div style={{ padding: "28px 18px" }}>
-      <h1 style={{ margin: "0 0 4px", fontSize: 23, letterSpacing: "-.02em" }}>Who are you?</h1>
-      <p style={{ margin: "0 0 20px", fontSize: 13.5, color: "var(--fg-4)", lineHeight: 1.55 }}>
-        Every break you send is recorded against your name in the audit log. This device will
-        remember you.
-      </p>
-      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-        {WORKERS.map((w) => (
-          <button
-            key={w.did}
-            onClick={() => onPick({ did: w.did, name: w.name, role: w.role })}
-            style={{
-              display: "flex", alignItems: "center", gap: 12, width: "100%", textAlign: "left",
-              // 56px: a thumb target, not a cursor target
-              minHeight: 56, padding: "10px 14px", borderRadius: 12,
-              border: "1px solid var(--border)", background: "#fff", cursor: "pointer",
-            }}
-          >
-            <span
-              style={{
-                width: 36, height: 36, borderRadius: 999, background: "var(--bg-2)",
-                display: "inline-flex", alignItems: "center", justifyContent: "center",
-                fontSize: 12.5, fontWeight: 700, color: "var(--fg-3)", flexShrink: 0,
-              }}
-            >
-              {w.name.split(" ").map((x) => x[0]).join("")}
-            </span>
-            <span style={{ minWidth: 0 }}>
-              <span style={{ display: "block", fontSize: 15, fontWeight: 600, color: "var(--fg-1)" }}>{w.name}</span>
-              <span style={{ display: "block", fontSize: 12, color: "var(--fg-4)" }}>{w.role}</span>
-            </span>
-          </button>
-        ))}
-      </div>
-    </div>
-  );
-}
 
 /* ---------- pieces ---------- */
 
@@ -350,7 +316,7 @@ function PersonRow({
 function Sheet({
   p, now, me, onClose, onSend,
 }: {
-  p: BreakAssessment; now: number; me: Person;
+  p: BreakAssessment; now: number; me: Signed;
   onClose: () => void; onSend: (p: BreakAssessment, k: BreakKind) => void;
 }) {
   return (

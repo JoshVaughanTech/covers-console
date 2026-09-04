@@ -1,0 +1,66 @@
+/* ============================================================
+   POST /api/auth/request — ask for a sign-in code.
+
+   Open by design: asking for a code is not an authenticated act in
+   any magic-link system. What makes that safe is that the code goes
+   somewhere the requester does not control, which is the delivery
+   sink's job and, with no mail transport here, is the part that is
+   currently weakest. The response says which sink answered and
+   whether it proved anything, rather than letting a screen imply a
+   channel that does not exist.
+
+   The reply is deliberately the same whether or not the did is one
+   we know. A different answer for an unknown person turns this into
+   a way to enumerate who works here.
+   ============================================================ */
+import { NextResponse } from "next/server";
+import { authStore } from "@/lib/store/auth";
+import { sinkFromEnv } from "@/lib/auth/delivery";
+import { formatCode } from "@/lib/auth/token";
+import { WORKERS } from "@/lib/idara/seed";
+
+export const dynamic = "force-dynamic";
+
+const workerIndex = new Map(WORKERS.map((w) => [w.did, w]));
+
+export async function POST(req: Request) {
+  let body: { did?: unknown };
+  try {
+    body = (await req.json()) as { did?: unknown };
+  } catch {
+    return NextResponse.json({ error: "expected a JSON body" }, { status: 400 });
+  }
+
+  const did = typeof body.did === "string" ? body.did : null;
+  if (!did) return NextResponse.json({ error: "did is required" }, { status: 400 });
+
+  const sink = sinkFromEnv();
+  const person = workerIndex.get(did);
+
+  /* Same shape of answer either way. An unknown did costs a round trip and
+     tells the caller nothing they did not already supply. */
+  if (!person) {
+    return NextResponse.json({ sent: true, via: sink.describe(), outOfBand: true });
+  }
+
+  const grant = authStore().issue(did);
+  const origin = new URL(req.url).origin;
+  const link = `${origin}/api/auth/link?t=${encodeURIComponent(grant.token)}`;
+
+  const delivery = await sink.deliver({
+    did,
+    name: person.name,
+    code: grant.code,
+    link,
+    expiresAt: grant.expiresAt,
+  });
+
+  return NextResponse.json({
+    sent: true,
+    via: sink.describe(),
+    outOfBand: delivery.outOfBand,
+    expiresAt: grant.expiresAt,
+    // present only when no channel could carry it, and the screens say so
+    code: delivery.code ? formatCode(delivery.code) : undefined,
+  });
+}

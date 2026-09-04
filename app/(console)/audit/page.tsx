@@ -39,6 +39,8 @@ function eventMeta(e: AuditEvent): EventMeta {
       return { icon: "hand", tone: "info", kind: "Shift claimed" };
     case "shift.posted":
       return { icon: "megaphone", tone: "neutral", kind: "Shift posted" };
+    case "auth.signed_in":
+      return { icon: "log-in", tone: "neutral", kind: "Signed in" };
     case "report.delivered":
       return { icon: "file-check", tone: "success", kind: "Report delivered" };
     case "break.pushed":

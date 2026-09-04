@@ -238,6 +238,12 @@ export type AuditEventType =
    * credential published to the surface it protects.
    */
   | "auth.code_issued"
+  /**
+   * Somebody proved who they were and got a session. The fact belongs in the
+   * chain because a claim later disputed is read alongside it; the secret
+   * that let them in does not, and never leaves lib/store/auth.ts.
+   */
+  | "auth.signed_in"
   /** a manager assigning someone to an open shift (Open Shifts). */
   | "shift.assigned"
   /** a worker putting their hand up for an open shift. A request, not a

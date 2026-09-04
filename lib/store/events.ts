@@ -135,6 +135,23 @@ export class EventStore {
     this.db = new DatabaseSync(path);
     // WAL lets readers proceed while a write transaction holds the chain
     if (path !== ":memory:") this.db.exec("PRAGMA journal_mode = WAL");
+    /* Two connections now open this file — the event store and the auth
+       store — so a write can meet another write. Without a busy timeout
+       SQLite returns SQLITE_BUSY at once rather than waiting, which would
+       surface as a sign-in or a claim failing under load for no reason a
+       user could act on.
+
+       Five seconds is not a round number picked for looking sensible. Every
+       write here is one INSERT and one UPDATE inside a transaction, so real
+       overlap is sub-millisecond and this is about four orders of magnitude
+       of headroom. The number is chosen for what happens when it is NOT
+       enough: waiting and succeeding beats failing at the six-hour mark,
+       because the cost of a spurious failure is a supervisor who cannot send
+       a break or a casual who cannot claim a shift. The trade is that a
+       genuinely stuck lock now presents as a slow request rather than a fast
+       error, and slow is harder to attribute — but a stuck lock is a bug to
+       find either way, and it should not take a worker down with it. */
+    this.db.exec("PRAGMA busy_timeout = 5000");
     this.db.exec("PRAGMA foreign_keys = ON");
     this.db.exec(DDL);
     migrate(this.db);
