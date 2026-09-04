@@ -1,6 +1,6 @@
 # Design — Open Shifts: postings, claims and an explainable matcher
 
-**Date:** 2026-09-03 · **Status:** implemented · **Last revised:** 2026-09-03, after the loop was closed
+**Date:** 2026-09-03 · **Status:** implemented · **Last revised:** 2026-09-04, after durability and actor identity
 
 ---
 
@@ -39,24 +39,30 @@ person, and a test asserts the manager's row and the worker's own standing are
 | Module | Holds |
 |---|---|
 | `lib/people/` | skills with levels, rating, home venue, client exclusions, hours this week |
-| `lib/shifts/` | postings, seats, required skills, claims; posting, claiming and reviewing |
+| `lib/shifts/` | postings, seats, required skills, claims; posting, claiming, reviewing, and rebuilding the board from the log |
 | `lib/matching/` | the matcher: pure, synchronous, returns reasons with every score |
 
 `lib/shifts/` is deliberately several small modules rather than one: `types.ts`
 holds shape, `claim.ts` the act of claiming, `draft.ts` turning a form into a
-posting, `review.ts` answering claims. Each holds a rule that must not live in a
-component, because each is something the gate depends on.
+posting, `review.ts` answering claims, `replay.ts` rebuilding the board from the
+log (§8). Each holds a rule that must not live in a component, because each is
+something the gate depends on.
 
-**What `lib/idara/` gained.** Two audit event types — `"shift.assigned"` and
-`"shift.claimed"` — and one module, `duties.ts` (see §7). Nothing else: a rating
-is not a credential and a cocktail skill is not a legal position, so none of the
-workforce data went into the trust layer. The two join by DID; neither imports the
-other's vocabulary.
+**What `lib/idara/` gained**, as of this revision: three audit event types
+(`"shift.assigned"`, `"shift.claimed"`, `"shift.posted"`), one module —
+`duties.ts` (§7) — and one field on `AuditEvent`, `actorDid` (§12). Nothing else:
+a rating is not a credential and a cocktail skill is not a legal position, so none
+of the workforce data went into the trust layer. The two join by DID; neither
+imports the other's vocabulary.
 
-> An earlier revision of this document said the trust layer "gained exactly one
-> thing". That stopped being true and the sentence stayed, which is the failure
-> mode a design doc is most prone to — a specific, confident claim about the most
-> sensitive boundary in the codebase, quietly going stale.
+> **This paragraph has now gone stale twice.** It first said the trust layer
+> "gained exactly one thing", which stopped being true and stayed. It was
+> corrected to "two event types and one module", which stopped being true within
+> hours. A confident, specific, countable claim about the most sensitive boundary
+> in the codebase is exactly the sentence most likely to rot, because everything
+> that changes it is a change worth making. If you are editing the trust layer,
+> this line is the one to re-check — and if it has drifted again, say so here
+> rather than quietly fixing it.
 
 ## 4. Scoring
 
@@ -162,15 +168,47 @@ must be non-empty" but "non-empty for a role that implies some", which is what
 `checkDuties()` asks. Getting this wrong made a real role unpostable, and it
 shipped that way before being caught.
 
-## 8. The trail
+## 8. The trail, which is also the state
 
-Two new event types, not four. An **assignment** and a **claim** are each new kinds
-of thing, so each has one. A **declined claim** is not — it is an eligibility
-decision, so it writes as the existing `"decision"` type and renders under the
-existing label. A **lapsed** claim writes nothing at all: nothing happened, the
-facts simply moved, and the trail records acts rather than the passage of time.
+Three new event types, not five. A **posting**, an **assignment** and a **claim**
+are each new kinds of thing, so each has one. A **declined claim** is not — it is
+an eligibility decision, so it writes as the existing `"decision"` type and renders
+under the existing label. A **lapsed** claim writes nothing at all: nothing
+happened, the facts simply moved, and the trail records acts rather than the
+passage of time.
 
 Everything lands on the same SHA-256 hash chain as publishes and revocations.
+
+**The board is not stored beside the trail. It is read from it.** `replayPostings()`
+folds the log over the seed, and the page holds no posting state of its own — every
+action records an event and nothing else.
+
+This was not the original shape. The chain became durable before the marketplace
+did, and after a reload `/audit` still said someone had claimed a shift, chain
+verifying, while the queue showed no such claim and the assigned shift was open
+again. For a product whose central claim is a tamper-evident record of who was
+cleared to work, "the chain says it happened, the app says it didn't" is the worst
+inconsistency available.
+
+The fix was not a postings table. Two durable stores of one fact drift, which is
+the bug rather than the cure. It also honours what `lib/store/events.ts` says of
+itself — *"Covers stores what happened, not what is"* — whose reasoning is that
+the source of truth lives elsewhere, in Connecteam. Open Shifts has no elsewhere:
+a posting exists only here, so it needed its creation recorded rather than an
+exception to the principle. Hence `"shift.posted"`, which carries the posting
+itself.
+
+Two consequences worth knowing:
+
+- **The replay is idempotent per event.** The same log applied twice does not
+  double a claim, an assignment or a posting. The stream is at-least-once by
+  design — a reconnecting client re-reads the log — so this is what makes a
+  reconnect safe rather than inflationary.
+- **A failed append shows as nothing, not as a phantom.** When the backend refuses,
+  the provider records nothing locally, so the action does not appear on the board
+  either. An event in the log that no chain contains would be worse than a missing
+  one — but it means "it didn't show up" can mean "the server said no", not only
+  "it is slow".
 
 ## 9. What is derived, and therefore not stored
 
@@ -201,8 +239,8 @@ revoked afterwards. The request was fine when it was made.
 
 ## 11. Verification
 
-367 tests across 25 files at the time of writing, of which the marketplace
-contributes the matcher, claim, posting, duties and review suites.
+415 tests across 29 files at the time of writing, of which the marketplace
+contributes the matcher, claim, posting, duties, review and replay suites.
 
 The load-bearing test gives Jake a perfect profile — top rating, every skill at
 `lead`, zero hours — and asserts he still doesn't appear in the ranking, because
@@ -223,23 +261,41 @@ a full week; and one person appearing twice in the review queue in contradictory
 states. Tests check that data is correct per case. Only a person looking at the
 screen sees that two correct rows are together incoherent.
 
-## 12. Known gap — actor identity
+## 12. Actor identity — closed, with one constraint worth keeping
 
-**The chain says who an action was about, but not reliably who did it.**
-`AuditEvent.subject` is a `DID`; `AuditEvent.actor` is a display-name `string`.
-Two people with the same name are indistinguishable in the log, and a display name
-is not stable across a rename.
+The chain used to answer "who was this about" precisely and "who did this" only
+loosely: `subject` was a `DID`, `actor` was a display name. Two people with the
+same name were indistinguishable in a compliance log.
 
-State as of this revision: the supervisor phone carries the actor's DID in
-`data.actorDid` alongside the display name, with `via: "mobile"` recording which
-surface a decision came from (`ad2aee9`). That is a working mitigation on one path.
-Open Shifts still writes `actor: "Emma Taylor"` as a bare string, so the two
-surfaces identify actors differently — which is the thing worth fixing, not just
-the missing DID.
+`AuditEvent.actorDid` closes it (`1a82d95`). The console writes
+`CONSOLE_OPERATOR.did`, the phone writes the signed-in supervisor's DID, and the
+mobile path's earlier `data.actorDid` was folded into the typed field so there is
+one meaning in one place. `via: "mobile"` stayed in `data`, because which surface
+a decision came from is payload, not identity.
 
-Closing it properly means a typed actor on `AuditEvent` in the trust layer.
-One caution recorded here because it is not visible from the type: `verifyChain()`
-re-hashes the object it is given, so adding a field changes what *new* events hash
-over. New events chain correctly and existing ones keep verifying, since each hash
-covers only its own body — but anything that reconstructs an event and re-hashes it
-must include the new field or the result reads as tampering.
+**The constraint that made it dangerous, kept here because it looks like a style
+choice in the code:** an absent `actorDid` must read back as `undefined`, never
+`null`. `canonicalJson` drops keys whose value is undefined and keeps keys whose
+value is null, and the digest covers `Omit<AuditEvent, "hash">`. So a NULL column
+mapped to `null` adds `"actorDid":null` to the body of every event written before
+the field existed, changing its digest, and `verifyChain` reports the whole chain
+as tampered. `subject` already does `?? undefined` for exactly this reason.
+
+**And the part neither of us anticipated:** the DDL is `CREATE TABLE IF NOT
+EXISTS`, which is silent on a table that already exists, so a database written
+before the column never receives it and every append afterwards fails. Invisible
+in development, where the file is deleted between runs; total in a deployment,
+where it is not. `migrate()` now checks the live schema on every open. Confirmed
+against the real store: the same request returned 500 before and 201 after.
+
+## 13. Known gaps
+
+- **Identification is not authentication.** Both surfaces record who *claims* to
+  be acting. The phone's sign-in is a name picked from a list, and the console's
+  operator is a seed constant. The DID makes the record unambiguous; it does not
+  make it verified. A real session changes where the DID comes from, not what the
+  chain records.
+- **`ISODate` is narrower than the events that use it.** It is documented as
+  `YYYY-MM-DD`, but events carrying a moment rather than a day send a full
+  timestamp, and are right to. The renderer was fixed to accept both; the type
+  still claims otherwise.
