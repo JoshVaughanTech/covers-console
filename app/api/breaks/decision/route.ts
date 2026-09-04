@@ -8,7 +8,7 @@
    anyone on a second break.
    ============================================================ */
 import { NextResponse } from "next/server";
-import { callerOf } from "@/lib/auth/session";
+import { workerOf } from "@/lib/auth/session";
 import { eventStore } from "@/lib/store/events";
 import { sendOnBreak, type BreakPusher, type BreakDecisionInput } from "@/lib/store/decision";
 import { ConnecteamClient } from "@/lib/integrations/connecteam";
@@ -67,7 +67,7 @@ export async function POST(req: Request) {
      which put the strongest identity claim in the chain — a DID — entirely
      in the gift of whoever held the phone. An unverifiable name is a weak
      record; an unverifiable DID that looks verifiable is worse. */
-  const caller = callerOf(req);
+  const caller = workerOf(req);
   if (!caller) return NextResponse.json({ error: "not signed in" }, { status: 401 });
 
   if (!body?.subject || !body.name || !body.kind || !body.at) {

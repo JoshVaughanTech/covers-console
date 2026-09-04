@@ -1,5 +1,12 @@
 import { describe, it, expect, beforeAll, vi, afterEach } from "vitest";
-import { WORKERS, CONSOLE_OPERATOR } from "../lib/idara/seed";
+import { WORKERS } from "../lib/idara/seed";
+import { OPERATORS } from "../lib/auth/operators";
+import { signInOperator, asCaller, type TestSession } from "./sign-in-helper";
+
+/* Issuing is an operator act now, so these go through a real operator
+   session rather than relying on the route trusting whoever called it. */
+let op: TestSession;
+const OPERATOR = OPERATORS[0];
 
 /* ============================================================
    POST /api/auth/issue — an operator minting a code for somebody
@@ -23,6 +30,7 @@ let store: typeof import("../lib/store/events");
 beforeAll(async () => {
   issue = await import("../app/api/auth/issue/route");
   store = await import("../lib/store/events");
+  op = signInOperator(OPERATOR.did);
 });
 
 afterEach(() => vi.unstubAllEnvs());
@@ -32,11 +40,7 @@ let nextWorker = 0;
 const someone = () => WORKERS[nextWorker++ % WORKERS.length];
 
 const post = (body: unknown) =>
-  new Request("http://x/api/auth/issue", {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify(body),
-  });
+  asCaller(op, "http://x/api/auth/issue", { method: "POST", body: JSON.stringify(body) });
 
 const issueFor = async (did: string) => {
   const res = await issue.POST(post({ did }));
@@ -58,8 +62,8 @@ describe("minting for somebody", () => {
     const { body } = await issueFor(someone().did);
     // no console sign-in exists, so this is whoever opened the page — and
     // saying the name is what makes that legible rather than reassuring
-    expect(body.recordedAs.name).toBe(CONSOLE_OPERATOR.name);
-    expect(body.recordedAs.did).toBe(CONSOLE_OPERATOR.did);
+    expect(body.recordedAs.name).toBe(OPERATOR.name);
+    expect(body.recordedAs.did).toBe(OPERATOR.did);
   });
 
   it("tells an operator plainly that a name is not one of ours", async () => {
@@ -73,13 +77,7 @@ describe("minting for somebody", () => {
     expect((await issue.POST(post({}))).status).toBe(400);
     expect(
       (
-        await issue.POST(
-          new Request("http://x/api/auth/issue", {
-            method: "POST",
-            headers: { "content-type": "application/json" },
-            body: "not json",
-          }),
-        )
+        await issue.POST(asCaller(op, "http://x/api/auth/issue", { method: "POST", body: "not json" }))
       ).status,
     ).toBe(400);
   });
@@ -91,8 +89,8 @@ describe("the cause, recorded", () => {
     await issueFor(w.did);
 
     const e = store.eventStore().all("org-test").filter((x) => x.type === "auth.code_issued").at(-1)!;
-    expect(e.actor).toBe(CONSOLE_OPERATOR.name);
-    expect(e.actorDid).toBe(CONSOLE_OPERATOR.did);
+    expect(e.actor).toBe(OPERATOR.name);
+    expect(e.actorDid).toBe(OPERATOR.did);
     expect(e.subject).toBe(w.did);
     expect(e.summary).toContain(w.name);
     expect(store.eventStore().verify("org-test").ok).toBe(true);

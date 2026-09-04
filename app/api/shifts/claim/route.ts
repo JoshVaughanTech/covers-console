@@ -24,7 +24,7 @@ import { eventStore } from "@/lib/store/events";
 import { boardFrom, claimBlockReason, claimShift } from "@/lib/shifts";
 import { LocalCredentialVerifier } from "@/lib/idara/verifier";
 import { SITES } from "@/lib/idara/seed";
-import { callerOf } from "@/lib/auth/session";
+import { workerOf } from "@/lib/auth/session";
 
 export const dynamic = "force-dynamic";
 
@@ -44,7 +44,7 @@ export async function POST(req: Request) {
      else is read. The phone used to send it, which meant anyone could put
      anyone else’s hand up and the audit chain would record it truthfully and
      uselessly. */
-  const caller = callerOf(req);
+  const caller = workerOf(req);
   if (!caller) return NextResponse.json({ error: "not signed in" }, { status: 401 });
 
   const did = caller.did;

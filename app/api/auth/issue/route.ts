@@ -28,7 +28,8 @@ import { authStore } from "@/lib/store/auth";
 import { eventStore } from "@/lib/store/events";
 import { sinkFromEnv } from "@/lib/auth/delivery";
 import { formatCode } from "@/lib/auth/token";
-import { CONSOLE_OPERATOR, WORKERS } from "@/lib/idara/seed";
+import { WORKERS } from "@/lib/idara/seed";
+import { operatorOf } from "@/lib/auth/session";
 
 export const dynamic = "force-dynamic";
 
@@ -36,6 +37,13 @@ const ORG = process.env.COVERS_ORG ?? "org-brightwater";
 const workerIndex = new Map(WORKERS.map((w) => [w.did, w]));
 
 export async function POST(req: Request) {
+  /* The operator is now a session rather than a constant. Until console
+     sign-in existed this route wrote CONSOLE_OPERATOR whoever was calling,
+     which recorded a name and proved nothing; the screen said so. Now the
+     name in the chain is the one that proved itself at the door. */
+  const caller = operatorOf(req);
+  if (!caller) return NextResponse.json({ error: "not signed in" }, { status: 401 });
+
   let body: { did?: unknown };
   try {
     body = (await req.json()) as { did?: unknown };
@@ -101,10 +109,10 @@ export async function POST(req: Request) {
   const { event } = eventStore().append(ORG, {
     type: "auth.code_issued",
     at: new Date().toISOString(),
-    actor: CONSOLE_OPERATOR.name,
-    actorDid: CONSOLE_OPERATOR.did,
+    actor: caller.operator.name,
+    actorDid: caller.operator.did,
     subject: person.did,
-    summary: `${CONSOLE_OPERATOR.name} issued ${person.name} a sign-in code`,
+    summary: `${caller.operator.name} issued ${person.name} a sign-in code`,
     data: {
       grantId: grant.id,
       expiresAt: grant.expiresAt,
@@ -121,7 +129,7 @@ export async function POST(req: Request) {
     outOfBand: delivery.outOfBand,
     // present only when the configured sink could not carry it out of band
     code: delivery.code ? formatCode(delivery.code) : undefined,
-    recordedAs: { name: CONSOLE_OPERATOR.name, did: CONSOLE_OPERATOR.did },
+    recordedAs: { name: caller.operator.name, did: caller.operator.did },
     seq: event.seq,
   });
 }

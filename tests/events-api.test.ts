@@ -20,9 +20,15 @@ beforeAll(async () => {
   events = await import("../app/api/events/route");
   decision = await import("../app/api/breaks/decision/route");
   leanne = signIn("did:web:idara.app:w:leanne-vidal");
+  op = signInOperator(OPERATORS[0].did);
 });
 
-import { signIn, asCaller, type TestSession } from "./sign-in-helper";
+import { signIn, signInOperator, asCaller, type TestSession } from "./sign-in-helper";
+import { OPERATORS } from "../lib/auth/operators";
+
+/* The chain is an operator surface now: it is the venue compliance record,
+   and a worker reading it would see every colleague. */
+let op: TestSession;
 
 /* The break decision route takes the supervisor from the session now, so
    these go through a real sign-in rather than naming an actor in the body. */
@@ -30,6 +36,12 @@ let leanne: TestSession;
 const asLeanne = (body: unknown) =>
   asCaller(leanne, "http://x/api/breaks/decision", { method: "POST", body: JSON.stringify(body) });
 
+const asOperator = (body: unknown) =>
+  asCaller(op, "http://x/api/events", { method: "POST", body: JSON.stringify(body) });
+
+const asOperatorGet = (url: string) => asCaller(op, url);
+
+/** Unauthenticated, for the routes that still take one. */
 const post = (url: string, body: unknown) =>
   new Request(url, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
 
@@ -42,7 +54,7 @@ const anEvent = (summary: string) => ({
 
 describe("POST /api/events", () => {
   it("appends and returns the chained event", async () => {
-    const res = await events.POST(post("http://x/api/events", anEvent("first")));
+    const res = await events.POST(asOperator(anEvent("first")));
     expect(res.status).toBe(201);
     const body = await res.json();
     expect(body.created).toBe(true);
@@ -51,14 +63,14 @@ describe("POST /api/events", () => {
   });
 
   it("rejects an event missing its required fields", async () => {
-    const res = await events.POST(post("http://x/api/events", { type: "break.decision" }));
+    const res = await events.POST(asOperator({ type: "break.decision" }));
     expect(res.status).toBe(400);
     expect((await res.json()).error).toMatch(/required/);
   });
 
   it("returns 200 rather than an error when a clientRef is replayed", async () => {
-    const one = await events.POST(post("http://x/api/events", { ...anEvent("dup"), clientRef: "ref-1" }));
-    const two = await events.POST(post("http://x/api/events", { ...anEvent("dup"), clientRef: "ref-1" }));
+    const one = await events.POST(asOperator({ ...anEvent("dup"), clientRef: "ref-1" }));
+    const two = await events.POST(asOperator({ ...anEvent("dup"), clientRef: "ref-1" }));
     expect(one.status).toBe(201);
     expect(two.status).toBe(200);
     const a = await one.json();
@@ -70,16 +82,16 @@ describe("POST /api/events", () => {
 
 describe("GET /api/events", () => {
   it("returns the chain and its head", async () => {
-    const res = await events.GET(new Request("http://x/api/events"));
+    const res = await events.GET(asOperatorGet("http://x/api/events"));
     const body = await res.json();
     expect(body.events.length).toBeGreaterThan(0);
     expect(body.head.seq).toBe(body.events.at(-1).seq);
   });
 
   it("honours the since cursor, which is what an SSE reconnect uses", async () => {
-    const all = await (await events.GET(new Request("http://x/api/events"))).json();
+    const all = await (await events.GET(asOperatorGet("http://x/api/events"))).json();
     const from = all.events[0].seq;
-    const res = await events.GET(new Request(`http://x/api/events?since=${from}`));
+    const res = await events.GET(asOperatorGet(`http://x/api/events?since=${from}`));
     const body = await res.json();
     expect(body.events.every((e: { seq: number }) => e.seq > from)).toBe(true);
   });
@@ -140,7 +152,7 @@ describe("POST /api/breaks/decision", () => {
   });
 
   it("leaves the chain verifiable after everything above", async () => {
-    const res = await events.GET(new Request("http://x/api/events"));
+    const res = await events.GET(asOperatorGet("http://x/api/events"));
     const { events: log } = await res.json();
     const { verifyChain } = await import("../lib/idara/audit");
     expect(verifyChain(log)).toEqual({ ok: true, brokenAt: null });

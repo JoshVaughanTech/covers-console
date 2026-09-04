@@ -40,6 +40,8 @@ CREATE TABLE IF NOT EXISTS signin_grant (
   issued_at   INTEGER NOT NULL,
   expires_at  INTEGER NOT NULL,
   attempts    INTEGER NOT NULL DEFAULT 0,
+  -- what the resulting session is for. Never inferred at the point of use.
+  kind        TEXT    NOT NULL DEFAULT 'worker',
   -- set the moment it is spent, so a second redemption of the same grant
   -- is refused by a fact rather than by the row being gone
   redeemed_at INTEGER
@@ -55,7 +57,8 @@ CREATE TABLE IF NOT EXISTS session (
   issued_at   INTEGER NOT NULL,
   expires_at  INTEGER NOT NULL,
   last_seen   INTEGER NOT NULL,
-  revoked_at  INTEGER
+  revoked_at  INTEGER,
+  kind        TEXT    NOT NULL DEFAULT 'worker'
 );
 
 CREATE INDEX IF NOT EXISTS session_did ON session (did);
@@ -71,9 +74,26 @@ CREATE TABLE IF NOT EXISTS redeem_attempt (
 CREATE INDEX IF NOT EXISTS redeem_attempt_bucket ON redeem_attempt (bucket, at);
 `;
 
+/**
+ * What a credential is for.
+ *
+ * A session is not just "signed in" — it is signed in AS something. A worker's
+ * phone session and an operator's console session are both a person proving
+ * who they are, and they must not be interchangeable: an operator session
+ * mints other people's credentials, and a worker session must never be able to
+ * do that by being presented at a different door.
+ *
+ * So the kind is fixed when the grant is issued and carried through to the
+ * session, rather than inferred at the point of use from which endpoint was
+ * called. Inferring it there would mean every new endpoint had to remember,
+ * and the one that forgot would be the hole.
+ */
+export type SessionKind = "worker" | "operator";
+
 export interface Grant {
   id: string;
   did: string;
+  kind: SessionKind;
   /** the plaintext link secret. Returned once, at issue, and never again. */
   token: string;
   /** the plaintext code. Returned once, at issue, and never again. */
@@ -94,12 +114,13 @@ export type IssueResult =
   | { ok: false; reason: "rate_limited" };
 
 export type RedeemResult =
-  | { ok: true; did: string; session: { id: string; secret: string; expiresAt: number } }
+  | { ok: true; did: string; kind: SessionKind; session: { id: string; secret: string; expiresAt: number } }
   | { ok: false; reason: "unknown" | "expired" | "spent" | "too_many_attempts" };
 
 export interface Session {
   id: string;
   did: string;
+  kind: SessionKind;
   issuedAt: number;
   expiresAt: number;
 }
@@ -137,6 +158,27 @@ const MAX_FAILURES_PER_WINDOW = 20;
 const ISSUE_WINDOW_SECONDS = 15 * 60;
 const MAX_ISSUES_PER_WINDOW = 5;
 
+/**
+ * Bring an existing database up to the current schema.
+ *
+ * CREATE TABLE IF NOT EXISTS says nothing to a table that already exists, so a
+ * database written before a column was added never receives it. Added columns
+ * default to "worker", which is the safe direction and the only safe one: an
+ * existing session predates operators entirely, and defaulting it the other
+ * way would silently promote every live phone session to console access.
+ */
+function migrate(db: DatabaseSync): void {
+  const cols = (t: string) =>
+    (db.prepare(`PRAGMA table_info(${t})`).all() as { name: string }[]).map((c) => c.name);
+
+  if (!cols("session").includes("kind")) {
+    db.exec("ALTER TABLE session ADD COLUMN kind TEXT NOT NULL DEFAULT 'worker'");
+  }
+  if (!cols("signin_grant").includes("kind")) {
+    db.exec("ALTER TABLE signin_grant ADD COLUMN kind TEXT NOT NULL DEFAULT 'worker'");
+  }
+}
+
 export class AuthStore {
   private db: DatabaseSync;
 
@@ -162,6 +204,7 @@ export class AuthStore {
        find either way, and it should not take a worker down with it. */
     this.db.exec("PRAGMA busy_timeout = 5000");
     this.db.exec(DDL);
+    migrate(this.db);
   }
 
   /**
@@ -172,7 +215,7 @@ export class AuthStore {
    * they are reading the older of two texts — and it doubles the guessing
    * surface for no benefit.
    */
-  issue(did: string, at = now()): IssueResult {
+  issue(did: string, kind: SessionKind = "worker", at = now()): IssueResult {
     this.sweep(at);
 
     /* Refuse BEFORE spending anything. The order is the whole defence: a
@@ -191,14 +234,14 @@ export class AuthStore {
     const id = `sg-${hash(minted.tokenHash).slice(0, 16)}`;
     this.db
       .prepare(
-        `INSERT INTO signin_grant (id, did, token_hash, code_hash, issued_at, expires_at)
-         VALUES (?,?,?,?,?,?)`,
+        `INSERT INTO signin_grant (id, did, token_hash, code_hash, issued_at, expires_at, kind)
+         VALUES (?,?,?,?,?,?,?)`,
       )
-      .run(id, did, minted.tokenHash, minted.codeHash, at, minted.expiresAt);
+      .run(id, did, minted.tokenHash, minted.codeHash, at, minted.expiresAt, kind);
 
     return {
       ok: true,
-      grant: { id, did, token: minted.token, code: minted.code, expiresAt: minted.expiresAt },
+      grant: { id, did, kind, token: minted.token, code: minted.code, expiresAt: minted.expiresAt },
     };
   }
 
@@ -286,13 +329,13 @@ export class AuthStore {
       const id = `ses-${hash(s.secretHash).slice(0, 16)}`;
       this.db
         .prepare(
-          `INSERT INTO session (id, did, secret_hash, issued_at, expires_at, last_seen)
-           VALUES (?,?,?,?,?,?)`,
+          `INSERT INTO session (id, did, secret_hash, issued_at, expires_at, last_seen, kind)
+           VALUES (?,?,?,?,?,?,?)`,
         )
-        .run(id, row.did, s.secretHash, at, s.expiresAt, at);
+        .run(id, row.did, s.secretHash, at, s.expiresAt, at, row.kind);
       this.db.exec("COMMIT");
 
-      return { ok: true, did: row.did, session: { id, secret: s.secret, expiresAt: s.expiresAt } };
+      return { ok: true, did: row.did, kind: row.kind, session: { id, secret: s.secret, expiresAt: s.expiresAt } };
     } catch (e) {
       this.db.exec("ROLLBACK");
       throw e;
@@ -309,7 +352,7 @@ export class AuthStore {
     if (row.expires_at <= at) return null;
 
     this.db.prepare("UPDATE session SET last_seen = ? WHERE id = ?").run(at, row.id);
-    return { id: row.id, did: row.did, issuedAt: row.issued_at, expiresAt: row.expires_at };
+    return { id: row.id, did: row.did, kind: row.kind, issuedAt: row.issued_at, expiresAt: row.expires_at };
   }
 
   /** Sign out. Revoking rather than deleting keeps the row auditable. */
@@ -328,7 +371,7 @@ export class AuthStore {
           "SELECT * FROM session WHERE did = ? AND revoked_at IS NULL AND expires_at > ? ORDER BY issued_at DESC",
         )
         .all(did, at) as SessionRow[]
-    ).map((r) => ({ id: r.id, did: r.did, issuedAt: r.issued_at, expiresAt: r.expires_at }));
+    ).map((r) => ({ id: r.id, did: r.did, kind: r.kind, issuedAt: r.issued_at, expiresAt: r.expires_at }));
   }
 
   revokeAllFor(did: string, at = now()): number {
@@ -357,11 +400,13 @@ export class AuthStore {
 type GrantRow = {
   id: string; did: string; token_hash: string; code_hash: string;
   issued_at: number; expires_at: number; attempts: number; redeemed_at: number | null;
+  kind: SessionKind;
 };
 
 type SessionRow = {
   id: string; did: string; secret_hash: string;
   issued_at: number; expires_at: number; last_seen: number; revoked_at: number | null;
+  kind: SessionKind;
 };
 
 /* One instance per process, cached across dev-server hot reloads for the same

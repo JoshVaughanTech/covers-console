@@ -12,8 +12,22 @@
    throw rather than a caught one — and under React Strict Mode the
    client mounts twice, so disconnects happen on every page load in
    development rather than rarely.
+   Who may read it, and how much.
+
+   The chain is the venue's compliance record — every break decision,
+   every claim, every credential revocation, for everybody. An
+   operator gets it. A worker does not, and until console sign-in
+   existed this route asked neither, which made the audit log the
+   first thing a worker reached after signing in on their phone.
+
+   A worker still gets a tick, because that is all the phone ever
+   used this for: es.onmessage refetches /api/breaks and never reads
+   the payload. So one mechanism serves both, and the caller that
+   needs less is given less rather than given everything and trusted
+   to look away.
    ============================================================ */
 import { eventStore } from "@/lib/store/events";
+import { operatorOf, workerOf } from "@/lib/auth/session";
 
 export const dynamic = "force-dynamic";
 
@@ -21,6 +35,14 @@ const ORG = process.env.COVERS_ORG ?? "org-brightwater";
 const HEARTBEAT_MS = 25_000;
 
 export async function GET(req: Request) {
+  const operator = operatorOf(req);
+  // a worker learns that something happened, never what
+  const worker = operator ? null : workerOf(req);
+  if (!operator && !worker) {
+    return new Response("not signed in", { status: 401 });
+  }
+  const full = operator !== null;
+
   const store = eventStore();
   const lastId = req.headers.get("last-event-id");
   const since = Number(lastId ?? new URL(req.url).searchParams.get("since") ?? -1);
@@ -56,7 +78,12 @@ export async function GET(req: Request) {
         try { controller.close(); } catch { /* already closed by the runtime */ }
       }
 
-      const send = (e: { seq: number }) => write(`id: ${e.seq}\ndata: ${JSON.stringify(e)}\n\n`);
+      /* An operator receives the event. A worker receives its sequence number
+         and nothing else — enough to know they are behind and refetch what
+         they are allowed to see, and not enough to learn anything about
+         anybody. */
+      const send = (e: { seq: number }) =>
+        write(`id: ${e.seq}\ndata: ${JSON.stringify(full ? e : { seq: e.seq })}\n\n`);
 
       // replay what this client missed before going live, so a reconnect never
       // leaves a hole between its cursor and the first live event

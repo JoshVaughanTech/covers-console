@@ -14,6 +14,7 @@ import { authStore } from "@/lib/store/auth";
 import { eventStore } from "@/lib/store/events";
 import { setSessionCookie } from "@/lib/auth/session";
 import { WORKERS } from "@/lib/idara/seed";
+import { operator } from "@/lib/auth/operators";
 
 export const dynamic = "force-dynamic";
 
@@ -30,18 +31,26 @@ export async function GET(req: Request) {
     return NextResponse.redirect(new URL(`/m?signin=${result.reason}`, url.origin));
   }
 
+  /* Where the link lands follows the kind of session it minted. An operator
+     sent to /m/shifts arrives somewhere their session cannot do anything —
+     not unsafe, because the kind still refuses everything there, but a dead
+     end that reads as the link being broken. */
+  const isOperator = result.kind === "operator";
+  const who = isOperator ? operator(result.did) : undefined;
   const person = workerIndex.get(result.did);
-  const res = NextResponse.redirect(new URL("/m/shifts", url.origin));
+  const name = who?.name ?? person?.name ?? result.did;
+
+  const res = NextResponse.redirect(new URL(isOperator ? "/overview" : "/m/shifts", url.origin));
   setSessionCookie(res, req, result.session.secret);
 
   eventStore().append(ORG, {
     type: "auth.signed_in",
     at: new Date().toISOString(),
-    actor: person?.name ?? result.did,
+    actor: name,
     actorDid: result.did,
     subject: result.did,
-    summary: `${person?.name ?? result.did} signed in on a device`,
-    data: { via: "link", sessionId: result.session.id },
+    summary: `${name} signed in ${isOperator ? "to the console" : "on a device"}`,
+    data: { via: "link", kind: result.kind, sessionId: result.session.id },
   });
 
   return res;
