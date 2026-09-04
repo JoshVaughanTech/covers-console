@@ -19,7 +19,7 @@ import { eventStore } from "@/lib/store/events";
 import { boardFrom, claimBlockReason, seatsLeft, standingFor } from "@/lib/shifts";
 import { LocalCredentialVerifier } from "@/lib/idara/verifier";
 import { SITES } from "@/lib/idara/seed";
-import { callerOf } from "@/lib/auth/session";
+import { workerOf } from "@/lib/auth/session";
 
 export const dynamic = "force-dynamic";
 
@@ -34,7 +34,7 @@ export async function GET(req: Request) {
      It used to be a query parameter, which is not a weak identity check but
      the absence of one: any phone could ask for anybody’s board, and the
      claim endpoint would then act on the name it was handed. */
-  const caller = callerOf(req);
+  const caller = workerOf(req);
   if (!caller) return NextResponse.json({ error: "not signed in" }, { status: 401 });
 
   const did = caller.did;

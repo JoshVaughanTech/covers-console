@@ -1,9 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Card, Avatar, Badge, Button, Icon, useToast } from "@/components/ui";
 import { CardHead, PageHead } from "@/components/screen/page-head";
-import { CONSOLE_OPERATOR, WORKERS } from "@/lib/idara/seed";
+import { WORKERS } from "@/lib/idara/seed";
 
 /* ============================================================
    Phone sign-in — minting a code for somebody standing in front of
@@ -16,16 +16,14 @@ import { CONSOLE_OPERATOR, WORKERS } from "@/lib/idara/seed";
 
    Two honesty rules shape it, and neither is decoration.
 
-   It names the identity it is about to write into the chain. There
-   is no console sign-in yet, so "the operator" is whoever opened
-   this page, and the event will say Emma Taylor whoever that was. A
-   vaguer line — "recorded as the signed-in operator" — would
-   describe a system that authenticates somebody, and this one does
-   not; it would read as reassurance to the person who most needs to
-   understand that none exists. It also stays true later: when
-   console auth arrives the same sentence stops being uncomfortable
-   and becomes ordinary, so the improvement is visible rather than
-   silent.
+   It names the identity it is about to write into the chain. That
+   line used to read "recorded as Emma Taylor, because this console
+   has no sign-in of its own" — uncomfortable on purpose, because it
+   was true. Console sign-in arrived, and the same sentence is now
+   ordinary: the name is the one that proved itself at the door. That
+   was the argument for saying it plainly rather than vaguely — a
+   vague line would still be sitting here, technically true and no
+   longer meaning anything.
 
    And it does not show the code unless the server was configured in
    a way that already exposes it. An operator surface answering with
@@ -57,6 +55,19 @@ export default function SignInCodesPage() {
   const [issued, setIssued] = useState<Issued | null>(null);
   const [failed, setFailed] = useState<Failed | null>(null);
   const [query, setQuery] = useState("");
+  const [me, setMe] = useState<{ name: string; role: string } | null>(null);
+
+  useEffect(() => {
+    void (async () => {
+      try {
+        const r = await fetch("/api/auth/session");
+        const b = await r.json();
+        if (b.signedIn && b.kind === "operator") setMe(b.operator);
+      } catch {
+        /* the shell handles a missing session; do not assert a name here */
+      }
+    })();
+  }, []);
 
   const shown = WORKERS.filter((w) =>
     `${w.name} ${w.role}`.toLowerCase().includes(query.trim().toLowerCase()),
@@ -93,15 +104,18 @@ export default function SignInCodesPage() {
         sub="Issue a one-time code so someone can sign in on their own phone. Codes last fifteen minutes and work once."
       />
 
-      {/* Named, not described. The discomfort is the information. */}
+      {/* This said "recorded as Emma Taylor, because this console has no
+          sign-in of its own yet" for as long as that was true. It is not any
+          more, and a screen that kept saying it would be understating the
+          system rather than overstating it — the rarer mistake, and still a
+          lie. The name is now the one that proved itself at the door. */}
       <Card pad={14} style={{ marginBottom: 16 }}>
         <div style={{ display: "flex", gap: 12, alignItems: "flex-start" }}>
-          <Icon name="shield-alert" size={18} style={{ color: "var(--warning-fg)", marginTop: 1 }} />
+          <Icon name="shield-check" size={18} style={{ color: "var(--fs-teal)", marginTop: 1 }} />
           <div style={{ fontSize: 13.5, lineHeight: 1.6, color: "var(--fg-2)" }}>
-            Anything issued here is recorded in the audit log as{" "}
-            <strong>{CONSOLE_OPERATOR.name}</strong>, because this console has no sign-in of its
-            own yet — it records whoever <em>could</em> open it, not who did. Until that changes,
-            treat this page as something anyone who can reach this server can use.
+            Codes issued here are recorded in the audit log against{" "}
+            <strong>{me?.name ?? "you"}</strong>, the operator signed in on this console. The code
+            itself is written to the server and never shown to whoever asked for it.
           </div>
         </div>
       </Card>

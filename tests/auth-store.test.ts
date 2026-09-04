@@ -29,7 +29,7 @@ let store: AuthStore;
 
 /** issue(), unwrapped. Refusal is its own case and has its own tests. */
 const issue = (did: string, at = T) => {
-  const r = store.issue(did, at);
+  const r = store.issue(did, "worker", at);
   if (!r.ok) throw new Error(`unexpectedly rate limited: ${did}`);
   return r.grant;
 };
@@ -260,7 +260,7 @@ describe("stopping someone signing in", () => {
     const first = issue(DARIE);
     let last = first;
     for (let i = 0; i < 20; i++) {
-      const r = store.issue(DARIE, T);
+      const r = store.issue(DARIE, "worker", T);
       if (r.ok) last = r.grant;
     }
 
@@ -272,27 +272,27 @@ describe("stopping someone signing in", () => {
   });
 
   it("refuses rather than issuing, and says which", () => {
-    for (let i = 0; i < 5; i++) expect(store.issue(DARIE, T).ok).toBe(true);
-    expect(store.issue(DARIE, T)).toEqual({ ok: false, reason: "rate_limited" });
+    for (let i = 0; i < 5; i++) expect(store.issue(DARIE, "worker", T).ok).toBe(true);
+    expect(store.issue(DARIE, "worker", T)).toEqual({ ok: false, reason: "rate_limited" });
   });
 
   it("refuses before it spends, which is the whole defence", () => {
     // the fifth grant is the last one issued; the sixth request must not kill it
     let last = issue(DARIE);
     for (let i = 1; i < 5; i++) last = issue(DARIE);
-    expect(store.issue(DARIE, T).ok).toBe(false);
+    expect(store.issue(DARIE, "worker", T).ok).toBe(false);
 
     expect(store.redeemCode(DARIE, last.code, "ip", T).ok).toBe(true);
   });
 
   it("does not let one person's budget lock out anybody else", () => {
-    for (let i = 0; i < 10; i++) store.issue(DARIE, T);
-    expect(store.issue(MITCH, T).ok).toBe(true);
+    for (let i = 0; i < 10; i++) store.issue(DARIE, "worker", T);
+    expect(store.issue(MITCH, "worker", T).ok).toBe(true);
   });
 
   it("lets the same person ask again in the next window", () => {
-    for (let i = 0; i < 6; i++) store.issue(DARIE, T);
-    const later = store.issue(DARIE, T + 15 * 60 + 1);
+    for (let i = 0; i < 6; i++) store.issue(DARIE, "worker", T);
+    const later = store.issue(DARIE, "worker", T + 15 * 60 + 1);
     expect(later.ok).toBe(true);
   });
 });

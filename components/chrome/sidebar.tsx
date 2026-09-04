@@ -4,7 +4,8 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Icon } from "@/components/ui/icon";
 import { Avatar } from "@/components/ui/avatar";
-import { Menu, useToast } from "@/components/ui";
+import { Menu } from "@/components/ui";
+import { useEffect, useState } from "react";
 import { NAV } from "./nav";
 
 /* ============================================================
@@ -13,8 +14,42 @@ import { NAV } from "./nav";
    ============================================================ */
 
 export function Sidebar() {
+  /* Who is signed in, asked of the server rather than assumed.
+
+     This said "Emma Taylor" for as long as the console had no sign-in, which
+     was honest then — it named the constant the audit chain was going to
+     record whoever was looking. Now that a session exists, a hardcoded name
+     would be the opposite: a screen asserting an identity nobody proved,
+     while the chain records the one that did. */
+  const [me, setMe] = useState<{ name: string; role: string } | null>(null);
+
+  useEffect(() => {
+    void (async () => {
+      try {
+        const r = await fetch("/api/auth/session");
+        const b = await r.json();
+        if (b.signedIn && b.kind === "operator") {
+          setMe(b.operator);
+          return;
+        }
+        /* Anybody else is sent to the door.
+
+           Presentation, not a gate — every console route resolves the session
+           itself and refuses, and this changes none of that. What it fixes is
+           that the middleware can only see whether a cookie EXISTS, and
+           cookies are not scoped by port or by app: a worker signed in on
+           their phone satisfies it and lands in a console shell where nothing
+           loads and no name appears. Refusing to render it is kinder than
+           letting them sit in a room where every drawer is locked. */
+        window.location.href = "/console-sign-in";
+      } catch {
+        /* offline: leave it blank rather than claim somebody is here, and do
+           not throw a signed-in operator out over one failed request */
+      }
+    })();
+  }, []);
+
   const pathname = usePathname();
-  const toast = useToast();
   return (
     <aside
       style={{
@@ -101,7 +136,12 @@ export function Sidebar() {
               label: "Sign out",
               icon: "log-out",
               tone: "danger",
-              onClick: () => toast("Signed out", { tone: "neutral", icon: "log-out" }),
+              onClick: () => {
+                // ends the session on the server, not just the impression of one
+                void fetch("/api/auth/session", { method: "DELETE" }).finally(() => {
+                  window.location.href = "/console-sign-in";
+                });
+              },
             },
           ]}
         >
@@ -122,13 +162,13 @@ export function Sidebar() {
               font: "inherit",
             }}
           >
-            <Avatar name="Emma Taylor" size={34} />
+            <Avatar name={me?.name ?? ""} size={34} />
             <span style={{ flex: 1, minWidth: 0 }}>
               <span style={{ display: "block", color: "#fff", fontSize: 13.5, fontWeight: 600 }}>
-                Emma Taylor
+                {me?.name ?? "…"}
               </span>
               <span style={{ display: "block", color: "#7C8B98", fontSize: 11.5 }}>
-                Operations Manager
+                {me?.role ?? ""}
               </span>
             </span>
             <Icon name="chevron-down" size={15} color="#7C8B98" />

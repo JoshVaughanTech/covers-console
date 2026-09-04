@@ -1,4 +1,11 @@
 import { describe, it, expect, beforeAll, afterEach } from "vitest";
+import { signInOperator, asCaller, type TestSession } from "./sign-in-helper";
+import { OPERATORS } from "../lib/auth/operators";
+
+/* The stream carries the chain to an operator and a bare sequence number to a
+   worker, so these tests have to say which they are. */
+let op: TestSession;
+const asOp = (url: string, init?: RequestInit) => asCaller(op, url, init);
 
 /* ============================================================
    The SSE stream's lifecycle.
@@ -28,6 +35,7 @@ const ev = (n: number) => ({
 });
 
 beforeAll(async () => {
+  op = signInOperator(OPERATORS[0].did);
   stream = await import("../app/api/events/stream/route");
   store = (await import("../lib/store/events")).eventStore();
 });
@@ -61,7 +69,7 @@ describe("replay on connect", () => {
     store.append(ORG, ev(1));
     store.append(ORG, ev(2));
 
-    const res = await stream.GET(new Request("http://x/api/events/stream?since=-1"));
+    const res = await stream.GET(asOp("http://x/api/events/stream?since=-1"));
     expect(res.headers.get("content-type")).toContain("text/event-stream");
 
     const frames = await readFrames(res, 2);
@@ -71,14 +79,14 @@ describe("replay on connect", () => {
   });
 
   it("honours a cursor so a reconnect does not replay everything", async () => {
-    const res = await stream.GET(new Request("http://x/api/events/stream?since=0"));
+    const res = await stream.GET(asOp("http://x/api/events/stream?since=0"));
     const frames = await readFrames(res, 1);
     expect(frames[0]).toMatch(/^id: 1\n/);
   });
 
   it("reads the cursor from Last-Event-ID, which is what EventSource sends", async () => {
     const res = await stream.GET(
-      new Request("http://x/api/events/stream", { headers: { "last-event-id": "0" } }),
+      asOp("http://x/api/events/stream", { headers: { "last-event-id": "0" } }),
     );
     const frames = await readFrames(res, 1);
     expect(frames[0]).toMatch(/^id: 1\n/);
@@ -88,7 +96,7 @@ describe("replay on connect", () => {
 describe("when the client goes away", () => {
   it("does not throw when an event arrives after a disconnect", async () => {
     const ctl = new AbortController();
-    const res = await stream.GET(new Request("http://x/api/events/stream", { signal: ctl.signal }));
+    const res = await stream.GET(asOp("http://x/api/events/stream", { signal: ctl.signal }));
     await readFrames(res, 1, 400);
 
     ctl.abort();
@@ -103,7 +111,7 @@ describe("when the client goes away", () => {
   it("survives many connect/disconnect cycles, as Strict Mode produces", async () => {
     for (let i = 0; i < 10; i++) {
       const ctl = new AbortController();
-      const res = await stream.GET(new Request("http://x/api/events/stream", { signal: ctl.signal }));
+      const res = await stream.GET(asOp("http://x/api/events/stream", { signal: ctl.signal }));
       await readFrames(res, 1, 200);
       ctl.abort();
     }
@@ -117,7 +125,7 @@ describe("when the client goes away", () => {
   it("handles a request that is already aborted before the stream starts", async () => {
     const ctl = new AbortController();
     ctl.abort();
-    const res = await stream.GET(new Request("http://x/api/events/stream", { signal: ctl.signal }));
+    const res = await stream.GET(asOp("http://x/api/events/stream", { signal: ctl.signal }));
     expect(res.status).toBe(200);
     await new Promise((r) => setTimeout(r, 50));
     expect(() => store.append(ORG, ev(101))).not.toThrow();

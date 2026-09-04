@@ -9,19 +9,34 @@
    asserts.
    ============================================================ */
 import { NextResponse } from "next/server";
-import { callerOf, clearSessionCookie, secretOf } from "@/lib/auth/session";
+import { workerOf, operatorOf, clearSessionCookie, secretOf } from "@/lib/auth/session";
 import { authStore } from "@/lib/store/auth";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(req: Request) {
-  const caller = callerOf(req);
-  if (!caller) return NextResponse.json({ signedIn: false }, { status: 200 });
+  /* Asked separately rather than resolved once and labelled, so this route
+     cannot become the place that hands a worker session to a console caller
+     by reporting a kind and trusting whoever reads it. */
+  const worker = workerOf(req);
+  if (worker) {
+    return NextResponse.json({
+      signedIn: true,
+      kind: "worker",
+      worker: { did: worker.did, name: worker.person.name, role: worker.person.role },
+    });
+  }
 
-  return NextResponse.json({
-    signedIn: true,
-    worker: { did: caller.did, name: caller.person.name, role: caller.person.role },
-  });
+  const op = operatorOf(req);
+  if (op) {
+    return NextResponse.json({
+      signedIn: true,
+      kind: "operator",
+      operator: { did: op.did, name: op.operator.name, role: op.operator.role },
+    });
+  }
+
+  return NextResponse.json({ signedIn: false }, { status: 200 });
 }
 
 export async function DELETE(req: Request) {
