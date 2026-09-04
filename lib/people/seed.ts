@@ -20,6 +20,7 @@ export const PROFILES: StaffProfile[] = [
     homeSiteId: "s-brightwater",
     skills: { cocktails: "solid", till_pos: "solid", wine_service: "basic" },
     hoursThisWeek: 22,
+    award: { level: 2, employment: "casual" },
   },
   {
     // rated highest, but already near a full week — the matcher should
@@ -29,6 +30,7 @@ export const PROFILES: StaffProfile[] = [
     homeSiteId: "s-brightwater",
     skills: { till_pos: "lead", wine_service: "solid", silver_service: "solid" },
     hoursThisWeek: 38,
+    award: { level: 5, employment: "full_time" },
   },
   {
     did: W["Mitch Egan"],
@@ -36,6 +38,7 @@ export const PROFILES: StaffProfile[] = [
     homeSiteId: "s-brightwater-gaming",
     skills: { till_pos: "solid", cocktails: "basic" },
     hoursThisWeek: 12,
+    award: { level: 2, employment: "casual" },
   },
   {
     did: W["Aaron Patel"],
@@ -43,6 +46,7 @@ export const PROFILES: StaffProfile[] = [
     homeSiteId: "s-brightwater",
     skills: { cocktails: "solid", wine_service: "solid" },
     hoursThisWeek: 8,
+    award: { level: 2, employment: "casual" },
   },
   {
     did: W["Sophie Nguyen"],
@@ -50,6 +54,7 @@ export const PROFILES: StaffProfile[] = [
     homeSiteId: "s-brightwater",
     skills: { till_pos: "lead", silver_service: "lead", wine_service: "solid" },
     hoursThisWeek: 41,
+    award: { level: 5, employment: "full_time" },
   },
   {
     // the demo's blocked worker: strong on paper, gated by a lapsed RSA
@@ -58,6 +63,7 @@ export const PROFILES: StaffProfile[] = [
     homeSiteId: "s-northside",
     skills: { cocktails: "solid", till_pos: "solid", bump_in_out: "lead" },
     hoursThisWeek: 15,
+    award: { level: 2, employment: "casual" },
   },
   {
     did: W["Hassan Ali"],
@@ -65,6 +71,7 @@ export const PROFILES: StaffProfile[] = [
     homeSiteId: "s-brightwater",
     skills: { plated_events: "lead", canapes: "solid" },
     hoursThisWeek: 36,
+    award: { level: 5, employment: "full_time" },
   },
   {
     did: W["Liam O'Brien"],
@@ -72,6 +79,7 @@ export const PROFILES: StaffProfile[] = [
     homeSiteId: "s-brightwater",
     skills: { bump_in_out: "solid" },
     hoursThisWeek: 18,
+    award: { level: 1, employment: "casual" },
   },
   {
     did: W["Priya Sharma"],
@@ -79,6 +87,7 @@ export const PROFILES: StaffProfile[] = [
     homeSiteId: "s-werribee-wedding",
     skills: { silver_service: "lead", plated_events: "solid", wine_service: "solid", canapes: "solid" },
     hoursThisWeek: 20,
+    award: { level: 3, employment: "part_time" },
   },
   {
     // excluded by a client after a prior engagement — a business rule,
@@ -89,6 +98,7 @@ export const PROFILES: StaffProfile[] = [
     skills: { silver_service: "solid", canapes: "basic" },
     excludedClients: ["Meridian Group"],
     hoursThisWeek: 26,
+    award: { level: 2, employment: "casual" },
   },
 ];
 
