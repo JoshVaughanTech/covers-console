@@ -67,6 +67,32 @@ function daysUntil(from: ISODate, to: ISODate): number {
   return Math.round((b - a) / 86_400_000);
 }
 
+/**
+ * How long a credential covers its holder — the ranking used when somebody
+ * holds more than one record of the same type.
+ *
+ * They routinely do, because renewing a licence leaves the superseded record
+ * in place rather than deleting it. Something has to decide which record a
+ * requirement is answered by, and the one thing it must not be is array order.
+ * This engine used to take the first match it found, which meant a stale
+ * record filed ahead of a current one refused somebody lawfully entitled to
+ * work.
+ *
+ * The verdict was the smaller half. On the seeded board the stale record
+ * changed the REASON on four postings whose refusal was otherwise correct,
+ * replacing a site induction with "RSA: Expired". A wrong verdict is a wrong
+ * answer; a wrong reason is an instruction. It sent Michael Tan to re-sit an
+ * RSA he already held, to come back still blocked by the induction that was
+ * the real cause, with nothing on the screen to suggest the system was wrong
+ * rather than him.
+ *
+ * Longest cover wins, and a non-expiring credential outranks every dated one —
+ * which is why null sorts as Infinity rather than as zero.
+ */
+function coversUntil(c: Credential): number {
+  return c.expiresAt === null ? Infinity : Date.parse(calendarDate(c.expiresAt));
+}
+
 export function decide(input: DecideInput): Decision {
   const { person, credentials, action, site, at, verifier } = input;
   const reasons: DecisionReason[] = [];
@@ -92,13 +118,13 @@ export function decide(input: DecideInput): Decision {
       continue;
     }
 
-    const match = credentials.find(
+    const held = credentials.filter(
       (c) =>
         c.type === req.type &&
         (!req.siteScoped || c.claims.siteId === site.id),
     );
 
-    if (!match) {
+    if (held.length === 0) {
       reasons.push({
         code: "credential.missing",
         outcome: "fail",
@@ -110,8 +136,18 @@ export function decide(input: DecideInput): Decision {
       continue;
     }
 
-    const result = verifier.verify(match, at);
-    if (result.status !== "valid") {
+    /* Every record of this type is weighed, longest cover first, and the
+       first that verifies is the one the requirement is answered by. */
+    const ranked = [...held].sort((a, b) => coversUntil(b) - coversUntil(a));
+    const checked = ranked.map((c) => ({ credential: c, result: verifier.verify(c, at) }));
+    const good = checked.find((c) => c.result.status === "valid");
+
+    if (!good) {
+      /* Nothing valid. Report the longest-covering record rather than whichever
+         happened to be first: somebody holding a revoked licence that runs to
+         2027 and a lapsed one from 2024 needs to be told about the revocation,
+         which is the live fact and the one they can act on. */
+      const { result } = checked[0];
       reasons.push({
         code: `credential.${result.status}`,
         outcome: "fail",
@@ -120,6 +156,8 @@ export function decide(input: DecideInput): Decision {
       });
       continue;
     }
+
+    const match = good.credential;
 
     if (match.expiresAt) {
       const left = daysUntil(at, match.expiresAt);
