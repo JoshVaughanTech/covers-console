@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import {
   HIGA,
   assessAll,
@@ -12,7 +13,7 @@ import {
   type Severity,
 } from "@/lib/awards";
 import { WORKERS } from "@/lib/idara/seed";
-import { currentSupervisor, setSupervisor, clearSupervisor, type Supervisor } from "@/lib/mobile/identity";
+import { currentPerson, setPerson, clearPerson, type Person } from "@/lib/mobile/identity";
 
 /* ============================================================
    Break Compliance, on the floor.
@@ -56,7 +57,7 @@ interface Sent {
 }
 
 export default function MobileBreaksPage() {
-  const [me, setMe] = useState<Supervisor | null>(null);
+  const [me, setMe] = useState<Person | null>(null);
   const [ready, setReady] = useState(false);
   const [payload, setPayload] = useState<Payload | null>(null);
   const [now, setNow] = useState(() => Math.floor(Date.now() / 1000));
@@ -66,7 +67,7 @@ export default function MobileBreaksPage() {
   /* identity is read after mount: localStorage does not exist on the server,
      and reading it during render would be a hydration mismatch */
   useEffect(() => {
-    setMe(currentSupervisor());
+    setMe(currentPerson());
     setReady(true);
   }, []);
 
@@ -156,7 +157,7 @@ export default function MobileBreaksPage() {
   }
 
   if (!ready) return null;
-  if (!me) return <SignIn onPick={(s) => { setSupervisor(s); setMe(s); }} />;
+  if (!me) return <SignIn onPick={(s) => { setPerson(s); setMe(s); }} />;
 
   const active = open ? staff.find((p) => p.userId === open) ?? null : null;
 
@@ -170,7 +171,7 @@ export default function MobileBreaksPage() {
           </p>
         </div>
         <button
-          onClick={() => { clearSupervisor(); setMe(null); }}
+          onClick={() => { clearPerson(); setMe(null); }}
           style={{
             border: "1px solid var(--border-2)", background: "#fff", borderRadius: 999,
             padding: "6px 12px", fontSize: 12, fontWeight: 600, color: "var(--fg-2)", cursor: "pointer",
@@ -179,6 +180,11 @@ export default function MobileBreaksPage() {
           {me.name.split(" ")[0]}
         </button>
       </header>
+
+      <nav style={{ display: "flex", gap: 8, marginBottom: 14 }}>
+        <span style={mTab(true)}>Breaks</span>
+        <Link href="/m/shifts" style={mTab(false)}>Shifts</Link>
+      </nav>
 
       {payload?.mode === "error" && (
         <Banner tone="danger">Time-clock data unavailable — this list may be out of date.</Banner>
@@ -222,9 +228,17 @@ export default function MobileBreaksPage() {
   );
 }
 
+const mTab = (on: boolean): React.CSSProperties => ({
+  flex: 1, textAlign: "center", padding: "8px 0", borderRadius: 10, fontSize: 13, fontWeight: 600,
+  textDecoration: "none",
+  border: `1px solid ${on ? "var(--accent)" : "var(--border)"}`,
+  background: on ? "var(--accent-bg, var(--bg-2))" : "#fff",
+  color: on ? "var(--accent-fg, var(--fg-1))" : "var(--fg-3)",
+});
+
 /* ---------- sign in ---------- */
 
-function SignIn({ onPick }: { onPick: (s: Supervisor) => void }) {
+function SignIn({ onPick }: { onPick: (s: Person) => void }) {
   return (
     <div style={{ padding: "28px 18px" }}>
       <h1 style={{ margin: "0 0 4px", fontSize: 23, letterSpacing: "-.02em" }}>Who are you?</h1>
@@ -336,7 +350,7 @@ function PersonRow({
 function Sheet({
   p, now, me, onClose, onSend,
 }: {
-  p: BreakAssessment; now: number; me: Supervisor;
+  p: BreakAssessment; now: number; me: Person;
   onClose: () => void; onSend: (p: BreakAssessment, k: BreakKind) => void;
 }) {
   return (

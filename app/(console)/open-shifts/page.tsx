@@ -29,12 +29,10 @@ import {
 import { PageHead, CardHead } from "@/components/screen/page-head";
 import {
   useIdara,
-  decideMember,
   LocalCredentialVerifier,
   ALL_WORK_FUNCTIONS,
   CONSOLE_OPERATOR,
   ROLE_FUNCTIONS,
-  type Decision,
   type WorkFunction,
 } from "@/lib/idara";
 import { SKILLS, profileOf, type SkillId, type SkillLevel } from "@/lib/people";
@@ -48,6 +46,7 @@ import {
   standingFor,
 
   claimShift,
+  claimBlockReason,
   buildPosting,
   emptyDraft,
   dutiesForRole,
@@ -201,33 +200,23 @@ export default function OpenShiftsPage() {
   /* One answer to "can this person take this shift?", used both to render
      the row and to enforce the claim. Hiding a button is presentation, and
      presentation is not a gate — so the claim re-runs this rather than
-     trusting the control that was rendered. */
-  const blockReasonFor = useCallback(
-    (p: ShiftPosting, did: string): string | null => {
-      const person = worker(did);
-      const s = site(p.siteId);
-      if (!person || !s) return "Not eligible";
+     trusting the control that was rendered.
 
-      const decision: Decision = decideMember({
-        person,
+     The answer itself lives in lib/shifts/gate.ts, because the phone and the
+     claim endpoint need the same one. It used to live here, which is why the
+     phone could not have it: a screen is not somewhere another process can
+     read from, and the only way to give one an answer would have been to
+     write the rule a second time. */
+  const blockReasonFor = useCallback(
+    (p: ShiftPosting, did: string): string | null =>
+      claimBlockReason({
+        posting: p,
+        person: worker(did),
+        site: site(p.siteId),
         credentials: credentials.filter((c) => c.subject === did),
-        action: "be_rostered",
-        site: s,
         at: today,
         verifier,
-        shifts: [{ id: p.shiftId, duties: p.duties }],
-      });
-
-      // two refusals from different layers, deliberately kept apart:
-      // a credential fact, and a commercial one
-      if (!decision.allowed) {
-        return decision.reasons.find((r) => r.outcome === "fail")?.detail ?? "Not eligible";
-      }
-      if (p.client && profileOf(did)?.excludedClients?.includes(p.client)) {
-        return "Not available for this client";
-      }
-      return null;
-    },
+      }),
     [worker, site, credentials, today, verifier],
   );
 

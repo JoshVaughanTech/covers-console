@@ -234,6 +234,23 @@ export class EventStore {
     return this.since(orgId, -1);
   }
 
+  /**
+   * The event a given client ref already produced, if any.
+   *
+   * append() dedups on this ref internally, which is enough when the append is
+   * the first thing a caller does. It is not enough when a caller must decide
+   * something before appending: a claim that already landed is, on a retry,
+   * indistinguishable from a duplicate request, and the caller would refuse a
+   * write it had already made. Asking first lets a retry return the original
+   * answer rather than an error about it.
+   */
+  byClientRef(orgId: string, clientRef: string): AuditEvent | null {
+    const row = this.db
+      .prepare("SELECT * FROM audit_event WHERE org_id = ? AND client_ref = ?")
+      .get(orgId, clientRef) as Row | undefined;
+    return row ? toEvent(row) : null;
+  }
+
   head(orgId: string): { seq: number; hash: string } | null {
     return (
       (this.db.prepare("SELECT seq, hash FROM chain_head WHERE org_id = ?").get(orgId) as

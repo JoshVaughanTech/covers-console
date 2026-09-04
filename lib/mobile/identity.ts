@@ -17,23 +17,30 @@
    venue tablet would need a per-action prompt instead, which is the
    other branch the design considered and rejected for costing
    friction at the six-hour mark.
+
+   Called Person rather than Supervisor because the phone now serves
+   two people who are not the same person. A duty manager sends
+   breaks; a casual claims shifts. What the device stores is who is
+   holding it — what that buys them is decided per screen, and on the
+   server. The storage key keeps its original name so a phone already
+   signed in stays signed in.
    ============================================================ */
 
 const KEY = "covers.supervisor";
 
-export interface Supervisor {
+export interface Person {
   did: string;
   name: string;
   role: string;
 }
 
 /** Whoever this device is signed in as, or null on first run. */
-export function currentSupervisor(): Supervisor | null {
+export function currentPerson(): Person | null {
   if (typeof window === "undefined") return null;
   try {
     const raw = window.localStorage.getItem(KEY);
     if (!raw) return null;
-    const s = JSON.parse(raw) as Partial<Supervisor>;
+    const s = JSON.parse(raw) as Partial<Person>;
     // a half-written or stale shape is treated as signed out rather than
     // trusted — an actor with no did would land in the chain unusable
     return s.did && s.name ? { did: s.did, name: s.name, role: s.role ?? "" } : null;
@@ -42,7 +49,7 @@ export function currentSupervisor(): Supervisor | null {
   }
 }
 
-export function setSupervisor(s: Supervisor): void {
+export function setPerson(s: Person): void {
   try {
     window.localStorage.setItem(KEY, JSON.stringify(s));
   } catch {
@@ -51,7 +58,7 @@ export function setSupervisor(s: Supervisor): void {
   }
 }
 
-export function clearSupervisor(): void {
+export function clearPerson(): void {
   try {
     window.localStorage.removeItem(KEY);
   } catch {
