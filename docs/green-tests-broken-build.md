@@ -157,8 +157,8 @@ that route still exists before changing anything.
 ## A different failure: things that look like evidence
 
 The six above are all **checks disagreeing about one tree** — one says sound,
-another says broken, and the disagreement is the signal. This one is the
-opposite and deserves separating rather than numbering: **every check agrees,
+another says broken, and the disagreement is the signal. These are the
+opposite and deserve separating rather than numbering: **every check agrees,
 confidently, on the wrong answer.**
 
 Agreement is what we normally treat as evidence. That is what makes this class
@@ -184,20 +184,54 @@ found the mock, concluded the page was joined to real identities, and was
 wrong. Somebody did, passed it on as guidance, and it cost another session a
 wrong turn before they opened the file.
 
-Both are the same failure: **an artefact carrying the authority of evidence
-without the substance of it.** A passing assertion and a familiar identifier
-are both things we read as confirmation, and neither was confirming anything.
+**A screen that was never the one under test.** Checking that the console door
+worked, I opened `localhost:3000`, read a sign-in page, and got two steps into
+diagnosing why our middleware redirected an API route — before noticing it
+redirected to `/login`, a path that exists nowhere in this repository. The
+server belonged to another project, running from another checkout, on the port
+I happened to try first.
+
+Nothing on that page was false. It was a real sign-in screen for a real
+product, rendering correctly and answering honestly. It simply was not ours,
+and I had never asked whether it was. Three ports were listening; I typed the
+lowest.
+
+All three are the same failure: **an artefact carrying the authority of
+evidence without the substance of it.** A passing assertion, a familiar
+identifier and a rendered page are all things we read as confirmation, and none
+of them was confirming anything.
+
+The third one adds a wrinkle worth keeping separate, because it is the one that
+generalises furthest. The test and the mock were *wrong about this tree*. The
+page was *right about a different one*. Correctness does not travel with
+relevance: a thing can be entirely accurate and still be no evidence at all
+about what you are looking at, and there is no property of the thing itself
+that tells you which — only the question of how you came to be looking at it.
 
 What makes them worse than an ordinary bug is that the normal response makes it
 worse. Finding a gap, you write a test — but the test is there. Doubting a
-join, you grep for the name — but the name is there. The check you would reach
-for has already been answered, incorrectly, by the thing you are checking.
+join, you grep for the name — but the name is there. Doubting a screen, you
+open it — but it renders. The check you would reach for has already been
+answered, incorrectly, by the thing you are checking.
 
 **The habit that catches these** is not more checking. It is reading one level
 past the answer when the answer is what you hoped for. What is this test
 asserting, rather than does it pass. Which module does this identifier come
-from, rather than does the name match. Both of today's instances were found by
-someone who had a reason to look at the line rather than at its result.
+from, rather than does the name match. Which server is answering, rather than
+does the page load. Every instance here was found by someone who had a reason
+to look at the thing rather than at its result.
+
+From the session that found the second of these, and it covers all three:
+
+> a confident sentence is cheaper to write than a verification, and it reads
+> the same afterwards
+
+That is the economics of this whole class. "Credentials works in DIDs" cost me
+a second to write and the next person a second to read; the verification that
+would have made it true cost opening one file, and neither of us paid it. The
+checked sentence and the unchecked one are indistinguishable on the page. That
+is not a lapse of care, it is a property of prose — which is why the checking
+has to happen before the sentence, not after somebody has acted on it.
 
 ---
 
@@ -220,3 +254,7 @@ coherent. Neither checks that a screen makes sense to the person reading it, and
 not one of the bugs listed above was found by a test.
 
 **So: build before claiming clean, and open the app before claiming done.**
+
+And — added the day someone spent two steps debugging a stranger's login page —
+**check it is your app.** Every rule here assumes you are looking at the right
+thing, which is the one assumption none of them check.
