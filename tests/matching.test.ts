@@ -90,9 +90,6 @@ describe("the Idara gate", () => {
             homeSiteId: p.siteId,
             skills: { cocktails: "lead", till_pos: "lead" },
             hoursThisWeek: 0,
-            // the matcher does not read this; StaffProfile requires it because
-            // a person the business employs always has a classification
-            award: { level: 2, employment: "casual" },
           },
         },
       ],
