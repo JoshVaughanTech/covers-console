@@ -280,3 +280,66 @@ describe("the audit chain is not a worker surface", () => {
     expect((await stream.GET(new Request("http://x/api/events/stream"))).status).toBe(401);
   });
 });
+
+describe("what the middleware is not", () => {
+  /* middleware.ts says it is a redirect and not a gate: it can only see that
+     a cookie EXISTS, because the edge runtime has no node:sqlite. The claim
+     that follows is that deleting it would authorise nothing.
+
+     That claim was false when it was written. /api/breaks and
+     /api/breaks/week asked nobody anything, so the redirect was the only
+     thing in front of live venue data — a file documented as not-a-gate was
+     the gate for exactly two routes, which is the worst place for an
+     exception to live because the documentation says it is not there.
+
+     So this checks the property route by route rather than trusting the
+     comment, and it will fail the next time somebody adds an endpoint behind
+     the matcher and forgets. */
+
+  const noCookie = (url: string) => new Request(url);
+
+  it("refuses the floor to somebody with no session", async () => {
+    const breaks = await import("../app/api/breaks/route");
+    const res = await breaks.GET(noCookie("http://x/api/breaks"));
+    // who is on shift, when they clocked in, who is overdue
+    expect(res.status).toBe(401);
+  });
+
+  it("refuses a priced week of the venue to somebody with no session", async () => {
+    const week = await import("../app/api/breaks/week/route");
+    const res = await week.GET(noCookie("http://x/api/breaks/week?start=0&end=1"));
+    expect(res.status).toBe(401);
+  });
+
+  it("gives the floor to a supervisor's phone as well as the console", async () => {
+    const breaks = await import("../app/api/breaks/route");
+    const w = aWorker();
+    const wr = await import("../app/api/auth/request/route");
+    const wrd = await import("../app/api/auth/redeem/route");
+    await wr.POST(json("http://x/api/auth/request", { did: w.did }));
+    const cookie = cookieFrom(
+      await wrd.POST(json("http://x/api/auth/redeem", { did: w.did, code: codeFromFile(w.name) })),
+    )!;
+
+    // operator-only here would take the break board off the floor, which is
+    // where the six-hour mark is actually noticed
+    const res = await breaks.GET(new Request("http://x/api/breaks", { headers: { cookie } }));
+    expect(res.status).toBe(200);
+  });
+
+  it("keeps the priced week away from a worker", async () => {
+    const week = await import("../app/api/breaks/week/route");
+    const w = aWorker();
+    const wr = await import("../app/api/auth/request/route");
+    const wrd = await import("../app/api/auth/redeem/route");
+    await wr.POST(json("http://x/api/auth/request", { did: w.did }));
+    const cookie = cookieFrom(
+      await wrd.POST(json("http://x/api/auth/redeem", { did: w.did, code: codeFromFile(w.name) })),
+    )!;
+
+    const res = await week.GET(
+      new Request("http://x/api/breaks/week?start=0&end=1", { headers: { cookie } }),
+    );
+    expect(res.status).toBe(401);
+  });
+});

@@ -26,6 +26,14 @@ import { COOKIE } from "@/lib/auth/cookie";
 
    Worth stating because the opposite arrangement is common and
    wrong: a middleware that authorises, and routes that trust it.
+
+   That claim was false when it was first written here, which is why
+   it is now tested rather than asserted. /api/breaks and
+   /api/breaks/week asked nobody anything, so this redirect WAS the
+   only thing in front of live venue data — a file documented as not
+   a gate, being the gate for exactly two routes. An exception is
+   worst where the documentation says there is none, because nobody
+   looks. tests/console-auth.test.ts checks it route by route.
    ============================================================ */
 
 export function middleware(req: NextRequest) {
