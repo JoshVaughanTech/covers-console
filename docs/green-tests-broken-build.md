@@ -196,10 +196,44 @@ product, rendering correctly and answering honestly. It simply was not ours,
 and I had never asked whether it was. Three ports were listening; I typed the
 lowest.
 
-All three are the same failure: **an artefact carrying the authority of
+**A fence that was only ever a sentence.** `lib/awards/rates.ts` carried a doc
+comment on `suggestedLevel()` reading *"Deliberately not exported through
+lib/awards/index.ts."* Line 11 of that file is `export * from "./rates"`. It had
+been exported the whole time, and `import { suggestedLevel } from "@/lib/awards"`
+compiles clean.
+
+This is not the same thing as somebody writing a careless comment, and filing it
+that way loses the lesson. The intention was real and the author was being
+careful — careful enough to write down *why* the function wanted fencing, which
+is more than most guards get. What defeated it was mechanical: a barrel one
+directory up re-exports everything a module exposes, including what you never
+chose to expose, and neither file says a word about it. **Fencing by
+not-mentioning is not fencing.** `export *` will do this again, to anyone, in
+silence.
+
+Note what it did to the reader as well as to the code. Somebody grepping
+`lib/awards/index.ts` for `suggestedLevel` finds nothing and concludes the fence
+holds — the shadowed `WORKERS` above, run in reverse. There a name was present
+and meant nothing; here a name is absent and means nothing. Absence reads as
+evidence more readily than presence does, because there is nothing to inspect.
+
+The repair is the part worth copying. The comment was not corrected to say
+"exported, but please don't". It was replaced with a description of the fences
+that do exist: `priceShift()` never calls it, and it may pre-fill a level a
+person then confirms but never write one. A comment describing a real
+constraint degrades honestly when the code moves — you can go and check it. A
+comment describing an imaginary one was never true, and nothing will ever say
+so. If a module genuinely must not be reachable through a barrel, the barrel
+has to name its exports; anything else is a wish with a comment attached.
+
+The general form, from the session that found it: **a comment asserting a
+constraint is the cheapest thing in a codebase to write and the only thing
+nothing checks.**
+
+All four are the same failure: **an artefact carrying the authority of
 evidence without the substance of it.** A passing assertion, a familiar
-identifier and a rendered page are all things we read as confirmation, and none
-of them was confirming anything.
+identifier, a rendered page and an absent name are all things we read as
+confirmation, and none of them was confirming anything.
 
 The third one adds a wrinkle worth keeping separate, because it is the one that
 generalises furthest. The test and the mock were *wrong about this tree*. The
@@ -218,7 +252,8 @@ answered, incorrectly, by the thing you are checking.
 past the answer when the answer is what you hoped for. What is this test
 asserting, rather than does it pass. Which module does this identifier come
 from, rather than does the name match. Which server is answering, rather than
-does the page load. Every instance here was found by someone who had a reason
+does the page load. Whether the barrel re-exports it, rather than whether the
+barrel mentions it. Every instance here was found by someone who had a reason
 to look at the thing rather than at its result.
 
 From the session that found the second of these, and it covers all three:
