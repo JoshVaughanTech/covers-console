@@ -9,7 +9,8 @@
     "start": "next start",
     "lint": "next lint",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "report:weekly": "node scripts/deliver-weekly-report.mjs"
   },
   "dependencies": {
     "lucide-react": "^0.469.0",
