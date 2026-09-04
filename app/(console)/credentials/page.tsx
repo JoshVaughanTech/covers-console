@@ -51,8 +51,27 @@ interface JobState {
   time: string;
 }
 
-/* ---- Seed data ---- */
-const WORKERS: Worker[] = [
+/* ---- Mock data ----
+
+   Named CREDENTIAL_ROWS rather than WORKERS, which is what it was called
+   until it caused a real problem. lib/idara/seed.ts exports a WORKERS const
+   holding the actual staff — the ones with DIDs that the engine gates and the
+   audit chain names. This page has never imported it. These are different
+   people invented for a design mock: Daniel Roberts and Sarah Thompson do not
+   exist anywhere else in the system.
+
+   Sharing the name meant anyone grepping for WORKERS found this and concluded
+   the page was joined to real identities. Somebody did, and passed that on as
+   guidance, and it cost another session a wrong turn before they opened the
+   file. A local const that shadows a real export reads exactly like the thing
+   it is not, which makes it look like evidence rather than a mock.
+
+   The deeper issue is unchanged and is not a naming problem: this screen is
+   fictional. Its columns — card id, match percentage, fatigue, access — have
+   no counterpart in the real model, so joining it to WORKERS is a feature
+   rather than a rename. Until someone does that, the name should at least
+   stop claiming otherwise. */
+const CREDENTIAL_ROWS: Worker[] = [
   { id: "w1", name: "Daniel Roberts", cardId: "9587 4632 7876", status: "Eligible", tone: "success", match: 100, issues: "—", fatigue: "Fit", access: "Approved" },
   { id: "w2", name: "Sarah Thompson", cardId: "6738 2910 4421", status: "Warning", tone: "warning", match: 83, issues: "Venue Induction missing", fatigue: "Fit", access: "Approved" },
   { id: "w3", name: "Michael Chen", cardId: "2846 9011 7783", status: "Blocked", tone: "danger", match: 50, issues: "Food Handling expired", fatigue: "Fit", access: "—" },
@@ -126,10 +145,10 @@ function credsFor(w: Worker): Cred[] {
 export default function CredentialsPage() {
   const toast = useToast();
 
-  const [workers, setWorkers] = useState<Worker[]>(WORKERS);
+  const [workers, setWorkers] = useState<Worker[]>(CREDENTIAL_ROWS);
   const [filter, setFilter] = useState<Filter>("All");
   const [page, setPage] = useState(1);
-  const [selectedId, setSelectedId] = useState<string>(WORKERS[0].id);
+  const [selectedId, setSelectedId] = useState<string>(CREDENTIAL_ROWS[0].id);
   const [checking, setChecking] = useState(false);
 
   const [job, setJob] = useState<JobState>({

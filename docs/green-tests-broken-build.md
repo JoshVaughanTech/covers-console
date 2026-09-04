@@ -1,21 +1,30 @@
-# Six ways your checks disagree about whether the tree is sound
+# When the checks are wrong about the tree
 
 **Date:** 2026-09-04 · **Status:** living note
 
-Every entry below was hit for real in this repo, not imagined. In five of them a
-passing test suite — usually with a clean `tsc` — sat over a tree that
-`next build` refuses. The sixth runs the other way: `tsc` fails on code nobody
-wrote, and the build is fine.
+Two different failures, and they are opposites.
 
-The reason there are six and not one is that these checks have **different and
-partly disjoint coverage**. `vitest` runs through esbuild, which strips types
-without checking them. `tsc` checks types but is configured without
+**Six disagreements.** A check says sound, another says broken, and only one of
+them is right. In five of these a passing test suite — usually with a clean
+`tsc` — sat over a tree that `next build` refuses. The sixth runs the other way:
+`tsc` fails on code nobody wrote, and the build is fine.
+
+**One false agreement.** Every check passes and they are all wrong together,
+because the thing being consulted is not evidence. That section is at the
+bottom; it is not a seventh case and numbering it as one would flatten it.
+
+Everything below was hit for real in this repo, not imagined.
+
+The reason there are six disagreements and not one is that these checks have
+**different and partly disjoint coverage**. `vitest` runs through esbuild, which
+strips types without checking them. `tsc` checks types but is configured without
 `noUnusedLocals`. `next lint` runs ESLint but not the route-contract checks.
 Only `next build` runs the type checker, ESLint, *and* Next's own validation of
 what a route module is allowed to export.
 
 > **The rule:** run a build before saying "clean". Tests and typecheck together
-> are not a substitute, and neither is `next lint`.
+> are not a substitute, and neither is `next lint`. And when a check tells you
+> what you hoped to hear, read what it actually asserts.
 
 ---
 
@@ -142,6 +151,53 @@ Entry 5 is the same coupling seen from the other side: the named export passed
 **How it arises:** renaming, moving or deleting a route, then trusting `tsc`
 without regenerating. When an error names a path under `.next/`, check whether
 that route still exists before changing anything.
+
+---
+
+## A different failure: things that look like evidence
+
+The six above are all **checks disagreeing about one tree** — one says sound,
+another says broken, and the disagreement is the signal. This one is the
+opposite and deserves separating rather than numbering: **every check agrees,
+confidently, on the wrong answer.**
+
+Agreement is what we normally treat as evidence. That is what makes this class
+expensive.
+
+**A test that pins the wrong behaviour.** `auth-delivery.test.ts` asserted
+`expect(new FileSink("/tmp/x").configured).toBe(true)`. `configured` is checked
+by callers *before minting a sign-in code*, and a grant is spent the moment it
+is minted — so a sink that claimed to be configured and then failed left a
+worker's previous code dead, the new one written nowhere, and no audit event at
+all. The test did not merely miss that. It stated the broken behaviour as the
+specification, so the next reader had no way to tell an untested case from an
+intended one.
+
+An absent test is a known gap. A test asserting the wrong thing is a gap
+wearing the costume of coverage.
+
+**A mock that shadows a real export.** `credentials/page.tsx` declared a local
+`const WORKERS` — the same name as the real staff list exported from
+`lib/idara/seed.ts`, the one with DIDs that the engine gates and the chain
+names. The page never imported the real one. Anyone grepping for `WORKERS`
+found the mock, concluded the page was joined to real identities, and was
+wrong. Somebody did, passed it on as guidance, and it cost another session a
+wrong turn before they opened the file.
+
+Both are the same failure: **an artefact carrying the authority of evidence
+without the substance of it.** A passing assertion and a familiar identifier
+are both things we read as confirmation, and neither was confirming anything.
+
+What makes them worse than an ordinary bug is that the normal response makes it
+worse. Finding a gap, you write a test — but the test is there. Doubting a
+join, you grep for the name — but the name is there. The check you would reach
+for has already been answered, incorrectly, by the thing you are checking.
+
+**The habit that catches these** is not more checking. It is reading one level
+past the answer when the answer is what you hoped for. What is this test
+asserting, rather than does it pass. Which module does this identifier come
+from, rather than does the name match. Both of today's instances were found by
+someone who had a reason to look at the line rather than at its result.
 
 ---
 
