@@ -1,8 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import Link from "next/link";
 import { SignIn, type Signed } from "../sign-in";
+import { MobileNav } from "../nav";
 import { PushToggle } from "../push";
 
 /* ============================================================
@@ -30,6 +30,38 @@ import { PushToggle } from "../push";
 
 type Standing = "open" | "declined" | "lapsed" | "assigned";
 
+/**
+ * What the shift pays, already checked against the award by the server.
+ *
+ * Every figure here arrives computed. The phone does no rate arithmetic of its
+ * own on purpose: "above award" on this card has to be the same answer that
+ * stopped the venue posting below it, and two implementations of the same sum
+ * is how they come to disagree. Null means no rate is published yet — which
+ * the card says, rather than showing a number nobody set.
+ */
+interface Pay {
+  offeredHourlyCents: number;
+  floorHourlyCents: number;
+  marginHourlyCents: number;
+  estGrossCents: number;
+  paidHours: number;
+  unpaidHours: number;
+  atOrAboveFloor: boolean;
+  bands: { band: string; label: string; hours: number; hourlyCents: number }[];
+  mixedRates: boolean;
+  awardId: string;
+  publicHolidaysChecked: boolean;
+  summary: string;
+  notModelled: string[];
+}
+
+/** 4150 → "$41.50". Formatting only; the arithmetic happened on the server. */
+const aud = (cents: number) => {
+  const sign = cents < 0 ? "-" : "";
+  const a = Math.abs(cents);
+  return `${sign}$${Math.floor(a / 100)}.${String(a % 100).padStart(2, "0")}`;
+};
+
 interface Shift {
   id: string;
   role: string;
@@ -43,6 +75,8 @@ interface Shift {
   seatsLeft: number;
   duties: string[];
   requires: { skill: string; level: string }[];
+  /** null until the venue publishes a rate. */
+  pay: Pay | null;
   status: string;
   blockReason: string | null;
   standing: { standing: Standing; at: string; reason: string | null } | null;
@@ -196,10 +230,7 @@ export default function MobileShiftsPage() {
         </button>
       </header>
 
-      <nav style={{ display: "flex", gap: 8, marginBottom: 14 }}>
-        <Link href="/m" style={tabStyle(false)}>Breaks</Link>
-        <span style={tabStyle(true)}>Shifts</span>
-      </nav>
+      <MobileNav current="/m/shifts" />
 
       {unseen.size > 0 && (
         <button
@@ -278,14 +309,6 @@ export default function MobileShiftsPage() {
 
 /* ---------- pieces ---------- */
 
-const tabStyle = (on: boolean): React.CSSProperties => ({
-  flex: 1, textAlign: "center", padding: "8px 0", borderRadius: 10, fontSize: 13, fontWeight: 600,
-  textDecoration: "none",
-  border: `1px solid ${on ? "var(--accent)" : "var(--border)"}`,
-  background: on ? "var(--accent-bg, var(--bg-2))" : "#fff",
-  color: on ? "var(--accent-fg, var(--fg-1))" : "var(--fg-3)",
-});
-
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <section style={{ marginBottom: 18 }}>
@@ -347,7 +370,22 @@ function Row({ s, sent, isNew, onTap }: { s: Shift; sent?: Sent; isNew?: boolean
             </span>
           )}
         </span>
-        <span style={{ fontSize: 12, color: "var(--fg-4)", whiteSpace: "nowrap" }}>{s.day}</span>
+        {/* The rate, where the eye lands. Someone scanning for work is
+            deciding on money and time before anything else, and burying it
+            under the venue name makes them open five shifts to compare two. */}
+        <span style={{ textAlign: "right", whiteSpace: "nowrap", flexShrink: 0 }}>
+          {s.pay ? (
+            <>
+              <span className="fs-tnum" style={{ display: "block", fontSize: 15, fontWeight: 700, color: "var(--fg-1)" }}>
+                {aud(s.pay.offeredHourlyCents)}
+                <span style={{ fontSize: 11, fontWeight: 500, color: "var(--fg-4)" }}>/h</span>
+              </span>
+              <span style={{ display: "block", fontSize: 11, color: "var(--fg-4)" }}>{s.day}</span>
+            </>
+          ) : (
+            <span style={{ fontSize: 12, color: "var(--fg-4)" }}>{s.day}</span>
+          )}
+        </span>
       </span>
       <span style={{ display: "block", fontSize: 12.5, color: "var(--fg-3)", marginTop: 2 }}>
         {s.functionName} · {s.window}
@@ -356,6 +394,32 @@ function Row({ s, sent, isNew, onTap }: { s: Shift; sent?: Sent; isNew?: boolean
         {s.siteName}
         {s.seatsLeft > 0 && ` · ${s.seatsLeft} of ${s.seats} left`}
       </span>
+
+      {s.pay && (
+        <span style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 7, alignItems: "center" }}>
+          {/* "Above award" is only worth printing because something refused to
+              publish this shift below it. The floor is named next to it so the
+              claim is checkable rather than a badge. */}
+          {s.pay.atOrAboveFloor && s.pay.marginHourlyCents > 0 && (
+            <span style={chip("success")}>✓ {aud(s.pay.marginHourlyCents)}/h above award</span>
+          )}
+          {s.pay.atOrAboveFloor && s.pay.marginHourlyCents === 0 && <span style={chip("info")}>At the award floor</span>}
+          <span style={{ fontSize: 11.5, color: "var(--fg-4)" }}>
+            floor {aud(s.pay.floorHourlyCents)}
+            {s.pay.mixedRates && " · mixed rates"}
+          </span>
+        </span>
+      )}
+      {s.pay && (
+        <span style={{ display: "block", fontSize: 12, color: "var(--fg-3)", marginTop: 5 }}>
+          Est. <strong style={{ color: "var(--fg-1)" }}>{aud(s.pay.estGrossCents)}</strong> for {s.pay.paidHours}h
+        </span>
+      )}
+      {!s.pay && (
+        <span style={{ display: "block", fontSize: 12, color: "var(--fg-4)", marginTop: 5, fontStyle: "italic" }}>
+          Rate not published yet
+        </span>
+      )}
 
       {s.blockReason && (
         <span
@@ -375,6 +439,98 @@ function Row({ s, sent, isNew, onTap }: { s: Shift; sent?: Sent; isNew?: boolean
     </button>
   );
 }
+
+/**
+ * The award maths, shown rather than summarised.
+ *
+ * The point of this panel is that a casual can check it. "Above award" as a
+ * badge is a marketing claim; the same badge next to the floor it beat, the
+ * hours it was worked out over, and the clause it comes from is something a
+ * person can argue with — which is the only version worth putting in front of
+ * someone whose pay it describes.
+ *
+ * It also says what it does not cover. A gross figure that quietly excludes
+ * overtime and allowances, presented as "your pay", is the kind of number that
+ * is believed until payday.
+ */
+function PayPanel({ pay }: { pay: Pay }) {
+  return (
+    <section
+      style={{
+        background: "var(--fs-navy, #0a1a28)", color: "#fff", borderRadius: 14,
+        padding: "14px 15px", margin: "0 0 14px",
+      }}
+    >
+      {/* globals.css colours h3 and p with --fg-1 / --fg-2, which are dark by
+          design and invisible on this panel. Inheritance does not reach them,
+          so every element here states its own colour. */}
+      <h3
+        style={{
+          margin: 0, fontSize: 10.5, fontWeight: 700, letterSpacing: ".08em",
+          textTransform: "uppercase", color: "#fff", opacity: 0.65,
+        }}
+      >
+        Your pay for this shift
+      </h3>
+
+      <p style={{ margin: "6px 0 0", display: "flex", alignItems: "baseline", gap: 8, flexWrap: "wrap", color: "#fff" }}>
+        <span className="fs-tnum" style={{ fontSize: 30, fontWeight: 800, letterSpacing: "-.02em" }}>
+          {aud(pay.estGrossCents)}
+        </span>
+        <span style={{ fontSize: 12.5, opacity: 0.7 }}>
+          est. gross · {pay.paidHours}h at {aud(pay.offeredHourlyCents)}/h
+        </span>
+      </p>
+
+      {/* Per band, because this is the part a single rate hides: an eight-hour
+          Friday that runs past midnight is not eight Friday hours. */}
+      <ul style={{ margin: "12px 0 0", padding: 0, listStyle: "none", fontSize: 12.5, color: "#fff" }}>
+        {pay.bands.map((b) => (
+          <li key={b.band} style={{ display: "flex", justifyContent: "space-between", gap: 12, padding: "3px 0" }}>
+            <span style={{ opacity: 0.75 }}>
+              {b.label} · {b.hours}h
+            </span>
+            <span className="fs-tnum" style={{ fontWeight: 600, whiteSpace: "nowrap" }}>
+              award {aud(b.hourlyCents)}/h
+            </span>
+          </li>
+        ))}
+        {/* The rows above cover the shift end to end, so they have to be
+            reconciled with the paid hours rather than quietly not adding up. */}
+        {pay.unpaidHours > 0 && (
+          <li style={{ display: "flex", justifyContent: "space-between", gap: 12, padding: "3px 0", opacity: 0.75 }}>
+            <span>Unpaid meal break</span>
+            <span className="fs-tnum" style={{ whiteSpace: "nowrap" }}>−{pay.unpaidHours}h</span>
+          </li>
+        )}
+      </ul>
+
+      <p
+        style={{
+          margin: "12px 0 0", padding: "9px 10px", borderRadius: 9, fontSize: 12.5, lineHeight: 1.5,
+          background: pay.atOrAboveFloor ? "rgba(18,217,198,.14)" : "rgba(255,120,120,.16)",
+          color: pay.atOrAboveFloor ? "var(--fs-teal-bright, #12d9c6)" : "#ffb4b4",
+          fontWeight: 600,
+        }}
+      >
+        {pay.atOrAboveFloor
+          ? `✓ ${aud(pay.offeredHourlyCents)}/h clears the ${pay.awardId} floor for every hour of this shift — the dearest hour is ${aud(pay.floorHourlyCents)}/h.`
+          : `This rate is below the ${pay.awardId} floor of ${aud(pay.floorHourlyCents)}/h.`}
+      </p>
+
+      <p style={{ margin: "10px 0 0", fontSize: 11, lineHeight: 1.5, color: "#fff", opacity: 0.6 }}>
+        {pay.awardId} cl 18 &amp; 29. Estimate for ordinary hours — excludes {pay.notModelled.slice(0, 3).join(", ")} and
+        super.
+        {!pay.publicHolidaysChecked && " Public holidays are not checked for this site."}
+      </p>
+    </section>
+  );
+}
+
+const chip = (tone: string): React.CSSProperties => ({
+  fontSize: 11.5, fontWeight: 700, borderRadius: 999, padding: "3px 8px",
+  color: `var(--${tone}-fg)`, background: `var(--${tone}-bg)`,
+});
 
 function Pill({ tone, children }: { tone: string; children: React.ReactNode }) {
   return (
@@ -434,6 +590,8 @@ function Sheet({
             </>
           )}
         </dl>
+
+        {s.pay && <PayPanel pay={s.pay} />}
 
         {s.blockReason && (
           <Banner tone="warn">

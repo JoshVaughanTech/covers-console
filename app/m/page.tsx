@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import Link from "next/link";
 import {
   HIGA,
   assessAll,
@@ -13,6 +12,7 @@ import {
   type Severity,
 } from "@/lib/awards";
 import { SignIn, type Signed } from "./sign-in";
+import { MobileNav } from "./nav";
 
 /* ============================================================
    Break Compliance, on the floor.
@@ -189,10 +189,7 @@ export default function MobileBreaksPage() {
         </button>
       </header>
 
-      <nav style={{ display: "flex", gap: 8, marginBottom: 14 }}>
-        <span style={mTab(true)}>Breaks</span>
-        <Link href="/m/shifts" style={mTab(false)}>Shifts</Link>
-      </nav>
+      <MobileNav current="/m" />
 
       {payload?.mode === "error" && (
         <Banner tone="danger">Time-clock data unavailable — this list may be out of date.</Banner>
@@ -235,14 +232,6 @@ export default function MobileBreaksPage() {
     </div>
   );
 }
-
-const mTab = (on: boolean): React.CSSProperties => ({
-  flex: 1, textAlign: "center", padding: "8px 0", borderRadius: 10, fontSize: 13, fontWeight: 600,
-  textDecoration: "none",
-  border: `1px solid ${on ? "var(--accent)" : "var(--border)"}`,
-  background: on ? "var(--accent-bg, var(--bg-2))" : "#fff",
-  color: on ? "var(--accent-fg, var(--fg-1))" : "var(--fg-3)",
-});
 
 /* ---------- pieces ---------- */
 
