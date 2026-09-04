@@ -343,3 +343,72 @@ describe("what the middleware is not", () => {
     expect(res.status).toBe(401);
   });
 });
+
+describe("every sign-in has a cause before it", () => {
+  /* auth.code_issued is the cause and auth.signed_in is the effect, and a
+     dispute is read against both. That only holds if EVERY path that mints a
+     code records one — it was wired into the operator route when that was
+     built and left out of the two self-request paths, so a worker asking for
+     their own code produced an effect with nothing before it.
+
+     Tested as a property over the whole chain rather than per route, because
+     the failure was a route nobody thought to check, and a third minting path
+     added later would reproduce it exactly. */
+
+  it("records who caused it, however the code was obtained", async () => {
+    const before = store.eventStore().all("org-test").length;
+
+    // a worker asking for their own
+    const w = aWorker();
+    await workerRequest.POST(json("http://x/api/auth/request", { did: w.did }));
+    await workerRedeem.POST(
+      json("http://x/api/auth/redeem", { did: w.did, code: codeFromFile(w.name) }),
+    );
+
+    // an operator asking for their own
+    const op = anOperator();
+    await signInOperator(op.did, op.name);
+
+    const fresh = store.eventStore().all("org-test").slice(before);
+    const issued = fresh.filter((e) => e.type === "auth.code_issued");
+    const signedIn = fresh.filter((e) => e.type === "auth.signed_in");
+
+    expect(signedIn.length).toBe(2);
+    expect(issued.length).toBe(2);
+
+    // and each effect follows its own cause, by subject and by position
+    for (const effect of signedIn) {
+      const cause = issued.find((c) => c.subject === effect.subject);
+      expect(cause, `no cause recorded for ${effect.actor}`).toBeTruthy();
+      expect(cause!.seq).toBeLessThan(effect.seq);
+      expect(cause!.data.trigger).toBe("self");
+      // nobody authorised a self-request; inventing an operator would be a lie
+      expect(cause!.actor).toBe("system");
+    }
+  });
+
+  it("never lets the code into the chain, on any path", async () => {
+    const w = aWorker();
+    await workerRequest.POST(json("http://x/api/auth/request", { did: w.did }));
+    const code = codeFromFile(w.name);
+
+    const serialised = JSON.stringify(store.eventStore().all("org-test"));
+    /* The audit screen is readable by every operator, so a code in the chain
+       would be a credential published to the surface it protects. */
+    expect(serialised).not.toContain(code.replace("-", ""));
+    expect(serialised).not.toContain(code);
+  });
+
+  it("records one cause per grant, however often a phone retries", async () => {
+    const w = aWorker();
+    await workerRequest.POST(json("http://x/api/auth/request", { did: w.did }));
+    const after = store.eventStore().all("org-test").filter((e) => e.type === "auth.code_issued").length;
+
+    // the same grant, re-announced: a flaky connection must not double the log
+    await workerRequest.POST(json("http://x/api/auth/request", { did: w.did }));
+    const grants = store.eventStore().all("org-test").filter((e) => e.type === "auth.code_issued");
+    // a second request mints a NEW grant, so this is 1 more, not 0 and not 2
+    expect(grants.length).toBe(after + 1);
+    expect(new Set(grants.map((g) => g.data.grantId)).size).toBe(grants.length);
+  });
+});
