@@ -129,14 +129,26 @@ export class NoSink implements CodeSink {
  * screen involved.
  *
  * So: a real channel if one is configured, the insecure one only when somebody
- * has said so out loud or when this is plainly a dev machine, and otherwise
+ * has said so out loud or the environment says what it is, and otherwise
  * nothing. A sign-in that refuses is a bad demo; a sign-in that hands out
  * credentials to strangers is a bad product.
+ *
+ * The safe case is asserted positively, and that is a correction rather than a
+ * style. This read `NODE_ENV !== "production"` for twenty minutes, which infers
+ * "safe to expose codes" from the ABSENCE of a danger marker — and absence is
+ * the default state of an unconfigured environment. Unset fell through to
+ * inline. So did "staging", which is exactly where real rosters and real names
+ * sit while everyone is still calling it not-production-yet, and the least
+ * likely place for anyone to be checking whether an endpoint returns
+ * credentials. Naming the two environments that may see a code means unset,
+ * staging, preview and anything misspelled all fail closed.
  */
 export function sinkFromEnv(): CodeSink {
   const dir = process.env.AUTH_CODES_DIR;
   if (dir) return new FileSink(dir);
   if (process.env.AUTH_CODES_INLINE === "1") return new InlineSink();
-  if (process.env.NODE_ENV !== "production") return new InlineSink();
+  if (process.env.NODE_ENV === "development" || process.env.NODE_ENV === "test") {
+    return new InlineSink();
+  }
   return new NoSink();
 }
