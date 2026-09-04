@@ -8,6 +8,7 @@
    anyone on a second break.
    ============================================================ */
 import { NextResponse } from "next/server";
+import { callerOf } from "@/lib/auth/session";
 import { eventStore } from "@/lib/store/events";
 import { sendOnBreak, type BreakPusher, type BreakDecisionInput } from "@/lib/store/decision";
 import { ConnecteamClient } from "@/lib/integrations/connecteam";
@@ -60,9 +61,18 @@ function connecteamPusher(): BreakPusher {
 export async function POST(req: Request) {
   const body = (await req.json().catch(() => null)) as Partial<BreakDecisionInput> | null;
 
-  if (!body?.subject || !body.name || !body.kind || !body.at || !body.actor) {
+  /* The supervisor comes from the session, not the body.
+
+     The phone used to send actor and actorDid and this route believed them,
+     which put the strongest identity claim in the chain — a DID — entirely
+     in the gift of whoever held the phone. An unverifiable name is a weak
+     record; an unverifiable DID that looks verifiable is worse. */
+  const caller = callerOf(req);
+  if (!caller) return NextResponse.json({ error: "not signed in" }, { status: 401 });
+
+  if (!body?.subject || !body.name || !body.kind || !body.at) {
     return NextResponse.json(
-      { error: "subject, name, kind, at and actor are required" },
+      { error: "subject, name, kind and at are required" },
       { status: 400 },
     );
   }
@@ -70,7 +80,12 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "kind must be meal or rest" }, { status: 400 });
   }
 
-  const result = await sendOnBreak(eventStore(), ORG, connecteamPusher(), body as BreakDecisionInput);
+  const result = await sendOnBreak(eventStore(), ORG, connecteamPusher(), {
+    ...(body as BreakDecisionInput),
+    // whatever the phone said, these are who it actually is
+    actor: caller.person.name,
+    actorDid: caller.did,
+  });
 
   // 200 on a replay, 201 on a genuinely new decision — a retrying client can
   // tell the difference without treating either as an error

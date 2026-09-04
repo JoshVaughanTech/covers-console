@@ -19,7 +19,16 @@ let decision: typeof import("../app/api/breaks/decision/route");
 beforeAll(async () => {
   events = await import("../app/api/events/route");
   decision = await import("../app/api/breaks/decision/route");
+  leanne = signIn("did:web:idara.app:w:leanne-vidal");
 });
+
+import { signIn, asCaller, type TestSession } from "./sign-in-helper";
+
+/* The break decision route takes the supervisor from the session now, so
+   these go through a real sign-in rather than naming an actor in the body. */
+let leanne: TestSession;
+const asLeanne = (body: unknown) =>
+  asCaller(leanne, "http://x/api/breaks/decision", { method: "POST", body: JSON.stringify(body) });
 
 const post = (url: string, body: unknown) =>
   new Request(url, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
@@ -82,12 +91,13 @@ describe("POST /api/breaks/decision", () => {
     name: "Darie Roberts",
     kind: "meal",
     at: "2026-09-03T03:56:00.000Z",
-    actor: "Leanne Vidal",
     overdue: true,
+    // no actor: the route takes it from the session, and a body that named
+    // one would be describing a supervisor nobody checked
   };
 
   it("records the decision even with no Connecteam write configured", async () => {
-    const res = await decision.POST(post("http://x/api/breaks/decision", valid));
+    const res = await decision.POST(asLeanne(valid));
     expect(res.status).toBe(201);
     const body = await res.json();
     // no break-type ids in env, so the push is skipped — but the decision stands,
@@ -98,20 +108,32 @@ describe("POST /api/breaks/decision", () => {
   });
 
   it("rejects a malformed break kind", async () => {
-    const res = await decision.POST(post("http://x/api/breaks/decision", { ...valid, kind: "coffee" }));
+    const res = await decision.POST(asLeanne({ ...valid, kind: "coffee" }));
     expect(res.status).toBe(400);
   });
 
-  it("rejects a decision with no actor — the log must be able to say who", async () => {
-    const { actor: _actor, ...noActor } = valid;
-    const res = await decision.POST(post("http://x/api/breaks/decision", noActor));
-    expect(res.status).toBe(400);
+  it("refuses a decision from nobody — the log must be able to say who", async () => {
+    /* This used to check that the body named an actor. A body can name
+       anyone, so what it really checked was that the phone had filled in a
+       field. Now the session says who, and a caller without one is refused. */
+    const res = await decision.POST(post("http://x/api/breaks/decision", valid));
+    expect(res.status).toBe(401);
+  });
+
+  it("attributes the decision to the session, not to anything the body says", async () => {
+    const res = await decision.POST(asLeanne({ ...valid, actor: "Somebody Else", actorDid: "did:web:idara.app:w:nobody" }));
+    expect(res.status).toBe(201);
+    const body = await res.json();
+    // an unverifiable name is a weak record; an unverifiable DID that looks
+    // verifiable is worse
+    expect(body.decision.actor).toBe("Leanne Vidal");
+    expect(body.decision.actorDid).toBe("did:web:idara.app:w:leanne-vidal");
   });
 
   it("does not double-send on a retried request", async () => {
     const withRef = { ...valid, clientRef: "phone-retry-1" };
-    const a = await decision.POST(post("http://x/api/breaks/decision", withRef));
-    const b = await decision.POST(post("http://x/api/breaks/decision", withRef));
+    const a = await decision.POST(asLeanne(withRef));
+    const b = await decision.POST(asLeanne(withRef));
     expect(a.status).toBe(201);
     expect(b.status).toBe(200);
     expect((await b.json()).created).toBe(false);

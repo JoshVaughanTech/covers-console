@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeAll } from "vitest";
 import { WORKERS, TODAY } from "../lib/idara/seed";
+import { signIn, asCaller, type TestSession } from "./sign-in-helper";
 
 /* ============================================================
    The marketplace's other side, through the real route handlers.
@@ -33,17 +34,26 @@ beforeAll(async () => {
 
 const did = (name: string) => WORKERS.find((w) => w.name === name)!.did;
 
+/* One session per worker, minted through the real grant-and-redeem path.
+   The routes take identity from the cookie now, so a test that skipped this
+   would be testing the 401. */
+const sessions = new Map<string, TestSession>();
+const as = (name: string): TestSession => {
+  const key = did(name);
+  if (!sessions.has(key)) sessions.set(key, signIn(key));
+  return sessions.get(key)!;
+};
+
 const board = async (who: string) => {
-  const res = await shifts.GET(new Request(`http://x/api/shifts?did=${encodeURIComponent(did(who))}`));
+  const res = await shifts.GET(asCaller(as(who), "http://x/api/shifts"));
   return { res, body: await res.json() };
 };
 
 const putHandUp = async (who: string, postingId: string, clientRef?: string) => {
   const res = await claim.POST(
-    new Request("http://x/api/shifts/claim", {
+    asCaller(as(who), "http://x/api/shifts/claim", {
       method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ did: did(who), postingId, clientRef }),
+      body: JSON.stringify({ postingId, clientRef }),
     }),
   );
   return { res, body: await res.json() };
@@ -126,13 +136,14 @@ describe("the board one worker sees", () => {
     expect(s.claimable).toBe(false);
   });
 
-  it("distinguishes 'we do not know you' from 'nothing for you'", async () => {
-    const res = await shifts.GET(new Request("http://x/api/shifts?did=did:web:idara.app:w:nobody"));
-    expect(res.status).toBe(404);
-  });
-
-  it("requires a did at all", async () => {
-    expect((await shifts.GET(new Request("http://x/api/shifts"))).status).toBe(400);
+  it("shows nobody a board without a session", async () => {
+    // the did used to be a query parameter, so any phone could ask for
+    // anybody’s board; there is nothing left to put in a URL
+    expect((await shifts.GET(new Request("http://x/api/shifts"))).status).toBe(401);
+    expect(
+      (await shifts.GET(new Request("http://x/api/shifts?did=did:web:idara.app:w:darie-roberts")))
+        .status,
+    ).toBe(401);
   });
 });
 
@@ -221,34 +232,34 @@ describe("what the phone cannot talk its way past", () => {
     expect(res.status).toBe(409);
   });
 
-  it("refuses an unknown posting and an unknown worker separately", async () => {
+  it("refuses an unknown posting", async () => {
     expect((await putHandUp("Darie Roberts", "sp-nope")).res.status).toBe(404);
+  });
 
+  it("refuses a claim with no session at all", async () => {
+    /* There is no longer a way to claim as someone else, because there is no
+       longer a way to say who you are: the body carries a posting and
+       nothing more. */
     const res = await claim.POST(
       new Request("http://x/api/shifts/claim", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ did: "did:web:idara.app:w:nobody", postingId: BAR }),
+        body: JSON.stringify({ did: "did:web:idara.app:w:darie-roberts", postingId: BAR }),
       }),
     );
-    expect(res.status).toBe(404);
+    expect(res.status).toBe(401);
   });
 
   it("rejects a malformed body rather than guessing", async () => {
     const bad = await claim.POST(
-      new Request("http://x/api/shifts/claim", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: "not json",
-      }),
+      asCaller(as("Darie Roberts"), "http://x/api/shifts/claim", { method: "POST", body: "not json" }),
     );
     expect(bad.status).toBe(400);
 
     const missing = await claim.POST(
-      new Request("http://x/api/shifts/claim", {
+      asCaller(as("Darie Roberts"), "http://x/api/shifts/claim", {
         method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ did: did("Darie Roberts") }),
+        body: JSON.stringify({}),
       }),
     );
     expect(missing.status).toBe(400);

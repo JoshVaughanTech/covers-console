@@ -18,25 +18,27 @@ import { NextResponse } from "next/server";
 import { eventStore } from "@/lib/store/events";
 import { boardFrom, claimBlockReason, seatsLeft, standingFor } from "@/lib/shifts";
 import { LocalCredentialVerifier } from "@/lib/idara/verifier";
-import { SITES, WORKERS } from "@/lib/idara/seed";
+import { SITES } from "@/lib/idara/seed";
+import { callerOf } from "@/lib/auth/session";
 
 export const dynamic = "force-dynamic";
 
 const ORG = process.env.COVERS_ORG ?? "org-brightwater";
 
-const workerIndex = new Map(WORKERS.map((w) => [w.did, w]));
 const siteIndex = new Map(SITES.map((s) => [s.id, s]));
 const verifier = new LocalCredentialVerifier();
 
 export async function GET(req: Request) {
-  const did = new URL(req.url).searchParams.get("did");
-  if (!did) return NextResponse.json({ error: "did is required" }, { status: 400 });
+  /* The did comes from the session, never from the request.
 
-  const person = workerIndex.get(did);
-  // an unknown did gets 404 rather than an empty board: "no shifts for you"
-  // and "we do not know who you are" are different answers, and a phone
-  // showing the first for the second would look like a quiet day
-  if (!person) return NextResponse.json({ error: "unknown worker" }, { status: 404 });
+     It used to be a query parameter, which is not a weak identity check but
+     the absence of one: any phone could ask for anybody’s board, and the
+     claim endpoint would then act on the name it was handed. */
+  const caller = callerOf(req);
+  if (!caller) return NextResponse.json({ error: "not signed in" }, { status: 401 });
+
+  const did = caller.did;
+  const person = caller.person;
 
   const board = boardFrom(eventStore().all(ORG));
 

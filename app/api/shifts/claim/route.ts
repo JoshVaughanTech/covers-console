@@ -23,24 +23,33 @@ import { NextResponse } from "next/server";
 import { eventStore } from "@/lib/store/events";
 import { boardFrom, claimBlockReason, claimShift } from "@/lib/shifts";
 import { LocalCredentialVerifier } from "@/lib/idara/verifier";
-import { SITES, WORKERS } from "@/lib/idara/seed";
+import { SITES } from "@/lib/idara/seed";
+import { callerOf } from "@/lib/auth/session";
 
 export const dynamic = "force-dynamic";
 
 const ORG = process.env.COVERS_ORG ?? "org-brightwater";
 
-const workerIndex = new Map(WORKERS.map((w) => [w.did, w]));
 const siteIndex = new Map(SITES.map((s) => [s.id, s]));
 const verifier = new LocalCredentialVerifier();
 
 interface ClaimBody {
-  did?: unknown;
   postingId?: unknown;
   /** the phone's own id for this attempt, so a retry is not a second claim. */
   clientRef?: unknown;
 }
 
 export async function POST(req: Request) {
+  /* Who is claiming comes from the session, and it is checked before anything
+     else is read. The phone used to send it, which meant anyone could put
+     anyone else’s hand up and the audit chain would record it truthfully and
+     uselessly. */
+  const caller = callerOf(req);
+  if (!caller) return NextResponse.json({ error: "not signed in" }, { status: 401 });
+
+  const did = caller.did;
+  const person = caller.person;
+
   let body: ClaimBody;
   try {
     body = (await req.json()) as ClaimBody;
@@ -48,14 +57,10 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "expected a JSON body" }, { status: 400 });
   }
 
-  const did = typeof body.did === "string" ? body.did : null;
   const postingId = typeof body.postingId === "string" ? body.postingId : null;
-  if (!did || !postingId) {
-    return NextResponse.json({ error: "did and postingId are required" }, { status: 400 });
+  if (!postingId) {
+    return NextResponse.json({ error: "postingId is required" }, { status: 400 });
   }
-
-  const person = workerIndex.get(did);
-  if (!person) return NextResponse.json({ error: "unknown worker" }, { status: 404 });
 
   const store = eventStore();
 
