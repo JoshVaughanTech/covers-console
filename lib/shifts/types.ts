@@ -8,6 +8,38 @@
 
 import type { WorkFunction } from "@/lib/idara";
 import type { SkillId, SkillLevel } from "@/lib/people";
+import type { EmploymentType } from "@/lib/awards";
+import type { Level } from "@/lib/awards/rates";
+
+/**
+ * What a posting pays, and the facts the award needs to check it.
+ *
+ * Optional on a posting, because a shift is a real thing before anyone has set
+ * a rate on it. Absent means "no rate published yet" and renders as exactly
+ * that — never as a number.
+ *
+ * `startsAt`/`endsAt` are epoch seconds and are NOT the same information as
+ * `day`/`window`. Those two are display strings a manager types; these are the
+ * moments the award is applied to. A shift priced off a hand-typed string
+ * would be priced off a typo.
+ *
+ * `level` is authored, never inferred from `role`. Which classification a job
+ * sits at is a legal position about duties and it is the venue's to record —
+ * see suggestedLevel() in lib/awards/rates.ts for why the guess is fenced off.
+ */
+export interface ShiftPay {
+  level: Level;
+  employment: EmploymentType;
+  /** integer cents per hour, as offered by the venue. */
+  offeredHourlyCents: number;
+  /** epoch seconds */
+  startsAt: number;
+  endsAt: number;
+  /** unpaid meal break, where the roster plans one. */
+  unpaidBreakSec?: number;
+  /** ISO dates that are public holidays at this site. Absent = not checked. */
+  publicHolidays?: readonly string[];
+}
 
 /**
  * What the manager set this posting to. Authored, never derived.
@@ -56,6 +88,8 @@ export interface ShiftPosting {
   /** what this shift actually involves — fed straight to decideMember(). */
   duties: WorkFunction[];
   requires: SkillRequirement[];
+  /** what it pays. Absent until the venue sets a rate — see ShiftPay. */
+  pay?: ShiftPay;
   claims: Claim[];
   /** DIDs already assigned. */
   assigned: string[];
