@@ -2,22 +2,32 @@
 
 **Date:** 2026-09-04 · **Status:** living note
 
-Two different failures, and they are opposites.
+Three different failures. The first two are opposites; the third is neither,
+and is the one that took longest to see.
 
-**Seven disagreements.** A check says sound, another says broken, and only one
+**Eight disagreements.** A check says sound, another says broken, and only one
 of them is right. In five of these a passing test suite — usually with a clean
 `tsc` — sat over a tree that `next build` refuses. The sixth runs the other way:
 `tsc` fails on code nobody wrote, and the build is fine. The seventh runs a
 third way, and is the one that undoes the tidy version of the rule: the build
-passes over a file `tsc` rejects, because the build never reads it.
+passes over a file `tsc` rejects, because the build never reads it. The eighth
+is not two checks disagreeing at all — it is one check, run twice, over two
+trees somebody thought were the same.
 
 **One false agreement.** Every check passes and they are all wrong together,
-because the thing being consulted is not evidence. That section is at the
-bottom; it is not an eighth case and numbering it as one would flatten it.
+because the thing being consulted is not evidence.
+
+**One silence.** Every check passes, every check is correct, and none of them
+was ever looking. A defect sat under 714 green tests that no test touched.
+Nothing disagreed and nothing lied — the suite simply had nothing to say, and
+had nothing to say in a way that is indistinguishable from having checked.
+
+Both of those are sections at the bottom rather than numbered cases; numbering
+them would flatten the difference.
 
 Everything below was hit for real in this repo, not imagined.
 
-The reason there are seven disagreements and not one is that these checks have
+The reason there are eight disagreements and not one is that these checks have
 **different and partly disjoint coverage** — and the coverage differs by
 directory, not only by tool.
 
@@ -223,12 +233,42 @@ sitting in it uncommitted.
 
 ---
 
+## 8. Two builds that disagree because they are not the same tree
+
+| check | result |
+|---|---|
+| `next build` on a copy of the working tree | **fails** |
+| `next build` on `git archive HEAD` | passes |
+
+Neither is broken and neither is stale. They are answers to different
+questions, and the failure is quoting one while meaning the other.
+
+    git archive HEAD  ->  does MAIN build?   blind to everything uncommitted
+    copy of the tree  ->  does MINE build?   blind to nobody's work but yours
+
+In a checkout three sessions share, "I ran an isolated build and it was clean"
+is not one claim. One session built a copy of the working tree — which compiles
+their own uncommitted work, and everybody else's — and reported it as an
+isolated build, with a real ESLint error sitting in their tree. Another treated
+the archive method as strictly better, and was structurally unable to see that
+error, because `git archive` emits committed content only.
+
+Both had one method and one sentence. The methods were fine.
+
+**How it arises:** reaching for the isolated build because a shared `.next` was
+causing trouble, and then answering whichever question the words "isolated
+build" happen to suggest. Say which tree. "Main builds" and "my tree builds"
+are different promises and only one of them is about the repo.
+
+---
+
 ## A different failure: things that look like evidence
 
-The seven above are all **checks disagreeing about one tree** — one says sound,
-another says broken, and the disagreement is the signal. These are the
-opposite and deserve separating rather than numbering: **every check agrees,
-confidently, on the wrong answer.**
+The eight above are all **checks disagreeing** — one says sound, another says
+broken, and the disagreement is the signal. Seven of them disagree about one
+tree; the eighth disagrees because it was shown two, which is the same lesson
+entered from the other side. These are the opposite and deserve separating
+rather than numbering: **every check agrees, confidently, on the wrong answer.**
 
 Agreement is what we normally treat as evidence. That is what makes this class
 expensive.
@@ -325,10 +365,27 @@ git records nothing about who did — a push leaves no reflog entry to attribute
 There the metadata is not misleading, it is simply absent, and absence at least
 announces itself. The author field is worse precisely because it responds.
 
-All five are the same failure: **an artefact carrying the authority of
+**A fixture that makes correct code look broken.** A probe checking whether
+withdrawing a shift twice was idempotent returned `409` on the first attempt
+and `409` on the retry. That reads unambiguously as a broken route: the write
+that should have succeeded did not.
+
+The route was correct. The probe had picked a worker who could not claim that
+shift in the first place, so there was never a claim to withdraw and both calls
+were refused for a reason that had nothing to do with idempotency. Rerun with a
+worker who could actually claim it: `200` then `409` without a client
+reference, `200` then `200` with one — exactly right.
+
+This one runs opposite to the other five, which all make broken things look
+sound. A fixture wrong in this direction manufactures a defect, and the cost is
+the hour spent fixing code that was never wrong — or worse, "fixing" it and
+breaking it to make the probe agree. It was caught by asking what the numbers
+*should* be before deciding what they meant.
+
+All six are the same failure: **an artefact carrying the authority of
 evidence without the substance of it.** A passing assertion, a familiar
-identifier, a rendered page, an absent name and a present one are all things we
-read as confirmation, and none of them was confirming anything.
+identifier, a rendered page, an absent name, a present one and a red result are
+all things we read as confirmation, and none of them was confirming anything.
 
 The screen adds a wrinkle worth keeping separate, because it is the one that
 generalises furthest. The test and the mock were *wrong about this tree*. The
@@ -365,6 +422,71 @@ has to happen before the sentence, not after somebody has acted on it.
 
 ---
 
+## A third failure: a check with nothing to say
+
+The eight disagreements are checks that contradict each other. The evidence
+cases are checks that agree and are wrong together. This one is neither. **Every
+check passed, every check was correct, and none of them was ever looking.**
+
+`decide()` answered a credential requirement with `credentials.find()`, taking
+the first record of a type and deciding on that alone. Renewal leaves the
+superseded record in place, so array position decided whether somebody could
+work. On the seeded board it cost one worker a Friday night and, on four other
+postings, replaced the true reason for refusing him with a false one.
+
+The suite at the time: **714 tests, all passing, not one of them touching the
+behaviour.** Measured by putting the bug back and running everything — only the
+six tests written afterwards go red, and the other 49 files stay green exactly
+as they had all along.
+
+Nothing was wrong with those 714 tests. That is the entire difficulty. A suite
+that has nothing to say about a defect is indistinguishable, from the outside,
+from a suite that has checked and found nothing: same colour, same count, same
+duration. Every other failure in this document announces itself to somebody
+willing to read carefully. This one has no surface to read.
+
+### It also runs forwards, and that is worse
+
+A test can start load-bearing and stop, without being touched and without
+failing. One session had a guard that never offers somebody a credential they
+already hold, pinned by a real test against a constructed case. Fixing
+`find()` removed the only path that reached it. The test still passes. It now
+describes the world rather than holding any code to anything, and nothing
+anywhere records that it changed meaning.
+
+Nobody made a mistake. A correct fix in one module quietly retired a test in
+another, and the only signal available — green — is the same signal it gave
+when it was doing its job.
+
+### The countermeasure
+
+> **A test earns its place by failing when the thing it guards is removed.** If
+> deleting the guard changes nothing, the test is describing the world rather
+> than holding the code to anything.
+
+That is mutation testing, done by hand and aimed. Full tooling is real cost for
+a repo this size, but the aimed version is minutes: revert the fix, or break the
+guard, in a copy of the tree, and run the suite.
+
+**What it is worth depends entirely on when you run it**, and the difference is
+large enough to state:
+
+| run it on | it asks | what it found here |
+|---|---|---|
+| a **fix** | was this bug invisible? | 714 green tests, none looking |
+| **new code** | is this promise held? | three guards, all already guarded |
+
+Only the first can surprise you. The second is cheap insurance and rarely
+returns anything — worth ten minutes, not worth overselling. "We mutation-tested
+and everything was fine" is close to no information while sounding like a lot,
+and this document has enough sentences of that kind in its history already.
+
+The affordable habit, then, is narrow: **when you fix a bug, look at what was
+guarding it.** That is exactly the set of tests that just went quiet, and it is
+small enough to check by hand every time.
+
+---
+
 ## The shape underneath
 
 Most of these share a shape with the worst bugs we found this quarter:
@@ -378,6 +500,8 @@ That shape is not confined to the build:
 - The audit log rendered `NaN May 2024` for every event a real device produced —
   and correctly for every seeded one.
 - A break classifier was right on demo data and wrong on the actual account.
+- A credential gate refused a renewed licence, because the record it replaced
+  happened to sort first in an array.
 
 Tests check that data is correct case by case. A build checks that the tree is
 coherent. Neither checks that a screen makes sense to the person reading it, and
@@ -388,3 +512,6 @@ not one of the bugs listed above was found by a test.
 And — added the day someone spent two steps debugging a stranger's login page —
 **check it is your app.** Every rule here assumes you are looking at the right
 thing, which is the one assumption none of them check.
+
+And one more, which the 714 earned: **when you fix something, ask what was
+guarding it.** A green suite is not a claim that anybody looked.
