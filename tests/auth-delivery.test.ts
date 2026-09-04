@@ -1,4 +1,7 @@
-import { describe, it, expect, vi, afterEach } from "vitest";
+import { describe, it, expect, vi, afterEach, beforeEach } from "vitest";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { sinkFromEnv, FileSink, InlineSink, NoSink } from "../lib/auth/delivery";
 
 /* ============================================================
@@ -93,13 +96,68 @@ describe("what an operator asked for", () => {
 });
 
 describe("a sink that cannot deliver", () => {
+  let tmp: string;
+  beforeEach(() => { tmp = mkdtempSync(join(tmpdir(), "covers-sink-")); });
+  afterEach(() => rmSync(tmp, { recursive: true, force: true }));
+
   it("says so before anyone mints against it", () => {
     expect(new NoSink().configured).toBe(false);
     expect(new InlineSink().configured).toBe(true);
-    expect(new FileSink("/tmp/x").configured).toBe(true);
+    expect(new FileSink(join(tmp, "codes")).configured).toBe(true);
+  });
+
+  it("refuses a directory that is actually a file", () => {
+    /* The earlier version of this test asserted configured was true for an
+       arbitrary path. That did not merely miss this — it pinned the wrong
+       behaviour as the specification, so a future reader would take "always
+       true" as intended. A path that is a file is an ordinary typo, and the
+       shape of a volume that did not mount. */
+    const notADir = join(tmp, "oops");
+    writeFileSync(notADir, "i am a file", "utf8");
+    const sink = new FileSink(notADir);
+
+    expect(sink.configured).toBe(false);
+    // and it says why, because somebody has to fix the path they mistyped
+    expect(sink.describe()).toMatch(/unusable/);
+  });
+
+  it("creates a directory that does not exist yet rather than refusing", () => {
+    // a fresh deployment has not made the folder; that is not a misconfiguration
+    expect(new FileSink(join(tmp, "deep", "nested", "codes")).configured).toBe(true);
   });
 
   it("throws with the fix in the message rather than a bare failure", async () => {
     await expect(new NoSink().deliver()).rejects.toThrow(/AUTH_CODES_DIR/);
+  });
+});
+
+describe("a directory that looks set and is not", () => {
+  it("falls through to the environment rule when AUTH_CODES_DIR is empty", () => {
+    /* Same family as a vague truthy AUTH_CODES_INLINE: a value that looks
+       configured but is not. The truthiness check catches it, and this says so
+       out loud rather than leaving it to be inferred from the other cases. */
+    vi.stubEnv("AUTH_CODES_DIR", "");
+    vi.stubEnv("AUTH_CODES_INLINE", "");
+    vi.stubEnv("NODE_ENV", "production");
+    expect(sinkFromEnv()).toBeInstanceOf(NoSink);
+  });
+
+  it("refuses rather than falling back when the directory is unusable", () => {
+    /* Not the same thing at all. An empty variable means nobody asked for a
+       file; an unusable path means somebody did and got it wrong, and quietly
+       falling back to the inline sink would answer a misconfiguration by
+       exposing codes — the opposite of what they asked for. */
+    const tmp = mkdtempSync(join(tmpdir(), "covers-sink-"));
+    const notADir = join(tmp, "oops");
+    writeFileSync(notADir, "i am a file", "utf8");
+    try {
+      vi.stubEnv("AUTH_CODES_DIR", notADir);
+      vi.stubEnv("NODE_ENV", "development");
+      const sink = sinkFromEnv();
+      expect(sink).toBeInstanceOf(FileSink);
+      expect(sink.configured).toBe(false);
+    } finally {
+      rmSync(tmp, { recursive: true, force: true });
+    }
   });
 });

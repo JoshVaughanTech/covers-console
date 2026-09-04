@@ -27,7 +27,7 @@
    authentication, which does not exist yet. That is a smaller hole
    than the one it replaces, and it is not no hole.
    ============================================================ */
-import { mkdirSync, appendFileSync } from "node:fs";
+import { mkdirSync, appendFileSync, accessSync, constants } from "node:fs";
 import { resolve } from "node:path";
 import { formatCode } from "./token";
 
@@ -51,18 +51,48 @@ export interface CodeSink {
   deliver(input: { did: string; name: string; code: string; link: string; expiresAt: number }): Promise<Delivery>;
 }
 
-/** Writes the code where server access is needed to read it. */
+/**
+ * Write the code where server access is needed to read it.
+ *
+ * `configured` means DELIVERABLE, not merely named. The difference is not
+ * pedantry: callers check it before minting, and a grant is spent the moment
+ * it is minted. A sink that claimed to be configured and then threw would
+ * leave the worker's previous code dead, the new one written nowhere, and —
+ * because the event append comes after delivery — no auth.code_issued at all,
+ * so a later redemption would show a sign-in with no cause before it. One
+ * mistyped path, and sign-in breaks in a way that reads as sign-in being
+ * broken rather than as a bad environment variable.
+ *
+ * So the directory is created and probed for writability once, here, and a
+ * failure fails closed at the same gate as no directory at all.
+ */
 export class FileSink implements CodeSink {
-  readonly configured = true;
-  constructor(private readonly dir: string) {}
+  readonly configured: boolean;
+  private readonly reason: string | null;
+
+  constructor(private readonly dir: string) {
+    let ok = true;
+    let why: string | null = null;
+    try {
+      mkdirSync(resolve(dir), { recursive: true });
+      // creating it says the path is reachable; this says we may write in it,
+      // which is the thing deliver() actually needs and the thing a read-only
+      // mount or a wrong owner would take away without touching the path
+      accessSync(resolve(dir), constants.W_OK);
+    } catch (e) {
+      ok = false;
+      why = e instanceof Error ? e.message : String(e);
+    }
+    this.configured = ok;
+    this.reason = why;
+  }
 
   describe(): string {
-    return this.dir;
+    return this.configured ? this.dir : `${this.dir} (unusable: ${this.reason})`;
   }
 
   async deliver(input: { did: string; name: string; code: string; link: string; expiresAt: number }): Promise<Delivery> {
     const dir = resolve(this.dir);
-    mkdirSync(dir, { recursive: true });
     const path = resolve(dir, "sign-in-codes.log");
     const line =
       `${new Date().toISOString()}  ${input.name} <${input.did}>  ` +

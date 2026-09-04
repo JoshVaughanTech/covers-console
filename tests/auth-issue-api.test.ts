@@ -170,3 +170,47 @@ describe("not becoming a new way to read a credential", () => {
     expect(body.via).toContain("covers-issue-test");
   });
 });
+
+describe("a mistyped directory", () => {
+  it("does not cost a worker the code they already had", async () => {
+    /* The failure this prevents, end to end. Before configured meant
+       deliverable: the operator issues, the grant is spent, deliver() throws
+       EEXIST, no auth.code_issued is written, and the worker's live code is
+       dead with nothing to replace it. It presents as sign-in being broken
+       rather than as a bad environment variable, which is why it would have
+       taken a long time to attribute. */
+    const { mkdtempSync, rmSync, writeFileSync } = await import("node:fs");
+    const { tmpdir } = await import("node:os");
+    const { join } = await import("node:path");
+
+    const tmp = mkdtempSync(join(tmpdir(), "covers-badpath-"));
+    const notADir = join(tmp, "oops");
+    writeFileSync(notADir, "i am a file", "utf8");
+
+    const w = someone();
+    // a good code exists first, the way one would after a normal issue
+    const good = await issueFor(w.did);
+    expect(good.res.status).toBe(200);
+    const before = store.eventStore().all("org-test").filter((x) => x.type === "auth.code_issued").length;
+
+    try {
+      vi.stubEnv("AUTH_CODES_DIR", notADir);
+      const { res, body } = await issueFor(w.did);
+
+      // refused at the gate, before anything was spent or written
+      expect(res.status).toBe(503);
+      expect(body.detail).toMatch(/AUTH_CODES_DIR/);
+    } finally {
+      vi.unstubAllEnvs();
+      rmSync(tmp, { recursive: true, force: true });
+    }
+
+    // nothing recorded, because nothing happened
+    const after = store.eventStore().all("org-test").filter((x) => x.type === "auth.code_issued").length;
+    expect(after).toBe(before);
+
+    // and the code the worker was already given still signs them in
+    const { authStore } = await import("../lib/store/auth");
+    expect(authStore().redeemCode(w.did, (good.body.code as string), "their-phone").ok).toBe(true);
+  });
+});
