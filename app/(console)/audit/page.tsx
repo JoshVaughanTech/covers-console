@@ -32,6 +32,19 @@ function eventMeta(e: AuditEvent): EventMeta {
       return { icon: "shield-off", tone: "danger", kind: "Credential revoked" };
     case "shift.assigned":
       return { icon: "user-check", tone: "success", kind: "Shift assigned" };
+    /* A claim is a request and an assignment is a decision — labelling both
+       "Event" made the two indistinguishable in the trail, which is most of
+       what this screen is for. */
+    case "shift.claimed":
+      return { icon: "hand", tone: "info", kind: "Shift claimed" };
+    case "shift.posted":
+      return { icon: "megaphone", tone: "neutral", kind: "Shift posted" };
+    case "report.delivered":
+      return { icon: "file-check", tone: "success", kind: "Report delivered" };
+    case "break.pushed":
+      return { icon: "circle-check", tone: "success", kind: "Break confirmed" };
+    case "break.push_failed":
+      return { icon: "triangle-alert", tone: "danger", kind: "Break not recorded" };
     case "break.decision":
       return e.data.overdue
         ? { icon: "coffee", tone: "warning", kind: "Break sent (late)" }
