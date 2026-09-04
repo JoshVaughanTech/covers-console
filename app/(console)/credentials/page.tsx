@@ -18,30 +18,62 @@ import {
 } from "@/components/ui";
 import type { Tone } from "@/lib/status";
 import { CardHead, LinkBtn } from "@/components/screen/page-head";
+import {
+  useIdara,
+  LocalCredentialVerifier,
+  CREDENTIAL_TYPES,
+  EXPIRY_WARN_DAYS,
+  calendarDate,
+  type Credential,
+  type CredentialVerifier,
+  type Identity,
+  type ISODate,
+} from "@/lib/idara";
 
-/* ---- Types ---- */
-type WStatus = "Eligible" | "Warning" | "Blocked";
-type Filter = "All" | WStatus;
+/* ---- Types ----
 
-interface Worker {
+   Everything on this screen is derived from the same credentials the
+   engine gates on. It used to be a separate mock with invented staff, which
+   meant a manager could read here that a licence was fine while the matcher
+   two screens away refused the person for that exact licence. Two views of
+   one fact, able to disagree — so there is now only one fact.
+
+   What this screen deliberately does NOT say is whether somebody is eligible
+   to work. Eligibility needs a site: an RSA is demanded of whoever serves
+   alcohol, an induction is per-venue, and a Food Safety Supervisor is owed by
+   the roster rather than the person. Those questions belong to Schedule and
+   Open Shifts, which know which site they are asking about. This screen
+   answers the narrower one it can answer alone: what does this person hold,
+   and what state is it in. */
+
+/** Credential state as this screen reports it — about the document, not a shift. */
+type CredState = "Current" | "Expiring" | "Expired" | "Revoked" | "Suspended";
+
+/** Worst state across somebody's credentials, which is what the row shows. */
+type RowState = "Current" | "Expiring" | "Action needed";
+type Filter = "All" | RowState;
+
+interface CredRow {
   id: string;
-  name: string;
-  cardId: string;
-  status: WStatus;
-  tone: Tone;
-  match: number;
-  issues: string;
-  fatigue: "Fit" | "At Risk";
-  access: "Approved" | "Pending" | "—";
-}
-
-interface Cred {
-  name: string;
+  label: string;
+  /** who issued it, and the certificate number where one is recorded */
   line1: string;
+  /** expiry, or the site it is scoped to */
   line2: string;
   icon: string;
-  state: string;
-  verified: boolean;
+  state: CredState;
+  tone: Tone;
+}
+
+interface Row {
+  did: string;
+  name: string;
+  role: string;
+  state: RowState;
+  tone: Tone;
+  /** what is wrong, in the manager's words rather than the engine's */
+  issues: string;
+  creds: CredRow[];
 }
 
 interface JobState {
@@ -51,104 +83,130 @@ interface JobState {
   time: string;
 }
 
-/* ---- Mock data ----
-
-   Named CREDENTIAL_ROWS rather than WORKERS, which is what it was called
-   until it caused a real problem. lib/idara/seed.ts exports a WORKERS const
-   holding the actual staff — the ones with DIDs that the engine gates and the
-   audit chain names. This page has never imported it. These are different
-   people invented for a design mock: Daniel Roberts and Sarah Thompson do not
-   exist anywhere else in the system.
-
-   Sharing the name meant anyone grepping for WORKERS found this and concluded
-   the page was joined to real identities. Somebody did, and passed that on as
-   guidance, and it cost another session a wrong turn before they opened the
-   file. A local const that shadows a real export reads exactly like the thing
-   it is not, which makes it look like evidence rather than a mock.
-
-   The deeper issue is unchanged and is not a naming problem: this screen is
-   fictional. Its columns — card id, match percentage, fatigue, access — have
-   no counterpart in the real model, so joining it to WORKERS is a feature
-   rather than a rename. Until someone does that, the name should at least
-   stop claiming otherwise. */
-const CREDENTIAL_ROWS: Worker[] = [
-  { id: "w1", name: "Daniel Roberts", cardId: "9587 4632 7876", status: "Eligible", tone: "success", match: 100, issues: "—", fatigue: "Fit", access: "Approved" },
-  { id: "w2", name: "Sarah Thompson", cardId: "6738 2910 4421", status: "Warning", tone: "warning", match: 83, issues: "Venue Induction missing", fatigue: "Fit", access: "Approved" },
-  { id: "w3", name: "Michael Chen", cardId: "2846 9011 7783", status: "Blocked", tone: "danger", match: 50, issues: "Food Handling expired", fatigue: "Fit", access: "—" },
-  { id: "w4", name: "Priya Nair", cardId: "5590 3312 6679", status: "Warning", tone: "warning", match: 67, issues: "RSG expiring · Venue Induction missing", fatigue: "Fit", access: "Pending" },
-  { id: "w5", name: "James Walker", cardId: "1123 5566 8890", status: "Blocked", tone: "danger", match: 40, issues: "Fatigue risk – review", fatigue: "At Risk", access: "Approved" },
-  { id: "w6", name: "Emily Davies", cardId: "4471 8820 1190", status: "Eligible", tone: "success", match: 96, issues: "—", fatigue: "Fit", access: "Approved" },
-  { id: "w7", name: "Lucas Martin", cardId: "3389 7745 2210", status: "Eligible", tone: "success", match: 92, issues: "—", fatigue: "Fit", access: "Approved" },
-  { id: "w8", name: "Aisha Khan", cardId: "7712 0093 5567", status: "Warning", tone: "warning", match: 71, issues: "First Aid expiring", fatigue: "Fit", access: "Pending" },
-  { id: "w9", name: "Tom Nguyen", cardId: "6650 2218 9034", status: "Eligible", tone: "success", match: 98, issues: "—", fatigue: "Fit", access: "Approved" },
-  { id: "w10", name: "Grace O'Brien", cardId: "2204 5561 7789", status: "Blocked", tone: "danger", match: 45, issues: "RSA expired", fatigue: "Fit", access: "—" },
-  { id: "w11", name: "Noah Patel", cardId: "8891 3320 4456", status: "Eligible", tone: "success", match: 94, issues: "—", fatigue: "Fit", access: "Approved" },
-  { id: "w12", name: "Olivia Reed", cardId: "1147 6690 2238", status: "Warning", tone: "warning", match: 78, issues: "Venue Induction missing", fatigue: "At Risk", access: "Pending" },
-  { id: "w13", name: "Ethan Brooks", cardId: "5523 1108 7790", status: "Eligible", tone: "success", match: 90, issues: "—", fatigue: "Fit", access: "Approved" },
-  { id: "w14", name: "Mia Foster", cardId: "9930 4471 2215", status: "Blocked", tone: "danger", match: 38, issues: "RSG revoked", fatigue: "At Risk", access: "—" },
-];
-
-const REQS: [string, number, string, Tone][] = [
-  ["Food Handling", 32, "utensils", "warning"],
-  ["First Aid", 34, "plus-square", "warning"],
-  ["RSA", 36, "id-card", "success"],
-  ["Venue Induction", 31, "clipboard-list", "warning"],
-  ["RSG", 28, "dice-5", "danger"],
-  ["Fatigue Status", 33, "battery-medium", "warning"],
-];
-
-const LOG: [string, string, string, Tone][] = [
-  ["Credential verified", "Food Handling", "shield-check", "success"],
-  ["Gaming access granted", "Brightwater Gaming Room", "dice-5", "success"],
-  ["Shift acknowledged", "Brightwater Friday Live", "check-circle-2", "info"],
-  ["Venue induction verified", "Brightwater Hotel", "clipboard-check", "success"],
-  ["Fatigue status updated", "Fit for Duty", "battery-medium", "success"],
-  ["Eligibility check run", "36 staff scanned", "scan-search", "info"],
-  ["Credential expiring soon", "First Aid · Aisha Khan", "alarm-clock", "warning"],
-  ["RSG revoked", "Mia Foster", "dice-5", "danger"],
-];
-
 const PAGE_SIZE = 5;
 
-/* ---- Per-worker credential derivation ---- */
-function credsFor(w: Worker): Cred[] {
-  const base: Cred[] = [
-    { name: "Food Handling", line1: "VIC · FH-0012345", line2: "Expires 12 May 2026", icon: "utensils", state: "Verified", verified: true },
-    { name: "First Aid (HLTAID011)", line1: "Expires 20 Oct 2025", line2: "", icon: "plus-square", state: "Verified", verified: true },
-    { name: "RSA (SITHFAB021)", line1: "Expires 14 Aug 2026", line2: "", icon: "wine", state: "Verified", verified: true },
-    { name: "Venue Induction", line1: "Brightwater Hotel – Fitzroy", line2: "Completed 2 May 2024", icon: "map-pin-check", state: "Verified", verified: true },
-    { name: "RSG", line1: "VGCCC · RSG-448120", line2: "Expires 30 May 2025", icon: "dice-5", state: "Approved", verified: true },
-    { name: "Fatigue Status", line1: "Fit for Duty · As at today, 6:15am", line2: "", icon: "battery-medium", state: "Fit", verified: true },
-  ];
-  const out = base.map((c) => ({ ...c }));
-  const flag = (name: string, state: string, line2?: string) => {
-    const c = out.find((x) => x.name.startsWith(name));
-    if (c) {
-      c.verified = false;
-      c.state = state;
-      if (line2 !== undefined) c.line2 = line2;
-    }
-  };
-  if (w.fatigue === "At Risk") flag("Fatigue Status", "At Risk", "Review required · today, 6:15am");
-  if (w.access === "Pending") flag("RSG", "Pending");
-  if (w.access === "—") flag("RSG", "Not Granted");
+/** Whole days between two dates, both narrowed to the day. */
+function daysBetween(from: ISODate, to: ISODate): number {
+  return Math.round(
+    (Date.parse(calendarDate(to)) - Date.parse(calendarDate(from))) / 86_400_000,
+  );
+}
 
-  if (w.issues.includes("Food Handling")) flag("Food Handling", "Expired", "Expired 4 Apr 2024");
-  if (w.issues.includes("RSA")) flag("RSA", "Expired", "");
-  if (w.issues.includes("First Aid")) flag("First Aid", "Expiring", "");
-  if (w.issues.includes("Venue Induction")) flag("Venue Induction", "Missing", "Not completed");
-  if (w.issues.includes("Access Approval expiring")) flag("RSG", "Expiring");
-  if (w.issues.includes("RSG revoked")) flag("RSG", "Revoked", "Revoked 1 May 2024");
-  return out;
+function fmtDay(iso: ISODate): string {
+  const [y, m, d] = calendarDate(iso).split("-");
+  const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  return `${Number(d)} ${MONTHS[Number(m) - 1]} ${y}`;
+}
+
+const CRED_TONE: Record<CredState, Tone> = {
+  Current: "success",
+  Expiring: "warning",
+  Expired: "danger",
+  Revoked: "danger",
+  Suspended: "warning",
+};
+
+/**
+ * One person's credentials, as held and as verified today.
+ *
+ * The verifier decides revoked, suspended and expired; the warning window is
+ * the engine's own EXPIRY_WARN_DAYS, so a credential shown amber here is the
+ * same one the matcher notes against a candidate.
+ */
+function credRowsFor(
+  did: string,
+  all: Credential[],
+  at: ISODate,
+  verifier: CredentialVerifier,
+  siteName: (id: string) => string,
+): CredRow[] {
+  return all
+    .filter((c) => c.subject === did)
+    .map((c): CredRow => {
+      const meta = CREDENTIAL_TYPES[c.type];
+      const v = verifier.verify(c, at);
+
+      let state: CredState =
+        v.status === "revoked" ? "Revoked"
+        : v.status === "suspended" ? "Suspended"
+        : v.status === "expired" ? "Expired"
+        : "Current";
+
+      let line2 = "";
+      if (c.expiresAt) {
+        const left = daysBetween(at, c.expiresAt);
+        if (state === "Current" && left <= EXPIRY_WARN_DAYS) state = "Expiring";
+        line2 = state === "Expired"
+          ? `Expired ${fmtDay(c.expiresAt)}`
+          : `Expires ${fmtDay(c.expiresAt)}${state === "Expiring" ? ` · ${left} day${left === 1 ? "" : "s"}` : ""}`;
+      } else {
+        line2 = "No expiry";
+      }
+      // a site-scoped credential is only meaningful with the site named
+      if (c.claims.siteId) line2 = `${siteName(c.claims.siteId)} · ${line2}`;
+
+      const cert = c.claims.cert ? ` · ${c.claims.cert}` : "";
+      return {
+        id: c.id,
+        label: meta.label,
+        line1: `${meta.authority}${cert}`,
+        line2,
+        icon: meta.icon,
+        state,
+        tone: CRED_TONE[state],
+      };
+    })
+    .sort((a, b) => a.label.localeCompare(b.label));
+}
+
+/** The row for one person: worst state wins, and the issue names itself. */
+function rowFor(person: Identity, creds: CredRow[]): Row {
+  const bad = creds.filter((c) => c.state === "Expired" || c.state === "Revoked" || c.state === "Suspended");
+  const soon = creds.filter((c) => c.state === "Expiring");
+
+  const state: RowState = bad.length ? "Action needed" : soon.length ? "Expiring" : "Current";
+  const issues = bad.length
+    ? bad.map((c) => `${c.label} ${c.state.toLowerCase()}`).join(" · ")
+    : soon.length
+      ? soon.map((c) => `${c.label} expiring`).join(" · ")
+      : "—";
+
+  return {
+    did: person.did,
+    name: person.name,
+    role: person.role,
+    state,
+    tone: state === "Current" ? "success" : state === "Expiring" ? "warning" : "danger",
+    issues,
+    creds,
+  };
 }
 
 export default function CredentialsPage() {
   const toast = useToast();
 
-  const [workers, setWorkers] = useState<Worker[]>(CREDENTIAL_ROWS);
+  const { workers: staff, credentials, sites, today, auditLog } = useIdara();
+  const verifier = useMemo(() => new LocalCredentialVerifier(), []);
+
+  const siteName = useMemo(() => {
+    const byId = new Map(sites.map((s) => [s.id, s.name]));
+    return (id: string) => byId.get(id) ?? id;
+  }, [sites]);
+
+  /* The rows are derived, never held. A credential revoked elsewhere in the
+     console changes this screen on the next render rather than after a
+     refresh, because there is nothing here to go stale. */
+  const workers = useMemo(
+    () =>
+      staff.map((person) =>
+        rowFor(person, credRowsFor(person.did, credentials, today, verifier, siteName)),
+      ),
+    [staff, credentials, today, verifier, siteName],
+  );
+
   const [filter, setFilter] = useState<Filter>("All");
   const [page, setPage] = useState(1);
-  const [selectedId, setSelectedId] = useState<string>(CREDENTIAL_ROWS[0].id);
+  const [selectedId, setSelectedId] = useState<string>(staff[0]?.did ?? "");
   const [checking, setChecking] = useState(false);
 
   const [job, setJob] = useState<JobState>({
@@ -167,13 +225,13 @@ export default function CredentialsPage() {
 
   /* ---- Derived ---- */
   const counts = useMemo(() => {
-    const c = { All: workers.length, Eligible: 0, Warning: 0, Blocked: 0 };
-    for (const w of workers) c[w.status] += 1;
+    const c: Record<Filter, number> = { All: workers.length, Current: 0, Expiring: 0, "Action needed": 0 };
+    for (const w of workers) c[w.state] += 1;
     return c;
   }, [workers]);
 
   const filtered = useMemo(
-    () => (filter === "All" ? workers : workers.filter((w) => w.status === filter)),
+    () => (filter === "All" ? workers : workers.filter((w) => w.state === filter)),
     [workers, filter]
   );
 
@@ -181,12 +239,32 @@ export default function CredentialsPage() {
   const pageWorkers = filtered.slice(pageStart, pageStart + PAGE_SIZE);
 
   const selected = useMemo(
-    () => workers.find((w) => w.id === selectedId) ?? workers[0],
+    () => workers.find((w) => w.did === selectedId) ?? workers[0],
     [workers, selectedId]
   );
-  const selectedCreds = useMemo(() => credsFor(selected), [selected]);
+  const selectedCreds = selected?.creds ?? [];
 
-  const FILTERS: Filter[] = ["All", "Eligible", "Warning", "Blocked"];
+  /* The event log is the audit chain, filtered to what this screen is about,
+     newest first. It used to be eight invented lines that never changed;
+     now a revocation performed here appears here, because it is the same
+     record the Audit Log screen renders and the matcher reads. */
+  const log = useMemo(
+    () =>
+      auditLog
+        .filter((e) => e.type.startsWith("credential."))
+        .slice()
+        .reverse()
+        .map((e) => ({
+          id: e.id,
+          title: e.type === "credential.revoked" ? "Credential revoked" : "Credential issued",
+          detail: e.summary,
+          at: fmtDay(e.at),
+          icon: e.type === "credential.revoked" ? "shield-off" : "badge-check",
+          tone: (e.type === "credential.revoked" ? "danger" : "success") as Tone,
+        })),
+    [auditLog],
+  );
+  const FILTERS: Filter[] = ["All", "Current", "Expiring", "Action needed"];
 
   /* ---- Handlers ---- */
   function applyFilter(f: Filter) {
@@ -198,22 +276,23 @@ export default function CredentialsPage() {
     setSelectedId(id);
   }
 
+  /* There is nothing to recompute. Every row on this screen is derived from
+     the credentials on each render, so the answer is already current — which
+     is the point of deriving rather than storing. The button reports what is
+     true instead of pretending to do work, and says what it counted so the
+     number can be checked against the list underneath it. */
   function checkEligibility() {
     if (checking) return;
     setChecking(true);
     setTimeout(() => {
-      // Recompute match scores with a tiny mock variance to show a live effect.
-      setWorkers((prev) =>
-        prev.map((w) => {
-          if (w.status === "Eligible") {
-            return { ...w, match: Math.min(100, Math.max(90, w.match + ((w.match * 7) % 5) - 2)) };
-          }
-          return w;
-        })
-      );
       setChecking(false);
-      toast("Eligibility re-checked · 36 workers scanned", { tone: "success", icon: "scan-search" });
-    }, 1100);
+      const held = workers.reduce((n, w) => n + w.creds.length, 0);
+      const wrong = counts["Action needed"] + counts.Expiring;
+      toast(
+        `${held} credentials verified across ${workers.length} staff · ${wrong} need attention`,
+        { tone: wrong ? "warning" : "success", icon: "scan-search" },
+      );
+    }, 400);
   }
 
   function openEdit() {
@@ -227,7 +306,23 @@ export default function CredentialsPage() {
     toast("Job details updated", { tone: "success", icon: "check" });
   }
 
-  const verifiedIdentity = selected.status !== "Blocked";
+  const verifiedIdentity = selected?.state !== "Action needed";
+
+  /* Coverage per credential type, counted rather than asserted: how many of
+     the staff hold this one in a state the verifier still accepts. A venue
+     asks this before it asks about any individual — "can we open the gaming
+     room tonight" is a question about how many RSGs are current. */
+  const coverage = useMemo(
+    () =>
+      (Object.keys(CREDENTIAL_TYPES) as (keyof typeof CREDENTIAL_TYPES)[]).map((type) => {
+        const meta = CREDENTIAL_TYPES[type];
+        const held = workers.filter((w) =>
+          w.creds.some((c) => c.label === meta.label && (c.state === "Current" || c.state === "Expiring")),
+        ).length;
+        return { label: meta.shortLabel, icon: meta.icon, held };
+      }),
+    [workers],
+  );
 
   return (
     <div>
@@ -254,16 +349,18 @@ export default function CredentialsPage() {
           </Card>
           {/* job requirements */}
           <Card style={{ marginBottom: 16 }}>
-            <CardHead title="Shift Requirements" right={<span style={{ fontSize: 11.5, color: "var(--fg-4)", display: "inline-flex", alignItems: "center", gap: 5 }}><Icon name="refresh-cw" size={13} />Last updated: 2 mins ago</span>} />
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(6,1fr)", gap: 10 }}>
-              {REQS.map(([n, v, icon, tone], i) => {
+            <CardHead title="Credential coverage" right={<span style={{ fontSize: 11.5, color: "var(--fg-4)", display: "inline-flex", alignItems: "center", gap: 5 }}><Icon name="users" size={13} />{workers.length} staff</span>} />
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 10 }}>
+              {coverage.map((c) => {
+                const pct = workers.length ? (c.held / workers.length) * 100 : 0;
+                const tone: Tone = pct === 100 ? "success" : pct >= 50 ? "warning" : "danger";
                 const [, , dc] = STATUS[tone];
                 return (
-                  <div key={i} style={{ border: "1px solid var(--border)", borderRadius: 11, padding: 12, display: "flex", flexDirection: "column", gap: 7 }}>
-                    <Icon name={icon} size={18} color="var(--fs-teal)" />
-                    <div style={{ fontSize: 11.5, fontWeight: 600, color: "var(--fg-2)", lineHeight: 1.25 }}>{n}<div style={{ fontSize: 10, color: "var(--fg-4)", fontWeight: 500 }}>Required</div></div>
-                    <div className="fs-tnum" style={{ fontSize: 16, fontWeight: 800, color: "var(--fg-1)" }}>{v}<span style={{ fontSize: 12, color: "var(--fg-4)", fontWeight: 600 }}> / 36</span></div>
-                    <Bar value={(v / 36) * 100} color={dc} height={4} />
+                  <div key={c.label} style={{ border: "1px solid var(--border)", borderRadius: 11, padding: 12, display: "flex", flexDirection: "column", gap: 7 }}>
+                    <Icon name={c.icon} size={18} color="var(--fs-teal)" />
+                    <div style={{ fontSize: 11.5, fontWeight: 600, color: "var(--fg-2)", lineHeight: 1.25 }}>{c.label}<div style={{ fontSize: 10, color: "var(--fg-4)", fontWeight: 500 }}>Currently held</div></div>
+                    <div className="fs-tnum" style={{ fontSize: 16, fontWeight: 800, color: "var(--fg-1)" }}>{c.held}<span style={{ fontSize: 12, color: "var(--fg-4)", fontWeight: 600 }}> / {workers.length}</span></div>
+                    <Bar value={pct} color={dc} height={4} />
                   </div>
                 );
               })}
@@ -303,7 +400,7 @@ export default function CredentialsPage() {
             <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12.5 }}>
               <thead>
                 <tr>
-                  {["Staff", "Status", "Match", "Missing / Issues", "Fatigue", "Gaming"].map((h) => (
+                  {["Staff", "Status", "Held", "Needs attention"].map((h) => (
                     <th key={h} style={{ textAlign: "left", padding: "9px 14px", fontSize: 10.5, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".04em", color: "var(--fg-4)" }}>{h}</th>
                   ))}
                 </tr>
@@ -311,16 +408,16 @@ export default function CredentialsPage() {
               <tbody>
                 {pageWorkers.length === 0 ? (
                   <tr style={{ borderTop: "1px solid var(--border)" }}>
-                    <td colSpan={6} style={{ padding: "28px 14px", textAlign: "center", color: "var(--fg-4)", fontSize: 13 }}>No workers match this filter.</td>
+                    <td colSpan={4} style={{ padding: "28px 14px", textAlign: "center", color: "var(--fg-4)", fontSize: 13 }}>No workers match this filter.</td>
                   </tr>
                 ) : (
                   pageWorkers.map((w) => {
-                    const isSel = w.id === selected.id;
+                    const isSel = w.did === selected?.did;
                     return (
                       <tr
-                        key={w.id}
+                        key={w.did}
                         className="hov-row"
-                        onClick={() => selectWorker(w.id)}
+                        onClick={() => selectWorker(w.did)}
                         style={{
                           borderTop: "1px solid var(--border)",
                           cursor: "pointer",
@@ -328,12 +425,10 @@ export default function CredentialsPage() {
                           boxShadow: isSel ? "inset 3px 0 0 var(--fs-teal)" : undefined,
                         }}
                       >
-                        <td style={{ padding: "11px 14px" }}><div style={{ display: "flex", alignItems: "center", gap: 9 }}><Avatar name={w.name} size={28} /><span><div style={{ fontWeight: 600, color: "var(--fg-1)" }}>{w.name}</div><div className="fs-tnum" style={{ fontSize: 10.5, color: "var(--fg-4)" }}>ID: {w.cardId}</div></span></div></td>
-                        <td style={{ padding: "11px 14px" }}><Badge tone={w.tone} dot>{w.status}</Badge></td>
-                        <td style={{ padding: "11px 14px", minWidth: 90 }}><div className="fs-tnum" style={{ fontSize: 12, fontWeight: 700, color: "var(--fg-1)", marginBottom: 4 }}>{w.match}%</div><Bar value={w.match} color={w.match >= 90 ? "var(--success)" : w.match >= 60 ? "var(--warning)" : "var(--danger)"} height={4} /></td>
-                        <td style={{ padding: "11px 14px", color: w.issues === "—" ? "var(--fg-4)" : "var(--warning-fg)", fontSize: 12, maxWidth: 200 }}>{w.issues}</td>
-                        <td style={{ padding: "11px 14px" }}>{w.fatigue === "Fit" ? <span style={{ color: "var(--success-fg)", fontWeight: 600, display: "inline-flex", gap: 5, alignItems: "center" }}><span style={{ width: 6, height: 6, borderRadius: 999, background: "var(--success)" }} />Fit</span> : <span style={{ color: "var(--danger-fg)", fontWeight: 600, display: "inline-flex", gap: 5, alignItems: "center" }}><Icon name="triangle-alert" size={13} />At Risk</span>}</td>
-                        <td style={{ padding: "11px 14px" }}>{w.access === "—" ? <span style={{ color: "var(--fg-4)" }}>—</span> : <Badge tone={w.access === "Approved" ? "success" : "warning"}>{w.access}</Badge>}</td>
+                        <td style={{ padding: "11px 14px" }}><div style={{ display: "flex", alignItems: "center", gap: 9 }}><Avatar name={w.name} size={28} /><span><div style={{ fontWeight: 600, color: "var(--fg-1)" }}>{w.name}</div><div style={{ fontSize: 10.5, color: "var(--fg-4)" }}>{w.role}</div></span></div></td>
+                        <td style={{ padding: "11px 14px" }}><Badge tone={w.tone} dot>{w.state}</Badge></td>
+                        <td className="fs-tnum" style={{ padding: "11px 14px", color: "var(--fg-2)" }}>{w.creds.length}</td>
+                        <td style={{ padding: "11px 14px", color: w.issues === "—" ? "var(--fg-4)" : w.state === "Action needed" ? "var(--danger-fg)" : "var(--warning-fg)", fontSize: 12, maxWidth: 260 }}>{w.issues}</td>
                       </tr>
                     );
                   })
@@ -356,30 +451,30 @@ export default function CredentialsPage() {
             <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 12 }}>Staff Verification</div>
             <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12 }}>
               <Avatar name={selected.name} size={46} />
-              <div><div style={{ fontSize: 15, fontWeight: 700, color: "var(--fg-1)" }}>{selected.name}</div><div className="fs-tnum" style={{ fontSize: 11.5, color: "var(--fg-4)" }}>ID: {selected.cardId}</div></div>
+              <div><div style={{ fontSize: 15, fontWeight: 700, color: "var(--fg-1)" }}>{selected.name}</div><div className="fs-tnum" style={{ fontSize: 11.5, color: "var(--fg-4)" }}>{selected?.role}</div></div>
             </div>
             {verifiedIdentity ? (
               <div style={{ display: "flex", alignItems: "center", gap: 7, padding: "8px 11px", background: "var(--success-bg)", borderRadius: 9, marginBottom: 14 }}>
-                <Icon name="badge-check" size={16} color="var(--success-fg)" /><span style={{ fontSize: 12, fontWeight: 700, color: "var(--success-fg)" }}>VERIFIED IDENTITY</span>
-                <span style={{ marginLeft: "auto", fontSize: 10.5, color: "var(--success-fg)", opacity: 0.8 }}>Today, 6:15am</span>
+                <Icon name="badge-check" size={16} color="var(--success-fg)" /><span style={{ fontSize: 12, fontWeight: 700, color: "var(--success-fg)" }}>ALL CREDENTIALS CURRENT</span>
+                <span style={{ marginLeft: "auto", fontSize: 10.5, color: "var(--success-fg)", opacity: 0.8 }}>as at {fmtDay(today)}</span>
               </div>
             ) : (
               <div style={{ display: "flex", alignItems: "center", gap: 7, padding: "8px 11px", background: "var(--danger-bg)", borderRadius: 9, marginBottom: 14 }}>
-                <Icon name="shield-alert" size={16} color="var(--danger-fg)" /><span style={{ fontSize: 12, fontWeight: 700, color: "var(--danger-fg)" }}>ELIGIBILITY BLOCKED</span>
-                <span style={{ marginLeft: "auto", fontSize: 10.5, color: "var(--danger-fg)", opacity: 0.8 }}>Today, 6:15am</span>
+                <Icon name="shield-alert" size={16} color="var(--danger-fg)" /><span style={{ fontSize: 12, fontWeight: 700, color: "var(--danger-fg)" }}>CREDENTIALS NEED ATTENTION</span>
+                <span style={{ marginLeft: "auto", fontSize: 10.5, color: "var(--danger-fg)", opacity: 0.8 }}>as at {fmtDay(today)}</span>
               </div>
             )}
             <div style={{ display: "flex", flexDirection: "column", gap: 11 }}>
               {selectedCreds.map((c, i) => {
-                const tone: Tone = c.verified ? "success" : c.state === "Pending" || c.state === "Expiring" ? "warning" : "danger";
+                const ok = c.state === "Current";
                 return (
                   <div key={i} style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
-                    <span style={{ width: 30, height: 30, borderRadius: 8, background: "var(--bg-2)", display: "inline-flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><Icon name={c.icon} size={15} color={c.verified ? "var(--fs-teal)" : "var(--fg-4)"} /></span>
+                    <span style={{ width: 30, height: 30, borderRadius: 8, background: "var(--bg-2)", display: "inline-flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><Icon name={c.icon} size={15} color={ok ? "var(--fs-teal)" : "var(--fg-4)"} /></span>
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: 12.5, fontWeight: 600, color: "var(--fg-1)" }}>{c.name}</div>
+                      <div style={{ fontSize: 12.5, fontWeight: 600, color: "var(--fg-1)" }}>{c.label}</div>
                       <div style={{ fontSize: 11, color: "var(--fg-4)" }}>{c.line1}{c.line2 && <> · {c.line2}</>}</div>
                     </div>
-                    <Badge tone={tone} icon={c.verified ? "check" : "alert-triangle"}>{c.state}</Badge>
+                    <Badge tone={c.tone} icon={ok ? "check" : "alert-triangle"}>{c.state}</Badge>
                   </div>
                 );
               })}
@@ -389,13 +484,13 @@ export default function CredentialsPage() {
           <Card>
             <CardHead title="Event Log" right={<LinkBtn onClick={() => setLogOpen(true)}>View all</LinkBtn>} />
             <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
-              {LOG.slice(0, 5).map((e, i) => {
-                const [bg, fg] = STATUS[e[3]];
+              {log.slice(0, 5).map((e, i) => {
+                const [bg, fg] = STATUS[e.tone];
                 return (
                   <div key={i} style={{ display: "flex", gap: 10, padding: "9px 0", borderTop: i ? "1px solid var(--border)" : 0 }}>
-                    <span style={{ width: 26, height: 26, borderRadius: 7, background: bg, color: fg, display: "inline-flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><Icon name={e[2]} size={14} /></span>
-                    <div style={{ flex: 1 }}><div style={{ fontSize: 12.5, fontWeight: 600, color: "var(--fg-1)" }}>{e[0]}</div><div style={{ fontSize: 11, color: "var(--fg-4)" }}>{e[1]}</div></div>
-                    <span style={{ fontSize: 10.5, color: "var(--fg-4)", whiteSpace: "nowrap" }}>Today, 6:15am</span>
+                    <span style={{ width: 26, height: 26, borderRadius: 7, background: bg, color: fg, display: "inline-flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><Icon name={e.icon} size={14} /></span>
+                    <div style={{ flex: 1 }}><div style={{ fontSize: 12.5, fontWeight: 600, color: "var(--fg-1)" }}>{e.title}</div><div style={{ fontSize: 11, color: "var(--fg-4)" }}>{e.detail}</div></div>
+                    <span style={{ fontSize: 10.5, color: "var(--fg-4)", whiteSpace: "nowrap" }}>{e.at}</span>
                   </div>
                 );
               })}
@@ -455,15 +550,15 @@ export default function CredentialsPage() {
           <Avatar name={selected.name} size={54} />
           <div style={{ flex: 1 }}>
             <div style={{ fontSize: 17, fontWeight: 700, color: "var(--fg-1)" }}>{selected.name}</div>
-            <div className="fs-tnum" style={{ fontSize: 12, color: "var(--fg-4)" }}>ID: {selected.cardId}</div>
+            <div style={{ fontSize: 12, color: "var(--fg-4)" }}>{selected?.role}</div>
           </div>
-          <Badge tone={selected.tone} dot>{selected.status}</Badge>
+          <Badge tone={selected.tone} dot>{selected.state}</Badge>
         </div>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 10, marginBottom: 18 }}>
           {[
-            ["Match Score", `${selected.match}%`, "target"],
-            ["Fatigue", selected.fatigue, "battery-medium"],
-            ["Venue Access", selected.access, "key-round"],
+            ["Credentials held", String(selected.creds.length), "badge-check"],
+            ["Needs attention", String(selected.creds.filter((c) => c.state !== "Current").length), "triangle-alert"],
+            ["Inductions", String(selected.creds.filter((c) => c.label.includes("Induction")).length), "map-pin-check"],
           ].map(([label, value, icon]) => (
             <div key={label} style={{ border: "1px solid var(--border)", borderRadius: 11, padding: 12 }}>
               <Icon name={icon} size={16} color="var(--fs-teal)" />
@@ -475,15 +570,15 @@ export default function CredentialsPage() {
         <div style={{ fontSize: 13, fontWeight: 700, color: "var(--fg-2)", marginBottom: 10 }}>Credentials</div>
         <div style={{ display: "flex", flexDirection: "column", gap: 11 }}>
           {selectedCreds.map((c, i) => {
-            const tone: Tone = c.verified ? "success" : c.state === "Pending" || c.state === "Expiring" ? "warning" : "danger";
+            const ok = c.state === "Current";
             return (
               <div key={i} style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
-                <span style={{ width: 30, height: 30, borderRadius: 8, background: "var(--bg-2)", display: "inline-flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><Icon name={c.icon} size={15} color={c.verified ? "var(--fs-teal)" : "var(--fg-4)"} /></span>
+                <span style={{ width: 30, height: 30, borderRadius: 8, background: "var(--bg-2)", display: "inline-flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><Icon name={c.icon} size={15} color={ok ? "var(--fs-teal)" : "var(--fg-4)"} /></span>
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 12.5, fontWeight: 600, color: "var(--fg-1)" }}>{c.name}</div>
+                  <div style={{ fontSize: 12.5, fontWeight: 600, color: "var(--fg-1)" }}>{c.label}</div>
                   <div style={{ fontSize: 11, color: "var(--fg-4)" }}>{c.line1}{c.line2 && <> · {c.line2}</>}</div>
                 </div>
-                <Badge tone={tone} icon={c.verified ? "check" : "alert-triangle"}>{c.state}</Badge>
+                <Badge tone={c.tone} icon={ok ? "check" : "alert-triangle"}>{c.state}</Badge>
               </div>
             );
           })}
@@ -499,13 +594,13 @@ export default function CredentialsPage() {
         footer={<Button size="sm" variant="sec" onClick={() => setLogOpen(false)}>Close</Button>}
       >
         <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
-          {LOG.map((e, i) => {
-            const [bg, fg] = STATUS[e[3]];
+          {log.map((e, i) => {
+            const [bg, fg] = STATUS[e.tone];
             return (
               <div key={i} style={{ display: "flex", gap: 10, padding: "11px 0", borderTop: i ? "1px solid var(--border)" : 0 }}>
-                <span style={{ width: 28, height: 28, borderRadius: 7, background: bg, color: fg, display: "inline-flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><Icon name={e[2]} size={15} /></span>
-                <div style={{ flex: 1 }}><div style={{ fontSize: 13, fontWeight: 600, color: "var(--fg-1)" }}>{e[0]}</div><div style={{ fontSize: 11.5, color: "var(--fg-4)" }}>{e[1]}</div></div>
-                <span style={{ fontSize: 11, color: "var(--fg-4)", whiteSpace: "nowrap" }}>Today, 6:15am</span>
+                <span style={{ width: 28, height: 28, borderRadius: 7, background: bg, color: fg, display: "inline-flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><Icon name={e.icon} size={15} /></span>
+                <div style={{ flex: 1 }}><div style={{ fontSize: 13, fontWeight: 600, color: "var(--fg-1)" }}>{e.title}</div><div style={{ fontSize: 11.5, color: "var(--fg-4)" }}>{e.detail}</div></div>
+                <span style={{ fontSize: 11, color: "var(--fg-4)", whiteSpace: "nowrap" }}>{e.at}</span>
               </div>
             );
           })}
