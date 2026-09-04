@@ -30,10 +30,18 @@ const MESSAGE: Record<string, string> = {
   too_many_attempts: "Too many tries. Ask for a new code.",
 };
 
-/** Who is asking, for throttling. Proxy header first, then the socket. */
-function bucketOf(req: Request): string {
+/**
+ * Who is asking, for throttling — the caller AND the person they are claiming
+ * to be.
+ *
+ * Per-address alone would make a venue one bucket, so one person fumbling a
+ * code read to them across a bar would lock out colleagues who did nothing.
+ * Including the did means a failure only ever costs the person it was about.
+ */
+function bucketOf(req: Request, did: string): string {
   const fwd = req.headers.get("x-forwarded-for")?.split(",")[0].trim();
-  return fwd || req.headers.get("x-real-ip") || "anon";
+  const caller = fwd || req.headers.get("x-real-ip") || "anon";
+  return `${caller}|${did}`;
 }
 
 export async function POST(req: Request) {
@@ -50,7 +58,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "did and code are required" }, { status: 400 });
   }
 
-  const result = authStore().redeemCode(did, code, bucketOf(req));
+  const result = authStore().redeemCode(did, code, bucketOf(req, did));
   if (!result.ok) {
     return NextResponse.json(
       { error: MESSAGE[result.reason] ?? MESSAGE.unknown, reason: result.reason },

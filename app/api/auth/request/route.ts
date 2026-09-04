@@ -35,6 +35,18 @@ export async function POST(req: Request) {
   if (!did) return NextResponse.json({ error: "did is required" }, { status: 400 });
 
   const sink = sinkFromEnv();
+
+  /* Refuse before minting anything. A sink that cannot deliver would otherwise
+     throw after the grant was issued, spending the person’s issue budget on a
+     code nobody could ever receive — and returning a 500 that reads like a bug
+     rather than the configuration problem it is. */
+  if (!sink.configured) {
+    return NextResponse.json(
+      { error: "No sign-in delivery channel is configured on this server." },
+      { status: 503 },
+    );
+  }
+
   const person = workerIndex.get(did);
 
   /* Same shape of answer either way. An unknown did costs a round trip and
@@ -43,7 +55,17 @@ export async function POST(req: Request) {
     return NextResponse.json({ sent: true, via: sink.describe(), outOfBand: true });
   }
 
-  const grant = authStore().issue(did);
+  const issued = authStore().issue(did);
+
+  /* Refused for asking too often. Answered exactly like a success, because the
+     difference is not the caller’s business and telling them apart would say
+     which names are being hammered. The code already outstanding is untouched,
+     so the one the manager is reading out still works. */
+  if (!issued.ok) {
+    return NextResponse.json({ sent: true, via: sink.describe(), outOfBand: true });
+  }
+
+  const grant = issued.grant;
   const origin = new URL(req.url).origin;
   const link = `${origin}/api/auth/link?t=${encodeURIComponent(grant.token)}`;
 

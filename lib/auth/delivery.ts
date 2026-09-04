@@ -45,12 +45,15 @@ export interface Delivery {
 }
 
 export interface CodeSink {
+  /** false when this sink cannot deliver at all, so callers refuse early. */
+  readonly configured: boolean;
   describe(): string;
   deliver(input: { did: string; name: string; code: string; link: string; expiresAt: number }): Promise<Delivery>;
 }
 
 /** Writes the code where server access is needed to read it. */
 export class FileSink implements CodeSink {
+  readonly configured = true;
   constructor(private readonly dir: string) {}
 
   describe(): string {
@@ -78,6 +81,7 @@ export class FileSink implements CodeSink {
  * as though a channel had verified anything.
  */
 export class InlineSink implements CodeSink {
+  readonly configured = true;
   describe(): string {
     return "returned in the response (no delivery channel configured)";
   }
@@ -89,6 +93,7 @@ export class InlineSink implements CodeSink {
 
 /** Reserved for the day there is a transport. */
 export class EmailSink implements CodeSink {
+  readonly configured = false;
   describe(): string {
     return "email (not configured)";
   }
@@ -98,14 +103,40 @@ export class EmailSink implements CodeSink {
   }
 }
 
+/** No channel at all. Refuses, so nothing can sign in. */
+export class NoSink implements CodeSink {
+  readonly configured = false;
+  describe(): string {
+    return "no delivery channel configured";
+  }
+
+  async deliver(): Promise<Delivery> {
+    throw new Error(
+      "no delivery channel is configured — set AUTH_CODES_DIR, or AUTH_CODES_INLINE=1 to accept that anyone who can reach this server can sign in as anyone",
+    );
+  }
+}
+
 /**
  * The sink this deployment should use.
  *
- * Ordered so that configuring a real channel is what turns the insecure one
- * off — nobody has to remember to disable anything.
+ * Fails CLOSED in production, and that is the whole point of the ordering.
+ * InlineSink returns the code in the response body, so with it as a silent
+ * default a POST to /api/auth/request with a guessable did — and a did is
+ * derivable from a name on the roster — hands a live sign-in code to anyone
+ * who can reach the server. The sign-in screen carries a warning about this,
+ * which mitigates nothing, because an attacker is running curl and there is no
+ * screen involved.
+ *
+ * So: a real channel if one is configured, the insecure one only when somebody
+ * has said so out loud or when this is plainly a dev machine, and otherwise
+ * nothing. A sign-in that refuses is a bad demo; a sign-in that hands out
+ * credentials to strangers is a bad product.
  */
 export function sinkFromEnv(): CodeSink {
   const dir = process.env.AUTH_CODES_DIR;
   if (dir) return new FileSink(dir);
-  return new InlineSink();
+  if (process.env.AUTH_CODES_INLINE === "1") return new InlineSink();
+  if (process.env.NODE_ENV !== "production") return new InlineSink();
+  return new NoSink();
 }

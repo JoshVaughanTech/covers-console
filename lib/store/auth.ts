@@ -81,6 +81,18 @@ export interface Grant {
   expiresAt: number;
 }
 
+/**
+ * The outcome of asking for a code.
+ *
+ * Not a bare Grant, because refusing has to be expressible. Issuing spends any
+ * outstanding grant, so an unthrottled issue endpoint is a denial of service on
+ * sign-in: loop requests for somebody and their code is dead before they can
+ * type it. A caller that could not be told "no" could not defend against that.
+ */
+export type IssueResult =
+  | { ok: true; grant: Grant }
+  | { ok: false; reason: "rate_limited" };
+
 export type RedeemResult =
   | { ok: true; did: string; session: { id: string; secret: string; expiresAt: number } }
   | { ok: false; reason: "unknown" | "expired" | "spent" | "too_many_attempts" };
@@ -94,9 +106,36 @@ export interface Session {
 
 const now = () => Math.floor(Date.now() / 1000);
 
-/** Throttle window, and how many failures one caller gets inside it. */
+/**
+ * Throttle window, and how many failures one bucket gets inside it.
+ *
+ * The bucket is per caller AND per person, not per caller alone. A venue is
+ * one IP: bucketing on the address alone means four people fumbling their five
+ * attempts locks out everyone behind that NAT, and eight characters read aloud
+ * across a bar makes that an ordinary Friday rather than an attack. The people
+ * locked out did nothing.
+ *
+ * The address half is also weaker than it looks — x-forwarded-for is
+ * client-supplied unless a trusted proxy overwrites it, so a caller can mint a
+ * fresh bucket per request. That is survivable because it is not the control
+ * doing the work: redeeming requires the did, and each person has their own
+ * five attempts. This is a flood ceiling, documented as one rather than
+ * relied on as a gate.
+ */
 const THROTTLE_WINDOW_SECONDS = 15 * 60;
 const MAX_FAILURES_PER_WINDOW = 20;
+
+/**
+ * How many codes one person can be issued in a window.
+ *
+ * Five is generous for a human — a mistyped code, an expired one, a phone that
+ * lost the page — and the number matters less than what happens at the limit:
+ * a refusal does not spend the grant already outstanding. So an attacker can
+ * burn the budget, and the last code issued stays live for the rest of the
+ * window, which is the one the manager is reading out.
+ */
+const ISSUE_WINDOW_SECONDS = 15 * 60;
+const MAX_ISSUES_PER_WINDOW = 5;
 
 export class AuthStore {
   private db: DatabaseSync;
@@ -133,8 +172,18 @@ export class AuthStore {
    * they are reading the older of two texts — and it doubles the guessing
    * surface for no benefit.
    */
-  issue(did: string, at = now()): Grant {
+  issue(did: string, at = now()): IssueResult {
     this.sweep(at);
+
+    /* Refuse BEFORE spending anything. The order is the whole defence: a
+       refusal that had already killed the outstanding grant would be the
+       denial of service it exists to prevent, just with a different status
+       code. */
+    const { n } = this.db
+      .prepare("SELECT COUNT(*) AS n FROM signin_grant WHERE did = ? AND issued_at >= ?")
+      .get(did, at - ISSUE_WINDOW_SECONDS) as { n: number };
+    if (n >= MAX_ISSUES_PER_WINDOW) return { ok: false, reason: "rate_limited" };
+
     this.db.prepare("UPDATE signin_grant SET redeemed_at = ? WHERE did = ? AND redeemed_at IS NULL")
       .run(at, did);
 
@@ -147,7 +196,10 @@ export class AuthStore {
       )
       .run(id, did, minted.tokenHash, minted.codeHash, at, minted.expiresAt);
 
-    return { id, did, token: minted.token, code: minted.code, expiresAt: minted.expiresAt };
+    return {
+      ok: true,
+      grant: { id, did, token: minted.token, code: minted.code, expiresAt: minted.expiresAt },
+    };
   }
 
   /** Redeem a link secret. */

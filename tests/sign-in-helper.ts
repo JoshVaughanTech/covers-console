@@ -14,8 +14,9 @@ export interface TestSession {
 }
 
 export function signIn(did: string): TestSession {
-  const grant = authStore().issue(did);
-  const result = authStore().redeemCode(did, grant.code, "test");
+  const issued = authStore().issue(did);
+  if (!issued.ok) throw new Error("test sign-in could not get a code: rate limited");
+  const result = authStore().redeemCode(did, issued.grant.code, "test");
   if (!result.ok) throw new Error(`test sign-in failed: ${result.reason}`);
   return { did, cookie: `${COOKIE}=${encodeURIComponent(result.session.secret)}` };
 }
