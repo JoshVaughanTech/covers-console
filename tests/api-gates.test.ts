@@ -21,6 +21,26 @@ import { join, posix, relative, sep } from "node:path";
    So this enumerates instead of naming. A new route file forces a
    decision at the moment it is added: gate it, or put it on the list
    below and say why. Both are fine. Silence is not.
+   What this proves, and what it does not.
+
+   gateOf() is a regex over source. It proves a route MENTIONS a
+   gate; it cannot prove one is enforced. This would pass:
+
+       const op = operatorOf(req);
+       // ...and nothing ever checks op
+
+   So a green run here means every route CONSIDERED who may call it,
+   not that every route is protected. Those differ exactly where
+   somebody thought about the gate and got it wrong, and the second
+   class needs the behavioural tests — the 401s in
+   console-auth.test.ts and the per-route suites — which exist for
+   the routes that carry anything.
+
+   Said out loud because a passing run will otherwise be read as the
+   stronger claim, and an artefact read as stronger than it is has
+   been the recurring failure this file came out of. The test that
+   proves consideration must not be allowed to stand in for the test
+   that proves enforcement.
    ============================================================ */
 
 const API = join(process.cwd(), "app", "api");
@@ -58,7 +78,14 @@ function routeFiles(dir: string, acc: string[] = []): string[] {
 const routeName = (file: string) =>
   relative(API, file).split(sep).slice(0, -1).join(posix.sep) || "(root)";
 
-/** How this file decides who is calling, or null if it does not. */
+/**
+ * How this file decides who is calling, or null if it does not.
+ *
+ * Textual, and therefore evidence of consideration rather than of
+ * enforcement — see the note at the top. Matching timingSafeEqual rather than
+ * a header name is deliberate: that route authenticates by comparing a
+ * secret, so renaming the header cannot silently drop the gate.
+ */
 function gateOf(source: string): string | null {
   if (/\boperatorOf\s*\(/.test(source) && /\bworkerOf\s*\(/.test(source)) return "either kind";
   if (/\boperatorOf\s*\(/.test(source)) return "operator";
