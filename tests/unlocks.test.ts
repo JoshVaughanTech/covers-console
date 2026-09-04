@@ -189,19 +189,26 @@ describe("site-scoped credentials are one row per venue", () => {
 });
 
 describe("never tells someone to buy a credential they already hold", () => {
-  /* Guarding this module against a known bug in decideMember().
+  /* An invariant, and — as of ef4b5b5 — one nothing can currently violate.
+     Saying so is the point of this comment.
 
-     engine.ts:95 does credentials.find(c => c.type === req.type) and verifies
-     whatever it finds, so a superseded record sitting earlier in the array
-     refuses somebody who lawfully holds a current one. Renewal leaves the old
-     record behind, so that shape is ordinary rather than exotic — it just does
-     not occur in the seed, which is why the guard above passes without ever
-     meeting it. A test that never encounters the case is not coverage.
+     It was written against a real bug: decideMember() took the first
+     credential of a type and verified only that, so a superseded record
+     sitting earlier in the array refused somebody who lawfully held a current
+     one, and this module would then have offered them the licence they were
+     holding. The engine now weighs every matching record, so a renewal is no
+     longer refused and the route into that failure is closed at its source.
 
-     What must hold regardless of the engine: if they hold a current one, this
-     never offers it. The shift may still read as blocked — that reason is the
-     gate's to fix — but the profile screen must not add "go and get an RSA" on
-     top of it, to somebody holding an RSA. */
+     Which means these two tests no longer bite. Measured, not assumed: with
+     the renewal shape below, the number of postings a fresh RSA would clear is
+     ZERO — so removing the holdsValid guard would change nothing here, and a
+     passing run proves the invariant holds rather than that it was tested.
+
+     They stay because the invariant is worth stating and cheap to keep: any
+     future path that reports somebody blocked on a credential they hold would
+     surface here as a wrong instruction to go and buy it. They are a tripwire,
+     not a demonstration, and dressing them up as the second would be the
+     coverage-costume this file already warns about twice. */
   const shape = () => {
     const person = worker("Michael Tan");
     const others = credsOf(person.did).filter((c) => c.type !== "rsa");
