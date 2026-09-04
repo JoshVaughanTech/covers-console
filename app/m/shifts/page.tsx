@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { SignIn, type Signed } from "../sign-in";
 import { MobileNav } from "../nav";
 import { PushToggle } from "../push";
@@ -165,13 +166,13 @@ export default function MobileShiftsPage() {
     return {
       // rostered, not "standing assigned": a manager can put someone on a
       // shift they never claimed, and that person is just as on it
-      yours: all.filter((s) => s.rostered),
-      waiting: all.filter((s) => !s.rostered && s.standing?.standing === "open"),
       available: all
         .filter((s) => s.claimable)
         // new first: the whole point of being told is not having to hunt
         .sort((a, b) => Number(unseen.has(b.id)) - Number(unseen.has(a.id))),
       blocked: all.filter((s) => s.blockReason && !s.rostered),
+      // a count only; the board points at them and never re-renders them
+      mine: all.filter((s) => s.rostered || s.standing?.standing === "open").length,
     };
   }, [payload, unseen]);
 
@@ -261,7 +262,7 @@ export default function MobileShiftsPage() {
 
       {!payload && !error && <p style={{ fontSize: 13, color: "var(--fg-4)" }}>Loading the board…</p>}
 
-      {payload && groups.available.length === 0 && groups.waiting.length === 0 && groups.yours.length === 0 && (
+      {payload && groups.available.length === 0 && (
         <Banner tone="info">
           {groups.blocked.length > 0
             ? `Nothing you can take right now. ${groups.blocked.length} shift${groups.blocked.length === 1 ? "" : "s"} below need something you don't hold yet.`
@@ -269,16 +270,13 @@ export default function MobileShiftsPage() {
         </Banner>
       )}
 
-      {groups.yours.length > 0 && (
-        <Section title={`You're on (${groups.yours.length})`}>
-          {groups.yours.map((s) => <Row key={s.id} s={s} onTap={() => setOpen(s.id)} />)}
-        </Section>
-      )}
-
-      {groups.waiting.length > 0 && (
-        <Section title={`Waiting on the manager (${groups.waiting.length})`}>
-          {groups.waiting.map((s) => <Row key={s.id} s={s} onTap={() => setOpen(s.id)} />)}
-        </Section>
+      {/* Shifts this person is already on, or has claimed, live on My shifts.
+          They were listed here too until this screen and that one disagreed
+          about the same shift; one fact belongs on one screen. */}
+      {payload && (groups.mine > 0) && (
+        <Link href="/m/mine" style={mineLink}>
+          {groups.mine} of yours {groups.mine === 1 ? "is" : "are"} on My shifts
+        </Link>
       )}
 
       {groups.available.length > 0 && (
@@ -526,6 +524,12 @@ function PayPanel({ pay }: { pay: Pay }) {
     </section>
   );
 }
+
+const mineLink: React.CSSProperties = {
+  display: "block", marginBottom: 14, padding: "11px 13px", borderRadius: 12,
+  border: "1px solid var(--border-2)", background: "#fff", textDecoration: "none",
+  fontSize: 13.5, fontWeight: 600, color: "var(--fg-2)",
+};
 
 const chip = (tone: string): React.CSSProperties => ({
   fontSize: 11.5, fontWeight: 700, borderRadius: 999, padding: "3px 8px",
