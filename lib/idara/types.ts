@@ -203,6 +203,12 @@ export type AuditEventType =
    */
   | "break.pushed"
   | "break.push_failed"
+  /**
+   * A report handed to payroll. Carries the sha-256 of exactly what was
+   * delivered, so a later dispute is about a specific document rather than
+   * about whether a report was sent.
+   */
+  | "report.delivered"
   /** a manager assigning someone to an open shift (Open Shifts). */
   | "shift.assigned"
   /** a worker putting their hand up for an open shift. A request, not a
