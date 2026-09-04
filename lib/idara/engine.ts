@@ -11,6 +11,7 @@
    ============================================================ */
 
 import { CREDENTIAL_TYPES, functionsForRole } from "./hospitality";
+import { calendarDate } from "./dates";
 import type { CredentialVerifier } from "./verifier";
 import type {
   Action,
@@ -51,9 +52,18 @@ export interface DecideInput {
   duties?: WorkFunction[];
 }
 
+/**
+ * Whole days between two dates.
+ *
+ * Both ends are narrowed to their calendar day first, because `at` may arrive
+ * as a full timestamp. Parsing "2024-05-16T22:10:00Z" against a bare date
+ * leaves most of a day on one side of the subtraction, which rounds the answer
+ * down: an expiry 18 days out reports as 17, and at the warning threshold it
+ * decides whether the manager is told anything at all.
+ */
 function daysUntil(from: ISODate, to: ISODate): number {
-  const a = Date.parse(from);
-  const b = Date.parse(to);
+  const a = Date.parse(calendarDate(from));
+  const b = Date.parse(calendarDate(to));
   return Math.round((b - a) / 86_400_000);
 }
 

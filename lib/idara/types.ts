@@ -17,7 +17,17 @@
 /** A Decentralised Identifier. v1 issues did:web; opaque at the type level. */
 export type DID = string;
 
-/** Calendar date as "YYYY-MM-DD" so string comparison is chronological. */
+/**
+ * A calendar date as "YYYY-MM-DD", so string comparison is chronological.
+ *
+ * Some events legitimately carry a moment rather than a day — a break sent at
+ * 22:10 is not the same fact as a break "on Thursday" — and those send a full
+ * ISO timestamp in this field. The type cannot express the difference, so
+ * anything comparing one of these for chronology must narrow it first with
+ * `calendarDate()`. Comparing a timestamp against a bare date as raw strings
+ * makes the timestamp sort after the date, which reads as "the day is over"
+ * on the day itself.
+ */
 export type ISODate = string;
 
 /** Effective state of a credential (mirrors a Bitstring Status List entry). */

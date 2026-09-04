@@ -12,6 +12,7 @@
    ============================================================ */
 
 import type { Credential, CredentialStatus, ISODate } from "./types";
+import { isBeforeDay } from "./dates";
 
 export interface VerificationResult {
   /** effective status of the credential at the decision time. */
@@ -36,7 +37,10 @@ export class LocalCredentialVerifier implements CredentialVerifier {
     if (cred.status === "suspended") {
       return { status: "suspended", detail: "Credential is suspended." };
     }
-    if (cred.expiresAt && cred.expiresAt < at) {
+    // compared by day, not as raw strings: `at` may arrive as a full timestamp,
+    // which sorts after the bare expiry date and would read as expired on the
+    // very day the credential is still good
+    if (cred.expiresAt && isBeforeDay(cred.expiresAt, at)) {
       return { status: "expired", detail: `Expired ${cred.expiresAt}.` };
     }
     return { status: "valid", detail: "Verified and current." };

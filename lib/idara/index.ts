@@ -37,6 +37,7 @@ export { LocalCredentialVerifier } from "./verifier";
 export type { CredentialVerifier, VerificationResult } from "./verifier";
 export { appendEvent, verifyChain, shortHash, GENESIS_HASH, HASH_ALGORITHM } from "./audit";
 export { sha256Hex, canonicalJson } from "./hash";
+export { calendarDate, isBeforeDay } from "./dates";
 export type { NewAuditEvent } from "./audit";
 export { IdaraProvider, useIdara } from "./provider";
 export type { PublishResult, RosterAssignment } from "./provider";
