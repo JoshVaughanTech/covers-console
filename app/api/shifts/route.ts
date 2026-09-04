@@ -16,7 +16,7 @@
    ============================================================ */
 import { NextResponse } from "next/server";
 import { eventStore } from "@/lib/store/events";
-import { boardFrom, claimBlockReason, seatsLeft, standingFor } from "@/lib/shifts";
+import { boardFrom, claimBlockReason, describePay, seatsLeft, standingFor } from "@/lib/shifts";
 import { LocalCredentialVerifier } from "@/lib/idara/verifier";
 import { SITES } from "@/lib/idara/seed";
 import { workerOf } from "@/lib/auth/session";
@@ -76,6 +76,12 @@ export async function GET(req: Request) {
         seatsLeft: left,
         duties: p.duties,
         requires: p.requires,
+        /* What it pays, and how that sits against the award — computed here
+           rather than sent as a number to render. The phone showing "above
+           award" has to be the same arithmetic that stopped the venue posting
+           below it, or the badge is decoration. null when no rate is set,
+           which the screen says rather than filling in. */
+        pay: describePay(p),
         status: p.status,
         blockReason,
         standing: standing ? { standing: standing.standing, at: standing.at, reason: standing.reason ?? null } : null,

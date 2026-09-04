@@ -51,9 +51,14 @@ import {
   buildPosting,
   emptyDraft,
   dutiesForRole,
+  payFromDraft,
+  describePay,
+  describePayFor,
+  payBlockReasonFor,
   type PostingDraft,
   type ShiftPosting,
 } from "@/lib/shifts";
+import { fmtAud, floorHourly, LEVELS, suggestedLevel, type EmploymentType, type Level } from "@/lib/awards";
 import { rankForShift, WEIGHTS, type MatchResult, type ScoreReason } from "@/lib/matching";
 
 const STATUS_TONE = {
@@ -67,6 +72,25 @@ const DUTY_LABEL: Record<WorkFunction, string> = {
   handle_food: "Handle food",
   gaming: "Gaming",
   supervise: "Supervise",
+};
+
+/* MA000009 cl 18. The examples are the classifications a hospitality manager
+   will recognise, because "Level 3" on its own is not a thing anybody can
+   check their roster against. */
+const LEVEL_LABEL: Record<string, string> = {
+  introductory: "Introductory — first 3 months, no prior experience",
+  1: "Level 1 — food & beverage grade 1, kitchen attendant grade 1",
+  2: "Level 2 — food & beverage grade 2, cook grade 1, door person",
+  3: "Level 3 — food & beverage grade 3, cook grade 2, front office grade 2",
+  4: "Level 4 — tradesperson cook grade 3, food & beverage grade 4",
+  5: "Level 5 — supervisor, tradesperson cook grade 4",
+  6: "Level 6 — tradesperson cook grade 5",
+};
+
+const EMPLOYMENT_LABEL: Record<EmploymentType, string> = {
+  casual: "Casual — 25% loading",
+  full_time: "Full-time",
+  part_time: "Part-time",
 };
 
 const STATUS_LABEL = {
@@ -248,6 +272,39 @@ export default function OpenShiftsPage() {
           .filter((s) => held.has(s))
           .map((s) => ({ skill: s, level: held.get(s)! })),
       };
+    });
+
+  /* What the gate will say, shown while they are still typing.
+
+     Deliberately the same payFromDraft() → payBlockReasonFor() the builder
+     runs, not a second opinion computed for display. A preview that decides
+     for itself is how a form comes to promise something the gate then
+     refuses — or worse, reassures about something the gate lets through. */
+  const ratePreview = useMemo(() => {
+    const parsed = payFromDraft(draft);
+    if (!parsed.ok) return { state: "incomplete" as const, errors: parsed.errors };
+    if (!parsed.pay) return { state: "unset" as const };
+    return {
+      state: "priced" as const,
+      summary: describePayFor(parsed.pay),
+      blocked: payBlockReasonFor(parsed.pay),
+    };
+  }, [draft]);
+
+  /* The display strings follow the real times rather than being typed beside
+     them. Two fields describing one shift is two fields that can disagree, and
+     the one a worker reads is not the one the award is applied to. */
+  const setShiftTime = (patch: Partial<PostingDraft>) =>
+    setDraft((d) => {
+      const next = { ...d, ...patch };
+      if (/^\d{4}-\d{2}-\d{2}$/.test(next.date)) {
+        const [y, m, day] = next.date.split("-").map(Number);
+        next.day = new Date(Date.UTC(y, m - 1, day)).toLocaleDateString("en-AU", {
+          weekday: "short", day: "numeric", month: "short", timeZone: "UTC",
+        });
+      }
+      if (next.startTime && next.endTime) next.window = `${next.startTime}–${next.endTime}`;
+      return next;
     });
 
   const toggleDuty = (fn: WorkFunction) =>
@@ -438,6 +495,28 @@ export default function OpenShiftsPage() {
                       <div className="fs-tnum" style={{ fontSize: 11.5, color: "var(--fg-4)" }}>
                         {p.window} · {site(p.siteId)?.region ?? ""}
                       </div>
+                      {/* The rate belongs beside the shift, not only inside the
+                          form that set it. A manager scanning the board is the
+                          person who can still fix an underpaying draft. */}
+                      {(() => {
+                        const pay = describePay(p);
+                        if (!pay) {
+                          return (
+                            <div style={{ fontSize: 11.5, color: "var(--fg-4)", fontStyle: "italic", marginTop: 3 }}>
+                              No rate set
+                            </div>
+                          );
+                        }
+                        return (
+                          <div className="fs-tnum" style={{ fontSize: 11.5, marginTop: 3, fontWeight: 600, color: pay.atOrAboveFloor ? "var(--success-fg)" : "var(--danger-fg)" }}>
+                            {fmtAud(pay.offeredHourlyCents)}/h
+                            <span style={{ fontWeight: 500, color: "var(--fg-4)" }}>
+                              {" "}· floor {fmtAud(pay.floorHourlyCents)}
+                              {!pay.atOrAboveFloor && " · under award"}
+                            </span>
+                          </div>
+                        );
+                      })()}
                     </td>
                     <td className="fs-tnum" style={{ padding: "12px 8px", textAlign: "right", fontWeight: 700, color: seatsLeft(p) ? "var(--warning-fg)" : "var(--success-fg)" }}>
                       {p.assigned.length}/{p.seats}
@@ -838,6 +917,141 @@ export default function OpenShiftsPage() {
                 icon="clock"
               />
             </Field>
+          </div>
+
+          {/* ---------- what it pays ---------- */}
+          <div
+            style={{
+              border: "1px solid var(--border-2)", borderRadius: 12, padding: 14,
+              display: "flex", flexDirection: "column", gap: 12, background: "var(--bg-2)",
+            }}
+          >
+            <div>
+              <div style={{ fontSize: 13, fontWeight: 700, color: "var(--fg-1)" }}>Rate</div>
+              <div style={{ fontSize: 12, color: "var(--fg-4)", marginTop: 2 }}>
+                Leave blank to post without a rate. Set one and Covers checks it against the
+                Hospitality Award before the shift can go on the board.
+              </div>
+            </div>
+
+            <div style={{ display: "grid", gridTemplateColumns: "1.2fr 1fr 1fr", gap: 10 }}>
+              <Field label="Date">
+                <TextField type="date" value={draft.date} onChange={(v) => setShiftTime({ date: v })} />
+              </Field>
+              <Field label="Start">
+                <TextField type="time" value={draft.startTime} onChange={(v) => setShiftTime({ startTime: v })} />
+              </Field>
+              <Field label="End">
+                <TextField type="time" value={draft.endTime} onChange={(v) => setShiftTime({ endTime: v })} />
+              </Field>
+            </div>
+
+            <Field
+              label="Award classification"
+              hint="Yours to record — it depends on what the person actually does, and it decides their legal minimum. The role only suggests a starting point."
+            >
+              <Select
+                value={draft.level}
+                onChange={(v) => setDraft((d) => ({ ...d, level: v }))}
+                options={LEVELS.map((l) => ({ label: LEVEL_LABEL[String(l)], value: String(l) }))}
+                placeholder="Pick the level this job sits at"
+              />
+            </Field>
+
+            {/* Offered, never applied. suggestedLevel() may pre-fill a level a
+                person confirms; it may not choose one on their behalf. */}
+            {!draft.level && suggestedLevel(draft.role) != null && (
+              <button
+                type="button"
+                onClick={() => setDraft((d) => ({ ...d, level: String(suggestedLevel(d.role)) }))}
+                style={{
+                  font: "inherit", fontSize: 12, fontWeight: 600, cursor: "pointer", textAlign: "left",
+                  padding: "8px 11px", borderRadius: 9, border: "1px dashed var(--border-2)",
+                  background: "transparent", color: "var(--fg-3)",
+                }}
+              >
+                {draft.role} is usually {LEVEL_LABEL[String(suggestedLevel(draft.role))].split(" — ")[0]} — use that?
+              </button>
+            )}
+
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}>
+              <Field label="Employment">
+                <Select
+                  value={draft.employment}
+                  onChange={(v) => setDraft((d) => ({ ...d, employment: v as EmploymentType }))}
+                  options={(Object.keys(EMPLOYMENT_LABEL) as EmploymentType[]).map((e) => ({
+                    label: EMPLOYMENT_LABEL[e], value: e,
+                  }))}
+                />
+              </Field>
+              <Field label="Rate $/h">
+                <TextField
+                  value={draft.rate}
+                  onChange={(v) => setDraft((d) => ({ ...d, rate: v }))}
+                  placeholder="41.50"
+                  icon="dollar-sign"
+                />
+              </Field>
+              <Field label="Unpaid break (min)">
+                <TextField
+                  value={draft.unpaidBreakMin}
+                  onChange={(v) => setDraft((d) => ({ ...d, unpaidBreakMin: v }))}
+                  placeholder="30"
+                />
+              </Field>
+            </div>
+
+            {draft.level && (
+              <div style={{ fontSize: 12, color: "var(--fg-4)" }}>
+                Base weekday rate for this level:{" "}
+                <strong style={{ color: "var(--fg-2)" }}>
+                  {fmtAud(floorHourly(
+                    (/^\d+$/.test(draft.level) ? Number(draft.level) : draft.level) as Level,
+                    draft.employment,
+                  ))}/h
+                </strong>{" "}
+                — evening, weekend and public holiday hours are dearer, and the check below
+                uses the dearest hour in this shift.
+              </div>
+            )}
+
+            {ratePreview.state === "incomplete" && (
+              <div
+                style={{
+                  fontSize: 12.5, lineHeight: 1.5, borderRadius: 9, padding: "9px 11px",
+                  background: "var(--warning-bg)", color: "var(--warning-fg)",
+                }}
+              >
+                {ratePreview.errors.join(" · ")}
+              </div>
+            )}
+
+            {ratePreview.state === "priced" && ratePreview.summary && (
+              <div
+                style={{
+                  borderRadius: 10, padding: "11px 12px", fontSize: 12.5, lineHeight: 1.55,
+                  background: ratePreview.blocked ? "var(--danger-bg)" : "var(--success-bg)",
+                  color: ratePreview.blocked ? "var(--danger-fg)" : "var(--success-fg)",
+                }}
+              >
+                <div style={{ fontWeight: 700 }}>
+                  {ratePreview.blocked
+                    ? "This shift can't be posted at that rate"
+                    : `✓ Above the award — est. cost ${fmtAud(ratePreview.summary.estGrossCents)} for ${ratePreview.summary.paidHours}h`}
+                </div>
+                <div style={{ marginTop: 4 }}>
+                  {ratePreview.blocked ?? ratePreview.summary.summary}
+                </div>
+                <ul style={{ margin: "8px 0 0", padding: 0, listStyle: "none" }}>
+                  {ratePreview.summary.bands.map((b) => (
+                    <li key={b.band} style={{ display: "flex", justifyContent: "space-between", gap: 12, padding: "2px 0" }}>
+                      <span>{b.label} · {b.hours}h</span>
+                      <span className="fs-tnum" style={{ fontWeight: 600 }}>floor {fmtAud(b.hourlyCents)}/h</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
           </div>
 
           <Field
