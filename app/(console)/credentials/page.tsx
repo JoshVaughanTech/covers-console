@@ -22,8 +22,8 @@ import {
   useIdara,
   LocalCredentialVerifier,
   CREDENTIAL_TYPES,
-  EXPIRY_WARN_DAYS,
   calendarDate,
+  standingOf,
   type Credential,
   type CredentialVerifier,
   type Identity,
@@ -85,12 +85,6 @@ interface JobState {
 
 const PAGE_SIZE = 5;
 
-/** Whole days between two dates, both narrowed to the day. */
-function daysBetween(from: ISODate, to: ISODate): number {
-  return Math.round(
-    (Date.parse(calendarDate(to)) - Date.parse(calendarDate(from))) / 86_400_000,
-  );
-}
 
 function fmtDay(iso: ISODate): string {
   const [y, m, d] = calendarDate(iso).split("-");
@@ -120,40 +114,39 @@ function credRowsFor(
   verifier: CredentialVerifier,
   siteName: (id: string) => string,
 ): CredRow[] {
-  return all
-    .filter((c) => c.subject === did)
-    .map((c): CredRow => {
+  /* The states come from standingOf() rather than being recomputed here, so
+     this screen and People cannot disagree about whether a licence is good.
+     Everything below this line is presentation. */
+  return standingOf(did, all, at, verifier)
+    .held.map(({ credential: c, state, daysLeft }): CredRow => {
       const meta = CREDENTIAL_TYPES[c.type];
-      const v = verifier.verify(c, at);
+      const label: CredState =
+        state === "current" ? "Current"
+        : state === "expiring" ? "Expiring"
+        : state === "expired" ? "Expired"
+        : state === "revoked" ? "Revoked"
+        : "Suspended";
 
-      let state: CredState =
-        v.status === "revoked" ? "Revoked"
-        : v.status === "suspended" ? "Suspended"
-        : v.status === "expired" ? "Expired"
-        : "Current";
-
-      let line2 = "";
-      if (c.expiresAt) {
-        const left = daysBetween(at, c.expiresAt);
-        if (state === "Current" && left <= EXPIRY_WARN_DAYS) state = "Expiring";
-        line2 = state === "Expired"
-          ? `Expired ${fmtDay(c.expiresAt)}`
-          : `Expires ${fmtDay(c.expiresAt)}${state === "Expiring" ? ` · ${left} day${left === 1 ? "" : "s"}` : ""}`;
-      } else {
-        line2 = "No expiry";
-      }
+      const soon =
+        label === "Expiring" && daysLeft !== null
+          ? " · " + daysLeft + " day" + (daysLeft === 1 ? "" : "s")
+          : "";
+      let line2 = !c.expiresAt
+        ? "No expiry"
+        : label === "Expired"
+          ? "Expired " + fmtDay(c.expiresAt)
+          : "Expires " + fmtDay(c.expiresAt) + soon;
       // a site-scoped credential is only meaningful with the site named
-      if (c.claims.siteId) line2 = `${siteName(c.claims.siteId)} · ${line2}`;
+      if (c.claims.siteId) line2 = siteName(c.claims.siteId) + " · " + line2;
 
-      const cert = c.claims.cert ? ` · ${c.claims.cert}` : "";
       return {
         id: c.id,
         label: meta.label,
-        line1: `${meta.authority}${cert}`,
+        line1: meta.authority + (c.claims.cert ? " · " + c.claims.cert : ""),
         line2,
         icon: meta.icon,
-        state,
-        tone: CRED_TONE[state],
+        state: label,
+        tone: CRED_TONE[label],
       };
     })
     .sort((a, b) => a.label.localeCompare(b.label));
