@@ -10,6 +10,25 @@
    ============================================================ */
 
 import type { DID } from "@/lib/idara";
+import type { EmploymentType } from "@/lib/awards";
+import type { Level } from "@/lib/awards/rates";
+
+/**
+ * How this person is classified under the award.
+ *
+ * Authored per person, not derived from their role — the same rule ShiftPay
+ * follows, and for the same reason: which level a job sits at depends on what
+ * the person actually does, and getting it wrong underpays them. It lives on
+ * the profile rather than in Idara because a classification is what the
+ * business records, not something an issuer verified.
+ *
+ * A posting carries its own level, and it may differ: someone classified at
+ * Level 2 who works a supervisor shift is paid for the shift they worked.
+ */
+export interface AwardClassification {
+  level: Level;
+  employment: EmploymentType;
+}
 
 /** What a person can do behind a bar or on a floor. */
 export type SkillId =
@@ -42,4 +61,6 @@ export interface StaffProfile {
   excludedClients?: string[];
   /** hours already rostered this week; drives the fairness component. */
   hoursThisWeek: number;
+  /** what the award pays them at. See AwardClassification. */
+  award: AwardClassification;
 }
