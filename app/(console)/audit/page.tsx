@@ -37,6 +37,10 @@ function eventMeta(e: AuditEvent): EventMeta {
        what this screen is for. */
     case "shift.claimed":
       return { icon: "hand", tone: "info", kind: "Shift claimed" };
+    /* The claim leaves the posting when this is written, so this line is the
+       only remaining evidence the request was ever made. */
+    case "shift.withdrawn":
+      return { icon: "undo-2", tone: "neutral", kind: "Claim withdrawn" };
     case "shift.posted":
       return { icon: "megaphone", tone: "neutral", kind: "Shift posted" };
     /* The cause, next to the effect. Without a label of its own it renders

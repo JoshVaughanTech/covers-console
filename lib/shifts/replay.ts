@@ -42,7 +42,12 @@ const postingIdOf = (e: AuditEvent): string | null => {
 
 /** Does this event belong to Open Shifts at all? */
 export function isShiftEvent(e: AuditEvent): boolean {
-  if (e.type === "shift.posted" || e.type === "shift.claimed" || e.type === "shift.assigned") {
+  if (
+    e.type === "shift.posted" ||
+    e.type === "shift.claimed" ||
+    e.type === "shift.withdrawn" ||
+    e.type === "shift.assigned"
+  ) {
     return true;
   }
   // a declined claim writes as a plain decision, so it is identified by
@@ -75,6 +80,14 @@ function applyOne(postings: ShiftPosting[], e: AuditEvent): ShiftPosting[] {
       // replaying must not duplicate it
       if (p.claims.some((c) => c.did === did && c.at === e.at && !c.refused)) return p;
       return { ...p, claims: [...p.claims, { did, at: e.at }] };
+    }
+
+    /* Folds back over the claim above it. Without this a reload replays the
+       claim and not its withdrawal, and somebody who took their hand down is
+       back in the queue — the exact resurrection replay.ts exists to stop,
+       arriving through the one event that removes rather than adds. */
+    if (e.type === "shift.withdrawn") {
+      return { ...p, claims: p.claims.filter((c) => !(c.did === did && !c.refused)) };
     }
 
     if (e.type === "shift.assigned") {
