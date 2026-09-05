@@ -23,7 +23,7 @@ export const dynamic = "force-dynamic";
 const ORG = process.env.COVERS_ORG ?? "org-brightwater";
 
 export async function GET(req: Request) {
-  if (!workerOf(req)) return NextResponse.json({ error: "not signed in" }, { status: 401 });
+  if (!(await workerOf(req))) return NextResponse.json({ error: "not signed in" }, { status: 401 });
 
   const keys = vapidFromEnv();
   // not configured is a fact the phone needs, so it can stop asking rather
@@ -32,7 +32,7 @@ export async function GET(req: Request) {
 }
 
 export async function POST(req: Request) {
-  const caller = workerOf(req);
+  const caller = (await workerOf(req));
   if (!caller) return NextResponse.json({ error: "not signed in" }, { status: 401 });
   if (!vapidFromEnv()) {
     return NextResponse.json({ error: "push is not configured on this server" }, { status: 503 });
@@ -62,17 +62,17 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "endpoint must be https" }, { status: 400 });
   }
 
-  pushStore().save(
+  (await pushStore()).save(
     ORG,
     { did: caller.did, endpoint, p256dh, auth },
     new Date().toISOString(),
   );
 
-  return NextResponse.json({ subscribed: true, devices: pushStore().countFor(ORG, caller.did) });
+  return NextResponse.json({ subscribed: true, devices: (await pushStore()).countFor(ORG, caller.did) });
 }
 
 export async function DELETE(req: Request) {
-  const caller = workerOf(req);
+  const caller = (await workerOf(req));
   if (!caller) return NextResponse.json({ error: "not signed in" }, { status: 401 });
 
   const body = (await req.json().catch(() => null)) as { endpoint?: unknown } | null;
@@ -81,8 +81,8 @@ export async function DELETE(req: Request) {
 
   /* Scoped to this worker's own rows: the endpoint alone would let anyone
      signed in unsubscribe a device they had learned the endpoint of. */
-  const mine = pushStore().forWorker(ORG, caller.did).some((s) => s.endpoint === endpoint);
+  const mine = (await pushStore()).forWorker(ORG, caller.did).some((s) => s.endpoint === endpoint);
   if (!mine) return NextResponse.json({ removed: false });
 
-  return NextResponse.json({ removed: pushStore().remove(ORG, endpoint) });
+  return NextResponse.json({ removed: (await pushStore()).remove(ORG, endpoint) });
 }

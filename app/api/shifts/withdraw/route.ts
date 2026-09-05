@@ -32,7 +32,7 @@ interface WithdrawBody {
 }
 
 export async function POST(req: Request) {
-  const caller = workerOf(req);
+  const caller = (await workerOf(req));
   if (!caller) return NextResponse.json({ error: "not signed in" }, { status: 401 });
 
   const { did, person } = caller;
@@ -49,7 +49,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "postingId is required" }, { status: 400 });
   }
 
-  const store = eventStore();
+  const store = (await eventStore());
 
   /* Answered before the board is read, for the reason the claim route gives:
      by the time a retry arrives the first withdrawal has already removed the

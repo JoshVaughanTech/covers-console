@@ -41,7 +41,7 @@ export async function POST(req: Request) {
      sign-in existed this route wrote CONSOLE_OPERATOR whoever was calling,
      which recorded a name and proved nothing; the screen said so. Now the
      name in the chain is the one that proved itself at the door. */
-  const caller = operatorOf(req);
+  const caller = (await operatorOf(req));
   if (!caller) return NextResponse.json({ error: "not signed in" }, { status: 401 });
 
   let body: { did?: unknown };
@@ -74,7 +74,7 @@ export async function POST(req: Request) {
     );
   }
 
-  const issued = authStore().issue(did);
+  const issued = (await authStore()).issue(did);
   if (!issued.ok) {
     /* The operator is the one caller who must be told plainly that nothing was
        minted. The phone endpoint hides this on purpose; here, silence would
@@ -106,7 +106,7 @@ export async function POST(req: Request) {
      inverts to nothing. Never the code, never a hash of it: the audit screen
      is readable by anyone who can reach it, so a secret in the chain would be
      a credential published to the surface it protects. */
-  const { event } = eventStore().append(ORG, {
+  const { event } = (await eventStore()).append(ORG, {
     type: "auth.code_issued",
     at: new Date().toISOString(),
     actor: caller.operator.name,

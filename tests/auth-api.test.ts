@@ -129,7 +129,7 @@ describe("redeeming a code", () => {
     const { body } = await askFor(DARIE);
     await redeem.POST(json("http://x/api/auth/redeem", { did: DARIE, code: body.code }));
 
-    const events = store.eventStore().all("org-test").filter((e) => e.type === "auth.signed_in");
+    const events = (await store.eventStore()).all("org-test").filter((e) => e.type === "auth.signed_in");
     expect(events.length).toBeGreaterThan(0);
 
     const e = events.at(-1)!;
@@ -137,7 +137,7 @@ describe("redeeming a code", () => {
     // the fact belongs in the chain; the secret must never be able to get there
     const serialised = JSON.stringify(e);
     expect(serialised).not.toContain(body.code.replace("-", ""));
-    expect(store.eventStore().verify("org-test").ok).toBe(true);
+    expect((await store.eventStore()).verify("org-test").ok).toBe(true);
   });
 });
 
@@ -146,7 +146,7 @@ describe("the link", () => {
     const DARIE = someone();
     // the link is minted by the request route; take it from the store's grant
     const { authStore } = await import("../lib/store/auth");
-    const issued = authStore().issue(DARIE);
+    const issued = (await authStore()).issue(DARIE);
     if (!issued.ok) throw new Error("rate limited");
     const grant = issued.grant;
 

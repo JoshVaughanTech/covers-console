@@ -70,7 +70,7 @@ export async function POST(req: Request) {
      it is worth more to an attacker than confirming somebody works here. */
   if (!who) return NextResponse.json({ sent: true });
 
-  const issued = authStore().issue(did, "operator");
+  const issued = (await authStore()).issue(did, "operator");
   if (!issued.ok) return NextResponse.json({ sent: true });
 
   const origin = new URL(req.url).origin;
@@ -84,7 +84,7 @@ export async function POST(req: Request) {
 
   /* Same gap as the worker route, for the same reason. An operator who asks
      for their own console code produced a sign-in with no cause before it. */
-  eventStore().append(
+  (await eventStore()).append(
     ORG,
     {
       type: "auth.code_issued",

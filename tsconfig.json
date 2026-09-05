@@ -1,6 +1,11 @@
 {
   "compilerOptions": {
-    "target": "ES2017",
+    /* ES2020 for BigInt literals, which lib/store/db.ts needs: a Postgres
+       advisory lock key is a signed 64-bit integer and JS has exactly one
+       type that holds one without rounding. Writing the FNV constants as
+       Number would silently lose precision above 2^53 and hand two
+       different org ids the same lock. */
+    "target": "ES2020",
     "lib": ["dom", "dom.iterable", "esnext"],
     "allowJs": true,
     "skipLibCheck": true,

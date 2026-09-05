@@ -37,7 +37,7 @@ const ev = (n: number) => ({
 beforeAll(async () => {
   op = signInOperator(OPERATORS[0].did);
   stream = await import("../app/api/events/stream/route");
-  store = (await import("../lib/store/events")).eventStore();
+  store = await (await import("../lib/store/events")).eventStore();
 });
 
 /** Any unhandled rejection here is the bug this file exists to catch. */

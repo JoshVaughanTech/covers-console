@@ -30,10 +30,10 @@ export const dynamic = "force-dynamic";
 const ORG = process.env.COVERS_ORG ?? "org-brightwater";
 
 export async function GET(req: Request) {
-  if (!operatorOf(req)) return NextResponse.json({ error: "not signed in" }, { status: 401 });
+  if (!(await operatorOf(req))) return NextResponse.json({ error: "not signed in" }, { status: 401 });
 
   const since = Number(new URL(req.url).searchParams.get("since") ?? -1);
-  const store = eventStore();
+  const store = (await eventStore());
   // a fresh database would otherwise serve an empty audit screen
   store.seedIfEmpty(ORG, SEED_AUDIT_EVENTS);
   return NextResponse.json({
@@ -45,7 +45,7 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
   // appending to the chain is a console act; the phone appends through the
   // endpoints that know what it is allowed to say
-  const caller = operatorOf(req);
+  const caller = (await operatorOf(req));
   if (!caller) return NextResponse.json({ error: "not signed in" }, { status: 401 });
 
   const body = (await req.json().catch(() => null)) as
@@ -67,7 +67,7 @@ export async function POST(req: Request) {
     actor: caller.operator.name,
     actorDid: caller.operator.did,
   };
-  const r = eventStore().append(ORG, ev, { clientRef });
+  const r = (await eventStore()).append(ORG, ev, { clientRef });
 
   /* A posting nobody hears about fills as slowly as no posting at all.
 
@@ -75,7 +75,7 @@ export async function POST(req: Request) {
      one made by a screen nobody has written yet. Only on a genuinely new
      append: a replayed clientRef must not re-offer, or a retrying client
      would put the same shift on ten phones twice. */
-  const offer = r.created ? offerPosting(eventStore(), notificationStore(), ORG, r.event) : null;
+  const offer = r.created ? offerPosting((await eventStore()), (await notificationStore()), ORG, r.event) : null;
 
   return NextResponse.json({ ...r, ...(offer ? { offered: offer } : {}) }, { status: r.created ? 201 : 200 });
 }

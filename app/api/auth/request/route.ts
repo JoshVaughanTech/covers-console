@@ -57,7 +57,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ sent: true, via: sink.describe(), outOfBand: true });
   }
 
-  const issued = authStore().issue(did);
+  const issued = (await authStore()).issue(did);
 
   /* Refused for asking too often. Answered exactly like a success, because the
      difference is not the caller’s business and telling them apart would say
@@ -90,7 +90,7 @@ export async function POST(req: Request) {
      asked and the server answered. The trigger says which of the two happened,
      because "Emma minted a code for Darie" and "Darie asked for one" are
      different facts and a dispute turns on which. */
-  eventStore().append(
+  (await eventStore()).append(
     ORG,
     {
       type: "auth.code_issued",

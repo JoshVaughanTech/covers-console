@@ -34,7 +34,7 @@ export async function GET(req: Request) {
 
      It asked nothing until now, and the middleware redirect was the only
      thing in front of it. */
-  if (!operatorOf(req)) return NextResponse.json({ error: "not signed in" }, { status: 401 });
+  if (!(await operatorOf(req))) return NextResponse.json({ error: "not signed in" }, { status: 401 });
 
   const url = new URL(req.url);
   const now = Math.floor(Date.now() / 1000);

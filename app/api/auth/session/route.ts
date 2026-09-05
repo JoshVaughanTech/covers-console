@@ -18,7 +18,7 @@ export async function GET(req: Request) {
   /* Asked separately rather than resolved once and labelled, so this route
      cannot become the place that hands a worker session to a console caller
      by reporting a kind and trusting whoever reads it. */
-  const worker = workerOf(req);
+  const worker = (await workerOf(req));
   if (worker) {
     return NextResponse.json({
       signedIn: true,
@@ -27,7 +27,7 @@ export async function GET(req: Request) {
     });
   }
 
-  const op = operatorOf(req);
+  const op = (await operatorOf(req));
   if (op) {
     return NextResponse.json({
       signedIn: true,
@@ -41,7 +41,7 @@ export async function GET(req: Request) {
 
 export async function DELETE(req: Request) {
   const secret = secretOf(req);
-  if (secret) authStore().revoke(secret);
+  if (secret) (await authStore()).revoke(secret);
 
   const res = NextResponse.json({ signedIn: false });
   // clear the cookie whether or not a session was found: a stale cookie that

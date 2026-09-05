@@ -38,7 +38,7 @@ export async function GET(req: Request) {
      Until now it asked nothing at all, and the middleware's redirect was the
      only thing in front of it — which made a file documented as "not a gate"
      into the gate for this data. */
-  if (!operatorOf(req) && !workerOf(req)) {
+  if (!(await operatorOf(req)) && !(await workerOf(req))) {
     return NextResponse.json({ error: "not signed in" }, { status: 401 });
   }
 

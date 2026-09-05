@@ -21,10 +21,10 @@ export const dynamic = "force-dynamic";
 const ORG = process.env.COVERS_ORG ?? "org-brightwater";
 
 export async function GET(req: Request) {
-  const caller = workerOf(req);
+  const caller = (await workerOf(req));
   if (!caller) return NextResponse.json({ error: "not signed in" }, { status: 401 });
 
-  const store = notificationStore();
+  const store = (await notificationStore());
   return NextResponse.json({
     offers: store.forWorker(ORG, caller.did),
     unseen: store.unseenCount(ORG, caller.did),
@@ -32,7 +32,7 @@ export async function GET(req: Request) {
 }
 
 export async function POST(req: Request) {
-  const caller = workerOf(req);
+  const caller = (await workerOf(req));
   if (!caller) return NextResponse.json({ error: "not signed in" }, { status: 401 });
 
   const body = (await req.json().catch(() => ({}))) as { postingIds?: unknown };
@@ -40,7 +40,7 @@ export async function POST(req: Request) {
     ? body.postingIds.filter((x): x is string => typeof x === "string")
     : undefined;
 
-  const store = notificationStore();
+  const store = (await notificationStore());
   const seen = store.markSeen(ORG, caller.did, new Date().toISOString(), ids);
   return NextResponse.json({ seen, unseen: store.unseenCount(ORG, caller.did) });
 }

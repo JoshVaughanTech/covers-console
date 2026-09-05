@@ -61,7 +61,7 @@ export async function pushOffer(
     return { delivered: 0, pruned: 0, failed: 0, attempted: false };
   }
 
-  const store = pushStore();
+  const store = (await pushStore());
   const subs = dids.flatMap((did) => store.forWorker(orgId, did));
   if (subs.length === 0) return { delivered: 0, pruned: 0, failed: 0, attempted: true };
 

@@ -67,11 +67,11 @@ export function secretOf(req: Request): string | null {
 }
 
 /** The worker making this request, or null. An operator session is not one. */
-export function workerOf(req: Request): WorkerCaller | null {
+export async function workerOf(req: Request): Promise<WorkerCaller | null> {
   const secret = secretOf(req);
   if (!secret) return null;
 
-  const session = authStore().resolve(secret);
+  const session = await (await authStore()).resolve(secret);
   if (!session || session.kind !== "worker") return null;
 
   const person = workerIndex.get(session.did);
@@ -83,11 +83,11 @@ export function workerOf(req: Request): WorkerCaller | null {
 }
 
 /** The operator making this request, or null. A worker session is not one. */
-export function operatorOf(req: Request): OperatorCaller | null {
+export async function operatorOf(req: Request): Promise<OperatorCaller | null> {
   const secret = secretOf(req);
   if (!secret) return null;
 
-  const session = authStore().resolve(secret);
+  const session = await (await authStore()).resolve(secret);
   if (!session || session.kind !== "operator") return null;
 
   const who = operator(session.did);
