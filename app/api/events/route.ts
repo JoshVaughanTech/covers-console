@@ -33,7 +33,7 @@ export async function GET(req: Request) {
   if (!(await operatorOf(req))) return NextResponse.json({ error: "not signed in" }, { status: 401 });
 
   const since = Number(new URL(req.url).searchParams.get("since") ?? -1);
-  const store = (await eventStore());
+  const store = await eventStore();
   // a fresh database would otherwise serve an empty audit screen
   await store.seedIfEmpty(ORG, SEED_AUDIT_EVENTS);
   return NextResponse.json({
@@ -45,7 +45,7 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
   // appending to the chain is a console act; the phone appends through the
   // endpoints that know what it is allowed to say
-  const caller = (await operatorOf(req));
+  const caller = await operatorOf(req);
   if (!caller) return NextResponse.json({ error: "not signed in" }, { status: 401 });
 
   const body = (await req.json().catch(() => null)) as
@@ -67,7 +67,7 @@ export async function POST(req: Request) {
     actor: caller.operator.name,
     actorDid: caller.operator.did,
   };
-  const r = (await (await eventStore()).append(ORG, ev, { clientRef }));
+  const r = await (await eventStore()).append(ORG, ev, { clientRef });
 
   /* A posting nobody hears about fills as slowly as no posting at all.
 

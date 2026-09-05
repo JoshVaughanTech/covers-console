@@ -35,7 +35,7 @@ describe("chaining", () => {
     expect(a.seq).toBe(0);
     expect(b.seq).toBe(1);
     expect(b.prevHash).toBe(a.hash);
-    expect((await store.verify(ORG))).toEqual({ ok: true, brokenAt: null });
+    expect(await store.verify(ORG)).toEqual({ ok: true, brokenAt: null });
   });
 
   it("produces a chain the existing verifier accepts unchanged", async () => {
@@ -45,7 +45,7 @@ describe("chaining", () => {
   });
 
   it("keeps one chain per org", async () => {
-    (await store.append(ORG, decision(1)));
+    await store.append(ORG, decision(1));
     const other = (await store.append("org-other", decision(1))).event;
     expect(other.seq).toBe(0);
     expect((await store.head(ORG))!.seq).toBe(0);
@@ -81,7 +81,7 @@ describe("concurrency — the test the design exists for", () => {
       Array.from({ length: N }, (_, i) => Promise.resolve().then(() => store.append(ORG, decision(i)))),
     );
 
-    const all = (await store.all(ORG));
+    const all = await store.all(ORG);
     expect(all).toHaveLength(N);
 
     // no gaps, no duplicates: exactly 0..N-1, in order
@@ -91,19 +91,19 @@ describe("concurrency — the test the design exists for", () => {
     expect(new Set(all.map((e) => e.hash)).size).toBe(N);
 
     // and the chain still verifies end to end
-    expect((await store.verify(ORG))).toEqual({ ok: true, brokenAt: null });
-    expect((await store.head(ORG))).toEqual({ seq: N - 1, hash: all[N - 1].hash });
+    expect(await store.verify(ORG)).toEqual({ ok: true, brokenAt: null });
+    expect(await store.head(ORG)).toEqual({ seq: N - 1, hash: all[N - 1].hash });
   });
 
   it("leaves nothing behind when an append fails mid-transaction", async () => {
-    (await store.append(ORG, decision(1)));
+    await store.append(ORG, decision(1));
     // an unserialisable payload throws inside the transaction
     const circular: Record<string, unknown> = {};
     circular.self = circular; // JSON.stringify throws inside the transaction
     const bad = { ...decision(2), data: circular };
     await expect(store.append(ORG, bad)).rejects.toThrow();
     // the failed append must not have advanced the head or left a row
-    expect((await store.all(ORG))).toHaveLength(1);
+    expect(await store.all(ORG)).toHaveLength(1);
     expect((await store.head(ORG))!.seq).toBe(0);
     expect((await store.verify(ORG)).ok).toBe(true);
   });
@@ -111,26 +111,26 @@ describe("concurrency — the test the design exists for", () => {
 
 describe("idempotency", () => {
   it("returns the original when a clientRef is replayed", async () => {
-    const first = (await store.append(ORG, decision(1), { clientRef: "phone-abc" }));
-    const again = (await store.append(ORG, decision(1), { clientRef: "phone-abc" }));
+    const first = await store.append(ORG, decision(1), { clientRef: "phone-abc" });
+    const again = await store.append(ORG, decision(1), { clientRef: "phone-abc" });
 
     expect(first.created).toBe(true);
     expect(again.created).toBe(false);
     expect(again.event.seq).toBe(first.event.seq);
     expect(again.event.hash).toBe(first.event.hash);
-    expect((await store.all(ORG))).toHaveLength(1);
+    expect(await store.all(ORG)).toHaveLength(1);
   });
 
   it("does not confuse refs across orgs", async () => {
-    (await store.append(ORG, decision(1), { clientRef: "same-ref" }));
-    const other = (await store.append("org-other", decision(1), { clientRef: "same-ref" }));
+    await store.append(ORG, decision(1), { clientRef: "same-ref" });
+    const other = await store.append("org-other", decision(1), { clientRef: "same-ref" });
     expect(other.created).toBe(true);
   });
 
   it("still appends when no ref is given", async () => {
-    (await store.append(ORG, decision(1)));
-    (await store.append(ORG, decision(1)));
-    expect((await store.all(ORG))).toHaveLength(2);
+    await store.append(ORG, decision(1));
+    await store.append(ORG, decision(1));
+    expect(await store.all(ORG)).toHaveLength(2);
   });
 });
 
@@ -139,8 +139,8 @@ describe("reading", () => {
     for (let i = 0; i < 5; i++) (await store.append(ORG, decision(i)));
     // this is what Last-Event-ID maps onto after an SSE reconnect
     expect((await store.since(ORG, 2)).map((e) => e.seq)).toEqual([3, 4]);
-    expect((await store.since(ORG, 4))).toHaveLength(0);
-    expect((await store.since(ORG, -1))).toHaveLength(5);
+    expect(await store.since(ORG, 4)).toHaveLength(0);
+    expect(await store.since(ORG, -1)).toHaveLength(5);
   });
 
   it("records when an event was stored, separately from when it happened", async () => {
@@ -148,12 +148,12 @@ describe("reading", () => {
     // recordedAt is metadata, NOT a field on the event — putting it on the
     // event would change the object verifyChain re-hashes, and every event
     // would fail verification. That is the chain working, not a bug.
-    const r = (await store.append(ORG, decision(1)));
+    const r = await store.append(ORG, decision(1));
     expect(r.event.at).toBe("2026-09-03T13:56:00.000Z");
     expect("recordedAt" in r.event).toBe(false);
     expect(Number.isNaN(Date.parse(r.recordedAt))).toBe(false);
 
-    const meta = (await store.withMeta(ORG));
+    const meta = await store.withMeta(ORG);
     expect(meta).toHaveLength(1);
     expect(meta[0].recordedAt).toBe(r.recordedAt);
     expect(meta[0].event.hash).toBe(r.event.hash);
@@ -164,12 +164,12 @@ describe("subscriptions", () => {
   it("notifies listeners for its own org only", async () => {
     const seen: number[] = [];
     const off = store.subscribe(ORG, (e) => seen.push(e.seq));
-    (await store.append(ORG, decision(1)));
-    (await store.append("org-other", decision(1)));
+    await store.append(ORG, decision(1));
+    await store.append("org-other", decision(1));
     await new Promise((r) => setTimeout(r, 10));
     expect(seen).toEqual([0]);
     off();
-    (await store.append(ORG, decision(2)));
+    await store.append(ORG, decision(2));
     await new Promise((r) => setTimeout(r, 10));
     expect(seen).toEqual([0]);
   });

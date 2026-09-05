@@ -47,7 +47,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "did and code are required" }, { status: 400 });
   }
 
-  const result = (await (await authStore()).redeemCode(did, code, bucketOf(req, did)));
+  const result = await (await authStore()).redeemCode(did, code, bucketOf(req, did));
   if (!result.ok) {
     return NextResponse.json({ error: MESSAGE[result.reason] ?? MESSAGE.unknown }, { status: 401 });
   }
@@ -68,7 +68,7 @@ export async function POST(req: Request) {
   });
   setSessionCookie(res, req, result.session.secret);
 
-  (await (await eventStore()).append(ORG, {
+  await (await eventStore()).append(ORG, {
     type: "auth.signed_in",
     at: new Date().toISOString(),
     actor: who.name,
@@ -76,7 +76,7 @@ export async function POST(req: Request) {
     subject: who.did,
     summary: `${who.name} signed in to the console`,
     data: { via: "console", sessionId: result.session.id },
-  }));
+  });
 
   return res;
 }

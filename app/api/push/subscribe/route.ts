@@ -32,7 +32,7 @@ export async function GET(req: Request) {
 }
 
 export async function POST(req: Request) {
-  const caller = (await workerOf(req));
+  const caller = await workerOf(req);
   if (!caller) return NextResponse.json({ error: "not signed in" }, { status: 401 });
   if (!vapidFromEnv()) {
     return NextResponse.json({ error: "push is not configured on this server" }, { status: 503 });
@@ -62,17 +62,17 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "endpoint must be https" }, { status: 400 });
   }
 
-  (await (await pushStore()).save(
+  await (await pushStore()).save(
     ORG,
     { did: caller.did, endpoint, p256dh, auth },
     new Date().toISOString(),
-  ));
+  );
 
   return NextResponse.json({ subscribed: true, devices: (await (await pushStore()).countFor(ORG, caller.did)) });
 }
 
 export async function DELETE(req: Request) {
-  const caller = (await workerOf(req));
+  const caller = await workerOf(req);
   if (!caller) return NextResponse.json({ error: "not signed in" }, { status: 401 });
 
   const body = (await req.json().catch(() => null)) as { endpoint?: unknown } | null;

@@ -89,16 +89,16 @@ describe("a chain written before the field, read back after it", () => {
   });
 
   it("comes back with actorDid undefined, not null", async () => {
-    (await store.append(ORG, oldStyle(0)));
-    const [e] = (await store.all(ORG));
+    await store.append(ORG, oldStyle(0));
+    const [e] = await store.all(ORG);
     expect(e.actorDid).toBeUndefined();
     expect(Object.prototype.hasOwnProperty.call(e, "actorDid") && e.actorDid === null).toBe(false);
   });
 
   it("re-hashes to the same digest it was stored with", async () => {
     // the failure this catches: a field hashed on write and lost on persist
-    (await store.append(ORG, oldStyle(0)));
-    const [e] = (await store.all(ORG));
+    await store.append(ORG, oldStyle(0));
+    const [e] = await store.all(ORG);
     expect(verifyChain([e]).ok).toBe(true);
   });
 });
@@ -114,19 +114,19 @@ describe("a mixed chain — the case a fresh database cannot produce", () => {
 
   it("verifies end to end", async () => {
     await mixed();
-    expect((await store.verify(ORG))).toEqual({ ok: true, brokenAt: null });
+    expect(await store.verify(ORG)).toEqual({ ok: true, brokenAt: null });
   });
 
   it("verifies again after a full read-back, which is what a reload does", async () => {
     await mixed();
-    const rows = (await store.all(ORG));
+    const rows = await store.all(ORG);
     expect(rows).toHaveLength(5);
     expect(verifyChain(rows).ok).toBe(true);
   });
 
   it("keeps each event's own actor identity through the round trip", async () => {
     await mixed();
-    const rows = (await store.all(ORG));
+    const rows = await store.all(ORG);
     expect(rows[0].actorDid).toBeUndefined();
     expect(rows[2].actorDid).toBe(CONSOLE_OPERATOR.did);
     expect(rows[3].actorDid).toBeUndefined();
@@ -135,7 +135,7 @@ describe("a mixed chain — the case a fresh database cannot produce", () => {
 
   it("does not disturb the display name either way", async () => {
     await mixed();
-    const rows = (await store.all(ORG));
+    const rows = await store.all(ORG);
     expect(rows[0].actor).toBe("Supervisor");
     expect(rows[2].actor).toBe(CONSOLE_OPERATOR.name);
   });
@@ -197,21 +197,21 @@ describe("what the field is for", () => {
   it("distinguishes two actors who share a name", async () => {
     const a: NewAuditEvent = { ...newStyle(0), actor: "Sam Taylor", actorDid: "did:web:idara.app:w:sam-taylor-1" };
     const b: NewAuditEvent = { ...newStyle(1), actor: "Sam Taylor", actorDid: "did:web:idara.app:w:sam-taylor-2" };
-    (await store.append(ORG, a));
-    (await store.append(ORG, b));
-    const rows = (await store.all(ORG));
+    await store.append(ORG, a);
+    await store.append(ORG, b);
+    const rows = await store.all(ORG);
     expect(rows[0].actor).toBe(rows[1].actor);
     expect(rows[0].actorDid).not.toBe(rows[1].actorDid);
   });
 
   it("lets a decision be attributed without trusting the display name", async () => {
-    (await store.append(ORG, newStyle(0)));
+    await store.append(ORG, newStyle(0));
     const mine = (await store.all(ORG)).filter((e: AuditEvent) => e.actorDid === CONSOLE_OPERATOR.did);
     expect(mine).toHaveLength(1);
   });
 
   it("leaves system events without one, rather than inventing an identity", async () => {
-    (await store.append(ORG, { type: "decision", at: AT, actor: "system", summary: "auto", data: {} }));
+    await store.append(ORG, { type: "decision", at: AT, actor: "system", summary: "auto", data: {} });
     expect((await store.all(ORG))[0].actorDid).toBeUndefined();
   });
 });

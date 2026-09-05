@@ -21,8 +21,8 @@ let decision: typeof import("../app/api/breaks/decision/route");
 beforeAll(async () => {
   events = await import("../app/api/events/route");
   decision = await import("../app/api/breaks/decision/route");
-  leanne = (await signIn("did:web:idara.app:w:leanne-vidal"));
-  op = (await signInOperator(OPERATORS[0].did));
+  leanne = await signIn("did:web:idara.app:w:leanne-vidal");
+  op = await signInOperator(OPERATORS[0].did);
 });
 
 import { signIn, signInOperator, asCaller, type TestSession } from "./sign-in-helper";

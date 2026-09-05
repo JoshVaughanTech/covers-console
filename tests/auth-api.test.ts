@@ -149,7 +149,7 @@ describe("the link", () => {
     const DARIE = someone();
     // the link is minted by the request route; take it from the store's grant
     const { authStore } = await import("../lib/store/auth");
-    const issued = (await (await authStore()).issue(DARIE));
+    const issued = await (await authStore()).issue(DARIE);
     if (!issued.ok) throw new Error("rate limited");
     const grant = issued.grant;
 

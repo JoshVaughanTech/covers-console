@@ -34,7 +34,7 @@ export async function GET(req: Request) {
      It used to be a query parameter, which is not a weak identity check but
      the absence of one: any phone could ask for anybody’s board, and the
      claim endpoint would then act on the name it was handed. */
-  const caller = (await workerOf(req));
+  const caller = await workerOf(req);
   if (!caller) return NextResponse.json({ error: "not signed in" }, { status: 401 });
 
   const did = caller.did;

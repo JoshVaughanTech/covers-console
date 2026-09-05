@@ -164,7 +164,7 @@ describe("offering a posting", () => {
     expect((await events.verify(ORG)).ok).toBe(true);
 
     const darie = did("Darie Roberts");
-    const theirs = (await notes.forWorker(ORG, darie));
+    const theirs = await notes.forWorker(ORG, darie);
     expect(theirs).toHaveLength(1);
     expect(theirs[0]).toMatchObject({ postingId: p.id, role: "Bartender", seenAt: null });
     // the site NAME, because a phone cannot read s-brightwater
@@ -174,7 +174,7 @@ describe("offering a posting", () => {
   it("says nothing to somebody the board would refuse", async () => {
     await offerPosting(events, notes, ORG, postedEvent(posting()));
     // an invitation followed by a closed door is worse than silence
-    expect((await notes.forWorker(ORG, did("Michael Tan")))).toHaveLength(0);
+    expect(await notes.forWorker(ORG, did("Michael Tan"))).toHaveLength(0);
   });
 
   it("records a shift nobody can take as told to nobody, rather than silently", async () => {
@@ -200,7 +200,7 @@ describe("offering twice", () => {
     await offerPosting(events, notes, ORG, postedEvent(p));
     await offerPosting(events, notes, ORG, postedEvent(p));
 
-    expect((await notes.forWorker(ORG, did("Darie Roberts")))).toHaveLength(1);
+    expect(await notes.forWorker(ORG, did("Darie Roberts"))).toHaveLength(1);
     // and one event, because the clientRef keys it by posting
     expect((await events.all(ORG)).filter((e) => e.type === "shift.offered")).toHaveLength(1);
   });
@@ -209,7 +209,7 @@ describe("offering twice", () => {
     const p = posting();
     const darie = did("Darie Roberts");
     await offerPosting(events, notes, ORG, postedEvent(p));
-    (await notes.markSeen(ORG, darie, AT));
+    await notes.markSeen(ORG, darie, AT);
 
     await offerPosting(events, notes, ORG, postedEvent(p));
 
@@ -217,7 +217,7 @@ describe("offering twice", () => {
        seat reopened on Thursday. Marking it unread again trains people to
        ignore the badge, which costs more than the one notification. */
     expect((await notes.forWorker(ORG, darie))[0].seenAt).toBe(AT);
-    expect((await notes.unseenCount(ORG, darie))).toBe(0);
+    expect(await notes.unseenCount(ORG, darie)).toBe(0);
   });
 });
 
@@ -227,23 +227,23 @@ describe("reading them", () => {
   it("counts what has not been seen", async () => {
     await offerPosting(events, notes, ORG, postedEvent(posting()));
     await offerPosting(events, notes, ORG, postedEvent(posting({ id: "sp-2", functionName: "Saturday" })));
-    expect((await notes.unseenCount(ORG, darie()))).toBe(2);
+    expect(await notes.unseenCount(ORG, darie())).toBe(2);
   });
 
   it("marks one without marking the rest", async () => {
     await offerPosting(events, notes, ORG, postedEvent(posting()));
     await offerPosting(events, notes, ORG, postedEvent(posting({ id: "sp-2", functionName: "Saturday" })));
 
-    expect((await notes.markSeen(ORG, darie(), AT, ["sp-notify"]))).toBe(1);
-    expect((await notes.unseenCount(ORG, darie()))).toBe(1);
+    expect(await notes.markSeen(ORG, darie(), AT, ["sp-notify"])).toBe(1);
+    expect(await notes.unseenCount(ORG, darie())).toBe(1);
   });
 
   it("marks everything when asked for everything", async () => {
     await offerPosting(events, notes, ORG, postedEvent(posting()));
     await offerPosting(events, notes, ORG, postedEvent(posting({ id: "sp-2", functionName: "Saturday" })));
 
-    expect((await notes.markSeen(ORG, darie(), AT))).toBe(2);
-    expect((await notes.unseenCount(ORG, darie()))).toBe(0);
+    expect(await notes.markSeen(ORG, darie(), AT)).toBe(2);
+    expect(await notes.unseenCount(ORG, darie())).toBe(0);
   });
 
   it("never touches anybody else's", async () => {
@@ -254,17 +254,17 @@ describe("reading them", () => {
     }
     expect(other).toBeTruthy();
 
-    (await notes.markSeen(ORG, darie(), AT));
+    await notes.markSeen(ORG, darie(), AT);
     // clearing somebody else's badge would hide a shift from them, and the
     // badge is the only thing that would have said so
-    expect((await notes.unseenCount(ORG, other.did))).toBe(1);
+    expect(await notes.unseenCount(ORG, other.did)).toBe(1);
   });
 
   it("marking an empty list marks nothing, rather than everything", async () => {
     await offerPosting(events, notes, ORG, postedEvent(posting()));
     // the difference between "these" and "all" must not turn on an empty array
-    expect((await notes.markSeen(ORG, darie(), AT, []))).toBe(0);
-    expect((await notes.unseenCount(ORG, darie()))).toBe(1);
+    expect(await notes.markSeen(ORG, darie(), AT, [])).toBe(0);
+    expect(await notes.unseenCount(ORG, darie())).toBe(1);
   });
 });
 
@@ -273,14 +273,14 @@ describe("the audience follows the chain, not the seed", () => {
     const darie = did("Darie Roberts");
     const rsa = CREDENTIALS.find((c) => c.subject === darie && c.type === "rsa")!;
 
-    (await events.append(ORG, {
+    await events.append(ORG, {
       type: "credential.revoked",
       at: TODAY,
       actor: "Emma Taylor",
       subject: darie,
       summary: "RSA revoked",
       data: { credId: rsa.id, type: "rsa" },
-    }));
+    });
 
     const a = audienceFor({
       posting: posting(),

@@ -18,7 +18,7 @@ export async function GET(req: Request) {
   /* Asked separately rather than resolved once and labelled, so this route
      cannot become the place that hands a worker session to a console caller
      by reporting a kind and trusting whoever reads it. */
-  const worker = (await workerOf(req));
+  const worker = await workerOf(req);
   if (worker) {
     return NextResponse.json({
       signedIn: true,
@@ -27,7 +27,7 @@ export async function GET(req: Request) {
     });
   }
 
-  const op = (await operatorOf(req));
+  const op = await operatorOf(req);
   if (op) {
     return NextResponse.json({
       signedIn: true,

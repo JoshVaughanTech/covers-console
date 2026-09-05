@@ -44,7 +44,7 @@ export async function POST(req: Request) {
      else is read. The phone used to send it, which meant anyone could put
      anyone else’s hand up and the audit chain would record it truthfully and
      uselessly. */
-  const caller = (await workerOf(req));
+  const caller = await workerOf(req);
   if (!caller) return NextResponse.json({ error: "not signed in" }, { status: 401 });
 
   const did = caller.did;
@@ -62,7 +62,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "postingId is required" }, { status: 400 });
   }
 
-  const store = (await eventStore());
+  const store = await eventStore();
 
   /* A retry is answered before anything is decided.
 

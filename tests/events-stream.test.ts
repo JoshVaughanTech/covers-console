@@ -38,7 +38,7 @@ const ev = (n: number) => ({
 });
 
 beforeAll(async () => {
-  op = (await signInOperator(OPERATORS[0].did));
+  op = await signInOperator(OPERATORS[0].did);
   stream = await import("../app/api/events/stream/route");
   store = await (await import("../lib/store/events")).eventStore();
 });
@@ -69,8 +69,8 @@ async function readFrames(res: Response, count: number, ms = 1500): Promise<stri
 
 describe("replay on connect", () => {
   it("sends what the client missed before going live", async () => {
-    (await store.append(ORG, ev(1)));
-    (await store.append(ORG, ev(2)));
+    await store.append(ORG, ev(1));
+    await store.append(ORG, ev(2));
 
     const res = await stream.GET(asOp("http://x/api/events/stream?since=-1"));
     expect(res.headers.get("content-type")).toContain("text/event-stream");

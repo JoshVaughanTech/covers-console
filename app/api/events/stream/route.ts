@@ -35,7 +35,7 @@ const ORG = process.env.COVERS_ORG ?? "org-brightwater";
 const HEARTBEAT_MS = 25_000;
 
 export async function GET(req: Request) {
-  const operator = (await operatorOf(req));
+  const operator = await operatorOf(req);
   // a worker learns that something happened, never what
   const worker = operator ? null : (await workerOf(req));
   if (!operator && !worker) {
@@ -43,7 +43,7 @@ export async function GET(req: Request) {
   }
   const full = operator !== null;
 
-  const store = (await eventStore());
+  const store = await eventStore();
   const lastId = req.headers.get("last-event-id");
   const since = Number(lastId ?? new URL(req.url).searchParams.get("since") ?? -1);
   const from = Number.isFinite(since) ? since : -1;

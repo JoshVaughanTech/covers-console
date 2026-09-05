@@ -33,7 +33,7 @@ let store: typeof import("../lib/store/events");
 beforeAll(async () => {
   issue = await import("../app/api/auth/issue/route");
   store = await import("../lib/store/events");
-  op = (await signInOperator(OPERATOR.did));
+  op = await signInOperator(OPERATOR.did);
 });
 
 afterEach(() => vi.unstubAllEnvs());

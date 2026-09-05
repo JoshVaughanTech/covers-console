@@ -47,7 +47,7 @@ const siteIndex = new Map(SITES.map((s) => [s.id, s]));
 const clockIdOf = (did: string) => did.replace(/^did:web:idara\.app:/, "");
 
 export async function GET(req: Request) {
-  const caller = (await workerOf(req));
+  const caller = await workerOf(req);
   if (!caller) return NextResponse.json({ error: "not signed in" }, { status: 401 });
 
   const { did, person } = caller;

@@ -41,17 +41,17 @@ afterEach(async () => { await store.close(); setDb(null); vi.restoreAllMocks(); 
 
 describe("remembering a device", () => {
   it("keeps one row per device, not per person", async () => {
-    (await store.save(ORG, sub(), AT));
-    (await store.save(ORG, sub({ endpoint: "https://push.example.test/sub/tablet" }), AT));
+    await store.save(ORG, sub(), AT);
+    await store.save(ORG, sub({ endpoint: "https://push.example.test/sub/tablet" }), AT);
     // a phone and a tablet should both light up
-    expect((await store.countFor(ORG, sub().did))).toBe(2);
+    expect(await store.countFor(ORG, sub().did)).toBe(2);
   });
 
   it("replaces the keys when a browser re-subscribes on the same endpoint", async () => {
-    (await store.save(ORG, sub(), AT));
-    (await store.save(ORG, sub({ auth: "ZZZZZZZZZZZZZZZZZZZZZZ" }), AT));
+    await store.save(ORG, sub(), AT);
+    await store.save(ORG, sub({ auth: "ZZZZZZZZZZZZZZZZZZZZZZ" }), AT);
 
-    expect((await store.countFor(ORG, sub().did))).toBe(1);
+    expect(await store.countFor(ORG, sub().did)).toBe(1);
     /* Keeping the old keys would encrypt to something the device can no
        longer read: a push that succeeds and silently never appears. */
     expect((await store.forWorker(ORG, sub().did))[0].auth).toBe("ZZZZZZZZZZZZZZZZZZZZZZ");
@@ -59,19 +59,19 @@ describe("remembering a device", () => {
 
   it("moves a device to whoever signed in on it last", async () => {
     const mitch = "did:web:idara.app:w:mitch-egan";
-    (await store.save(ORG, sub(), AT));
-    (await store.save(ORG, sub({ did: mitch }), AT));
+    await store.save(ORG, sub(), AT);
+    await store.save(ORG, sub({ did: mitch }), AT);
 
     // a shared phone must stop showing the previous person's shifts
-    expect((await store.countFor(ORG, sub().did))).toBe(0);
-    expect((await store.countFor(ORG, mitch))).toBe(1);
+    expect(await store.countFor(ORG, sub().did)).toBe(0);
+    expect(await store.countFor(ORG, mitch)).toBe(1);
   });
 
   it("forgets one on request", async () => {
-    (await store.save(ORG, sub(), AT));
-    expect((await store.remove(ORG, sub().endpoint))).toBe(true);
-    expect((await store.remove(ORG, sub().endpoint))).toBe(false);
-    expect((await store.countFor(ORG, sub().did))).toBe(0);
+    await store.save(ORG, sub(), AT);
+    expect(await store.remove(ORG, sub().endpoint)).toBe(true);
+    expect(await store.remove(ORG, sub().endpoint)).toBe(false);
+    expect(await store.countFor(ORG, sub().did)).toBe(0);
   });
 });
 
