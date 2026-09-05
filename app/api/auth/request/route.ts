@@ -15,12 +15,14 @@
    ============================================================ */
 import { NextResponse } from "next/server";
 import { authStore } from "@/lib/store/auth";
+import { eventStore } from "@/lib/store/events";
 import { sinkFromEnv } from "@/lib/auth/delivery";
 import { formatCode } from "@/lib/auth/token";
 import { WORKERS } from "@/lib/idara/seed";
 
 export const dynamic = "force-dynamic";
 
+const ORG = process.env.COVERS_ORG ?? "org-brightwater";
 const workerIndex = new Map(WORKERS.map((w) => [w.did, w]));
 
 export async function POST(req: Request) {
@@ -76,6 +78,37 @@ export async function POST(req: Request) {
     link,
     expiresAt: grant.expiresAt,
   });
+
+  /* The cause, for a code nobody else asked for.
+
+     auth.code_issued was wired into the operator route when it was built and
+     never into this one, so a worker who requested their own code produced an
+     auth.signed_in with nothing before it — the exact gap the event type
+     exists to close, left half open.
+
+     actor "system" rather than the worker: nobody authorised this, the person
+     asked and the server answered. The trigger says which of the two happened,
+     because "Emma minted a code for Darie" and "Darie asked for one" are
+     different facts and a dispute turns on which. */
+  eventStore().append(
+    ORG,
+    {
+      type: "auth.code_issued",
+      at: new Date().toISOString(),
+      actor: "system",
+      subject: person.did,
+      summary: `${person.name} requested a sign-in code`,
+      data: {
+        trigger: "self",
+        grantId: grant.id,
+        expiresAt: grant.expiresAt,
+        deliveredTo: delivery.target,
+        outOfBand: delivery.outOfBand,
+      },
+    },
+    // one record per grant, however many times a flaky phone retries
+    { clientRef: `code:${grant.id}` },
+  );
 
   return NextResponse.json({
     sent: true,

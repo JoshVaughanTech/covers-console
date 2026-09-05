@@ -22,10 +22,13 @@
    ============================================================ */
 import { NextResponse } from "next/server";
 import { authStore } from "@/lib/store/auth";
+import { eventStore } from "@/lib/store/events";
 import { FileSink } from "@/lib/auth/delivery";
 import { operator } from "@/lib/auth/operators";
 
 export const dynamic = "force-dynamic";
+
+const ORG = process.env.COVERS_ORG ?? "org-brightwater";
 
 export async function POST(req: Request) {
   let body: { did?: unknown };
@@ -78,6 +81,29 @@ export async function POST(req: Request) {
     link: `${origin}/api/auth/link?t=${encodeURIComponent(issued.grant.token)}`,
     expiresAt: issued.grant.expiresAt,
   });
+
+  /* Same gap as the worker route, for the same reason. An operator who asks
+     for their own console code produced a sign-in with no cause before it. */
+  eventStore().append(
+    ORG,
+    {
+      type: "auth.code_issued",
+      at: new Date().toISOString(),
+      actor: "system",
+      subject: who.did,
+      summary: `${who.name} requested a console sign-in code`,
+      data: {
+        trigger: "self",
+        kind: "operator",
+        grantId: issued.grant.id,
+        expiresAt: issued.grant.expiresAt,
+        // where it went, never what it was
+        deliveredTo: sink.describe(),
+        outOfBand: true,
+      },
+    },
+    { clientRef: `code:${issued.grant.id}` },
+  );
 
   // never the code, in any circumstance
   return NextResponse.json({ sent: true, expiresAt: issued.grant.expiresAt });
