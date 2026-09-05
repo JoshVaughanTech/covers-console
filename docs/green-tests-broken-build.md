@@ -1,6 +1,17 @@
 # When the checks are wrong about the tree
 
-**Date:** 2026-09-04 · **Status:** living note
+**Date:** 2026-09-04 – 05 · **Status:** living note
+
+The numbered entries below were found the ordinary way: something went red and
+somebody read the message.
+
+**Everything after them was found by checking a claim that was already
+believed.** Not one of those came out of new work. The suite was green, the
+build was green, and somebody went back to something that had already passed —
+a test that had been written, a comment that had been read, a result that had
+been reported and accepted — and asked what it actually said. That is the
+shortest true summary of the second half of this document, and it is the half
+that was expensive.
 
 Three different failures. The first two are opposites; the third is neither,
 and is the one that took longest to see.
@@ -515,3 +526,8 @@ thing, which is the one assumption none of them check.
 
 And one more, which the 714 earned: **when you fix something, ask what was
 guarding it.** A green suite is not a claim that anybody looked.
+
+Which returns to the top. The numbered entries arrived on their own — a check
+went red and somebody read it. Nothing in the second half did. Every one of
+those came from going back to something already agreed and asking what it
+actually said, in a repo that was green the entire time.
