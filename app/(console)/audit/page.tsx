@@ -232,10 +232,38 @@ export default function AuditPage() {
 
     if (e.type === "engagement.confirmed") {
       const fee = Number(e.data.bookingFeeCents ?? 0);
+      const variance = Number(e.data.varianceHours ?? 0);
+      const loadingMinutes = Number(e.data.loadingMinutes ?? 0);
       return (
-        <div style={{ fontSize: 12, color: "var(--fg-3)", marginTop: 6 }}>
-          {String(e.data.hours ?? "—")}h · wages ${(Number(e.data.wagesCents ?? 0) / 100).toFixed(2)} ·
-          super ${(Number(e.data.superCents ?? 0) / 100).toFixed(2)} · booking fee ${(fee / 100).toFixed(2)}
+        <div style={{ fontSize: 12, color: "var(--fg-3)", marginTop: 6, lineHeight: 1.6 }}>
+          {String(e.data.hours ?? "—")}h from the time clock
+          {/* The variance is what a manager scanning the trail looks for: half
+              an hour over is routine, three hours over is a conversation. */}
+          {variance !== 0 &&
+            ` · ${variance > 0 ? "+" : ""}${variance}h against a rostered ${String(e.data.plannedHours ?? "—")}h`}
+          {" · "}
+          {Number(e.data.breaks ?? 0) === 0 ? "no breaks taken" : `${String(e.data.breaks)} breaks`}
+          {loadingMinutes > 0 && (
+            <>
+              <br />
+              cl 16.6 loading owed for {loadingMinutes}m
+              {e.data.loadingCents != null &&
+                ` ($${(Number(e.data.loadingCents) / 100).toFixed(2)})`}
+            </>
+          )}
+          <br />
+          wages ${(Number(e.data.wagesCents ?? 0) / 100).toFixed(2)} · super $
+          {(Number(e.data.superCents ?? 0) / 100).toFixed(2)} · booking fee ${(fee / 100).toFixed(2)}
+          {/* Said plainly, because a settlement nobody looked at and one a
+              manager agreed to are different things to be reading later. */}
+          {e.data.via === "auto" && (
+            <>
+              <br />
+              <span style={{ color: "var(--warning-fg)" }}>
+                Settled by the 48-hour rule — the venue did not confirm.
+              </span>
+            </>
+          )}
         </div>
       );
     }

@@ -69,6 +69,20 @@ interface EmployerPayload {
   };
 }
 
+interface Worked {
+  hours: number;
+  plannedHours: number;
+  varianceHours: number;
+  breaksTaken: number;
+  clockIn: number;
+  clockOut: number;
+  loading: { clause: string; minutes: number; estimateCents: number | null } | null;
+  cost: { wagesCents: number; superCents: number; bookingFeeCents: number; totalCents: number };
+  autoConfirmAt: number;
+  dueForAutoConfirm: boolean;
+  confirmable: boolean;
+}
+
 interface EngagementRow {
   id: string;
   status: string;
@@ -86,6 +100,10 @@ interface EngagementRow {
     employer: { at: string; eventHash: string } | null;
   };
   employerProfileHash: string;
+  /** what the time clock says, once the shift has run. */
+  worked: Worked | null;
+  /** why the clock has nothing to say, when it has nothing. */
+  unmatched: string | null;
 }
 
 interface ConversionRow {
@@ -157,6 +175,41 @@ export default function EmployerSettingsPage() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  /**
+   * Settle one shift's hours.
+   *
+   * The figure is not sent. The endpoint reads it off the clock itself, so
+   * what this button does is agree — which is why the row shows the hours,
+   * the variance and the loading before it is pressed. A confirm control that
+   * posted a number would make this screen a payroll input form.
+   */
+  async function confirmHours(e: EngagementRow) {
+    setBusy(true);
+    try {
+      const res = await fetch("/api/engagements/confirm", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ engagementId: e.id }),
+      });
+      const b = await res.json();
+      if (!res.ok) throw new Error(b.error ?? `HTTP ${res.status}`);
+      toast(
+        `${e.worker.name} — ${b.hours}h confirmed${
+          b.loading ? `, plus ${b.loading.minutes}m cl 16.6 loading` : ""
+        }`,
+        { tone: "success", icon: "file-check" },
+      );
+      await load();
+    } catch (err) {
+      toast(err instanceof Error ? err.message : "Could not confirm those hours", {
+        tone: "danger",
+        icon: "triangle-alert",
+      });
+    } finally {
+      setBusy(false);
+    }
+  }
 
   async function post(body: Record<string, unknown>, ok: string) {
     setBusy(true);
@@ -388,7 +441,7 @@ export default function EmployerSettingsPage() {
                   <th style={th}>Worker</th>
                   <th style={th}>Shift</th>
                   <th style={th}>Rate</th>
-                  <th style={th}>Tax</th>
+                  <th style={th}>Hours worked</th>
                   <th style={th}>Released</th>
                   <th style={th}>Status</th>
                 </tr>
@@ -415,7 +468,7 @@ export default function EmployerSettingsPage() {
                       </span>
                     </td>
                     <td style={td}>
-                      {e.employment.claimsTaxFreeThreshold ? "Threshold claimed" : "No threshold"}
+                      <WorkedCell e={e} busy={busy} onConfirm={() => void confirmHours(e)} />
                     </td>
                     <td style={td}>
                       {e.releases.length === 0 ? (
@@ -485,6 +538,82 @@ export default function EmployerSettingsPage() {
 
 const th: React.CSSProperties = { padding: "0 12px 8px 0", fontWeight: 600 };
 const td: React.CSSProperties = { padding: "10px 12px 10px 0", verticalAlign: "top" };
+
+const UNMATCHED_COPY: Record<string, string> = {
+  no_session: "No clock-in against this shift",
+  still_open: "Still clocked in",
+  ambiguous: "Two possible sessions — settle it in the clock",
+};
+
+/**
+ * What the clock says, and the button that agrees with it.
+ *
+ * The hours, the variance against the roster and any cl 16.6 loading are all
+ * shown before the button is pressed, because "Confirm" on its own asks
+ * somebody to affirm a number they have not been given. The variance is the
+ * part a manager actually reads — a shift that ran half an hour long is
+ * routine, and one that ran three hours long is a conversation.
+ */
+function WorkedCell({
+  e,
+  busy,
+  onConfirm,
+}: {
+  e: EngagementRow;
+  busy: boolean;
+  onConfirm: () => void;
+}) {
+  if (!e.worked) {
+    /* Before the shift has run there is nothing to say and nothing is said.
+       After it has, the reason is the useful part. */
+    if (!e.unmatched) return <span style={{ color: "var(--fg-4)" }}>—</span>;
+    return (
+      <span style={{ color: "var(--warning-fg)", fontSize: 12.5 }}>
+        {UNMATCHED_COPY[e.unmatched] ?? e.unmatched}
+      </span>
+    );
+  }
+
+  const w = e.worked;
+  const over = w.varianceHours > 0;
+  return (
+    <div>
+      <span className="fs-tnum" style={{ fontWeight: 600 }}>
+        {w.hours}h
+      </span>
+      {w.varianceHours !== 0 && (
+        <span
+          className="fs-tnum"
+          style={{ marginLeft: 6, fontSize: 12, color: over ? "var(--warning-fg)" : "var(--fg-4)" }}
+        >
+          {over ? "+" : ""}
+          {w.varianceHours}h vs roster
+        </span>
+      )}
+      <span style={{ display: "block", fontSize: 12, color: "var(--fg-4)" }}>
+        {w.breaksTaken === 0 ? "no breaks taken" : `${w.breaksTaken} break${w.breaksTaken === 1 ? "" : "s"}`}
+        {w.loading && ` · cl ${w.loading.clause} ${w.loading.minutes}m owed`}
+      </span>
+
+      {w.confirmable ? (
+        <>
+          <Button size="sm" variant="sec" disabled={busy} onClick={onConfirm} style={{ marginTop: 6 }}>
+            Confirm {w.hours}h
+          </Button>
+          {w.dueForAutoConfirm && (
+            <span style={{ display: "block", fontSize: 11.5, color: "var(--warning-fg)", marginTop: 4 }}>
+              Past 48h — the next sweep confirms this for you
+            </span>
+          )}
+        </>
+      ) : (
+        <span style={{ display: "block", fontSize: 12, color: "var(--success-fg)", marginTop: 4 }}>
+          Fee {aud(w.cost.bookingFeeCents)} · wages {aud(w.cost.wagesCents)}
+        </span>
+      )}
+    </div>
+  );
+}
 
 function Stat({ label, value }: { label: string; value: string }) {
   return (

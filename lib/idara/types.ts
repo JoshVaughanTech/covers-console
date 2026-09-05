@@ -304,31 +304,38 @@ export type AuditEventType =
    * need; the number itself has no business in a log that a screen renders.
    */
   | "engagement.provisioned"
+  /**
+   * What was actually worked, settled and priced.
+   *
+   * The hours come from the time clock and never from a request — see
+   * app/api/engagements/confirm. `data.via` says whether the venue agreed the
+   * timesheet or whether the 48-hour window closed on it, because those are
+   * different facts and only one is anybody's affirmation.
+   *
+   * Carries the wages, super and booking fee it implies rather than leaving
+   * them to be recomputed: this is what Covers invoices against, and what was
+   * charged is a fact about a moment.
+   */
+  | "engagement.confirmed"
   /* ---- declared, and nothing writes them yet ----
 
-     The five below are part of the model §5 and §8 of
+     The four below are part of the model §5 and §8 of
      docs/plans/2026-09-05-one-tap-employment-design.md describe, and the
      replay in engagement.ts already folds them, so an event of any of these
      types would be handled correctly today. Nothing emits one.
 
      Stated here rather than only in the design note, because the union and
      eventMeta() in app/(console)/audit/page.tsx are what a reader consults —
-     and between them they would say pack verification and hour confirmation
-     are supported. A type surface that promises what the system cannot do is
-     the shape this repo has spent two days cataloguing: it looks like
-     coverage because every check of it passes.
+     and between them they would say pack verification is supported. A type
+     surface that promises what the system cannot do is the shape this repo
+     has spent two days cataloguing: it looks like coverage because every
+     check of it passes.
 
      Each names what it is waiting on. When you write the emitter, delete its
-     line. */
+     line — engagement.confirmed was on this list until the time-clock read
+     was written, and moving it out was part of that change rather than a
+     tidy-up afterwards. */
 
-  /**
-   * Hours confirmed by the venue (or by the 48-hour auto-confirm).
-   *
-   * NO WRITER YET. confirmedEvent() exists and is called by nothing: the
-   * hours have to come from the time clock, and reading a completed shift
-   * back out of Connecteam is the piece that is missing.
-   */
-  | "engagement.confirmed"
   /**
    * NO WRITER YET. cancelledEvent() exists and is called by nothing. There is
    * no screen on either side that cancels an engagement — a venue standing

@@ -18,4 +18,7 @@ export * from "./pay";
 export * from "./review";
 export * from "./unlocks";
 export * from "./replay";
+/* Safe here where engage.ts is not: timesheet.ts reads the clock's shape and
+   the engagement's, both of which are pure. It reaches no vault and no seed. */
+export * from "./timesheet";
 export { POSTINGS } from "./seed";

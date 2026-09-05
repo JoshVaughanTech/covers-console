@@ -17,8 +17,11 @@ import { timingSafeEqual } from "node:crypto";
 import { eventStore } from "@/lib/store/events";
 import { runWeeklyReport } from "@/lib/reports/weekly";
 import { FileSink, MemorySink, type ReportSink } from "@/lib/reports/delivery";
-import { DEMO_WEEK, DEMO_WEEK_SESSIONS, lastCompleteWeek, type ShiftSession } from "@/lib/awards";
-import { ConnecteamClient } from "@/lib/integrations/connecteam";
+import { lastCompleteWeek } from "@/lib/awards";
+/* One reader of the time clock, shared with hour confirmation. Two callers
+   deriving sessions for themselves would be two accounts of the same shift —
+   one telling payroll what the venue owes, the other telling it what to pay. */
+import { sessionsInWeek } from "@/lib/integrations/clock";
 
 export const dynamic = "force-dynamic";
 
@@ -33,27 +36,6 @@ function tokenOk(given: string | null): boolean {
   const a = Buffer.from(given);
   const b = Buffer.from(want);
   return a.length === b.length && timingSafeEqual(a, b);
-}
-
-async function sessionsFor(week: { start: number; end: number }): Promise<ShiftSession[]> {
-  const clock = process.env.CONNECTEAM_TIME_CLOCK_ID;
-  const live = Boolean(
-    clock &&
-      (process.env.CONNECTEAM_API_KEY ||
-        (process.env.CONNECTEAM_CLIENT_ID && process.env.CONNECTEAM_CLIENT_SECRET)),
-  );
-  if (!live) return week.start === DEMO_WEEK.start ? DEMO_WEEK_SESSIONS : [];
-
-  const client = new ConnecteamClient({
-    clientId: process.env.CONNECTEAM_CLIENT_ID,
-    clientSecret: process.env.CONNECTEAM_CLIENT_SECRET,
-    apiKey: process.env.CONNECTEAM_API_KEY,
-    timeClockId: clock as string,
-    timezone: TZ,
-    siteName: process.env.CONNECTEAM_SITE_NAME ?? "",
-  });
-  const all = await client.sessions(week.end, true);
-  return all.filter((s) => s.clockIn >= week.start && s.clockIn < week.end);
 }
 
 export async function POST(req: Request) {
@@ -82,7 +64,7 @@ export async function POST(req: Request) {
       store: eventStore(),
       orgId: ORG,
       sink,
-      sessions: await sessionsFor(week),
+      sessions: (await sessionsInWeek(week)).sessions,
       week,
       timezone: TZ,
       siteName: process.env.CONNECTEAM_SITE_NAME || null,

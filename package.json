@@ -10,7 +10,8 @@
     "lint": "next lint",
     "test": "vitest run",
     "test:watch": "vitest",
-    "report:weekly": "node scripts/deliver-weekly-report.mjs"
+    "report:weekly": "node scripts/deliver-weekly-report.mjs",
+    "confirm:hours": "node scripts/auto-confirm-hours.mjs"
   },
   "dependencies": {
     "lucide-react": "^0.469.0",
