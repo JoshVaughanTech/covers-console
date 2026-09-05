@@ -22,6 +22,7 @@ import { SEED_AUDIT_EVENTS } from "@/lib/idara/seed";
 import { operatorOf } from "@/lib/auth/session";
 import { notificationStore } from "@/lib/store/notifications";
 import { offerPosting } from "@/lib/notify/offer";
+import { engageOnAssign } from "@/lib/shifts/engage";
 import type { NewAuditEvent } from "@/lib/idara/audit";
 
 export const dynamic = "force-dynamic";
@@ -77,5 +78,19 @@ export async function POST(req: Request) {
      would put the same shift on ten phones twice. */
   const offer = r.created ? offerPosting(eventStore(), notificationStore(), ORG, r.event) : null;
 
-  return NextResponse.json({ ...r, ...(offer ? { offered: offer } : {}) }, { status: r.created ? 201 : 200 });
+  /* And an assignment is an employment offer waiting to be assembled.
+
+     Same placement, same argument: behind the append rather than at the call
+     site, so every assignment proposes an engagement — including one made by
+     a screen that does not know this feature exists. The console gets the
+     refusals back when the pack or the profile is not ready, because that is
+     the only place anybody can act on them; the assignment itself stands
+     regardless, since being rostered and being employed through Covers are
+     two different facts and only one of them is this route's to refuse. */
+  const engagement = r.created ? engageOnAssign(eventStore(), ORG, r.event) : null;
+
+  return NextResponse.json(
+    { ...r, ...(offer ? { offered: offer } : {}), ...(engagement ? { engagement } : {}) },
+    { status: r.created ? 201 : 200 },
+  );
 }

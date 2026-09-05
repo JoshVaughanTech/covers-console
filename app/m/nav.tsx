@@ -19,6 +19,7 @@ const TABS = [
   { href: "/m", label: "Breaks" },
   { href: "/m/shifts", label: "Find" },
   { href: "/m/mine", label: "Mine" },
+  { href: "/m/pack", label: "Pack" },
   { href: "/m/profile", label: "Profile" },
 ] as const;
 

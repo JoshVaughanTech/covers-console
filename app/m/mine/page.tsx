@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { SignIn, type Signed } from "../sign-in";
 import { MobileNav } from "../nav";
+import { Engagements } from "../engagements";
 
 /* ============================================================
    My shifts — what this person has on, and what they worked.
@@ -225,6 +226,12 @@ export default function MyShiftsPage() {
       </header>
 
       <MobileNav current="/m/mine" />
+
+      {/* Above the tabs, not inside one. An engagement waiting on a signature
+          is the most time-critical thing on this screen — until it is signed
+          the venue cannot put the person on payroll — and a tab is a place
+          things go unseen. */}
+      <Engagements onChanged={() => void load()} />
 
       <div style={{ display: "flex", gap: 6, marginBottom: 14 }}>
         {(
