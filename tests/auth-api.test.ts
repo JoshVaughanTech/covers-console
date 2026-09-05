@@ -13,7 +13,10 @@ import { WORKERS } from "../lib/idara/seed";
    up and the chain would record it truthfully and uselessly.
    ============================================================ */
 
-process.env.COVERS_DB = ":memory:";
+/* No database to point at any more: with no DATABASE_URL the store opens an
+   in-process Postgres, and vitest gives each test FILE its own worker, so
+   these routes get a database nobody else is writing to. Cases within one
+   file do share it — the ones that care set their own org or clientRef. */
 process.env.COVERS_ORG = "org-test";
 
 let request: typeof import("../app/api/auth/request/route");
