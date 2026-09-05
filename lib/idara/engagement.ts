@@ -586,30 +586,64 @@ export function provisionedEvent(
 }
 
 /**
- * NOTHING CALLS THIS YET. See "engagement.confirmed" in types.ts.
+ * How the hours came to be settled.
  *
- * A builder with no caller is worse than a missing one: it reads as wiring
- * that exists, and the compiler is happy either way. It is kept because the
- * hours it takes are the venue's confirmation of what was actually worked,
- * and that shape should be settled before the time-clock read is written
- * against it — not because anything is using it.
+ * Recorded because the two are not the same fact. "The venue agreed these
+ * hours" is somebody looking at a timesheet and saying yes; "the venue did not
+ * disagree within 48 hours" is a deadline passing. Both end with a worker
+ * paid, and only one of them is anybody's affirmation — so a dispute that
+ * turns on whether the venue actually checked has to be able to tell them
+ * apart, and a single `confirmed` could not.
  */
-export function confirmedEvent(
-  e: Engagement,
-  input: { at: string; actor: string; actorDid?: DID; hours: number; breaks: number },
-): NewAuditEvent {
+export type ConfirmedVia = "venue" | "auto";
+
+export interface ConfirmInput {
+  at: string;
+  actor: string;
+  actorDid?: DID;
+  /** paid hours as the CLOCK recorded them, not as the roster planned them. */
+  hours: number;
+  breaks: number;
+  via: ConfirmedVia;
+  /** cl 16.6 loading the venue owes for a break not given, where it does. */
+  loadingMinutes?: number;
+  /** integer cents; omitted when the session carries no rate to price it. */
+  loadingCents?: number;
+}
+
+/**
+ * The venue settling what was worked — written from the time clock's numbers.
+ *
+ * Carries the money it implies rather than leaving it to be recomputed later:
+ * this is the event Covers invoices against, and a fee derived on read could
+ * quietly change if the rate on the engagement ever did. What was charged is
+ * a fact about a moment, so it is recorded at that moment.
+ */
+export function confirmedEvent(e: Engagement, input: ConfirmInput): NewAuditEvent {
   const cost = engagementCost(e, input.hours);
+  const planned = engagementCost(e).hours;
+  const variance = +(input.hours - planned).toFixed(2);
+
   return {
     type: "engagement.confirmed",
     at: input.at,
     actor: input.actor,
     ...(input.actorDid ? { actorDid: input.actorDid } : {}),
     subject: e.workerDid,
-    summary: `Hours confirmed — ${input.hours}h on ${e.shift.role}`,
+    summary:
+      input.via === "auto"
+        ? `Hours auto-confirmed after 48h — ${input.hours}h on ${e.shift.role}`
+        : `Hours confirmed — ${input.hours}h on ${e.shift.role}`,
     data: {
       engagementId: e.id,
+      via: input.via,
       hours: input.hours,
+      plannedHours: planned,
+      // the number a manager scanning the trail actually looks for
+      varianceHours: variance,
       breaks: input.breaks,
+      ...(input.loadingMinutes ? { loadingMinutes: input.loadingMinutes } : {}),
+      ...(input.loadingCents != null ? { loadingCents: input.loadingCents } : {}),
       wagesCents: cost.wagesCents,
       superCents: cost.superCents,
       bookingFeeCents: cost.bookingFeeCents,

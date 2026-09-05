@@ -24,10 +24,13 @@ import { describeEngagement, standingOfEngagement } from "@/lib/idara/engagement
 import { conversionSignals } from "@/lib/idara/conversion";
 import { EMPLOYERS } from "@/lib/idara/employer-seed";
 import { WORKERS } from "@/lib/idara/seed";
+import { completedSessions } from "@/lib/integrations/clock";
+import { timesheet } from "@/lib/shifts/timesheet";
 
 export const dynamic = "force-dynamic";
 
 const ORG = process.env.COVERS_ORG ?? "org-brightwater";
+const TZ = process.env.TZ_VENUE ?? "Australia/Melbourne";
 const workerIndex = new Map(WORKERS.map((w) => [w.did, w]));
 
 export async function GET(req: Request) {
@@ -47,19 +50,56 @@ export async function GET(req: Request) {
      venue that opened last week. */
   const now = new Date().toISOString().slice(0, 10);
 
+  /* What the time clock says about the ones that have already run.
+
+     Read here rather than left to the confirm endpoint so the console can show
+     the hours BEFORE anybody confirms them — a Confirm button with no figure
+     behind it is asking somebody to agree to a number they cannot see. Keyed
+     by engagement so the table row and the confirmation are looking at one
+     answer from one read. */
+  const nowSec = Math.floor(Date.now() / 1000);
+  const { sessions, live: clockLive } = await completedSessions(nowSec);
+  const sheet = timesheet({ engagements: mine, sessions, now: nowSec, timezone: TZ });
+  const workedBy = new Map(sheet.worked.map((w) => [w.engagementId, w]));
+  const unmatchedBy = new Map(sheet.unmatched.map((u) => [u.engagementId, u]));
+
   return NextResponse.json({
     employer: { did: employer.did, name: employer.tradingName },
     at: now,
+    clockLive,
     engagements: mine
-      .map((e) => ({
-        ...describeEngagement(e),
-        standing: standingOfEngagement(e),
-        worker: {
-          did: e.workerDid,
-          name: workerIndex.get(e.workerDid)?.name ?? e.workerDid,
-          role: workerIndex.get(e.workerDid)?.role ?? "",
-        },
-      }))
+      .map((e) => {
+        const w = workedBy.get(e.id);
+        return {
+          ...describeEngagement(e),
+          standing: standingOfEngagement(e),
+          worker: {
+            did: e.workerDid,
+            name: workerIndex.get(e.workerDid)?.name ?? e.workerDid,
+            role: workerIndex.get(e.workerDid)?.role ?? "",
+          },
+          /* The clock's answer, or why there isn't one. Both are rendered:
+             "no session against a shift that was agreed and has passed" is the
+             row a venue most needs to see, and dropping it would make the
+             screen calmest exactly when something is wrong. */
+          worked: w
+            ? {
+                hours: w.hours,
+                plannedHours: w.plannedHours,
+                varianceHours: +(w.hours - w.plannedHours).toFixed(2),
+                breaksTaken: w.breaksTaken,
+                clockIn: w.clockIn,
+                clockOut: w.clockOut,
+                loading: w.loading,
+                cost: w.cost,
+                autoConfirmAt: w.autoConfirmAt,
+                dueForAutoConfirm: w.dueForAutoConfirm,
+                confirmable: e.status !== "confirmed",
+              }
+            : null,
+          unmatched: unmatchedBy.get(e.id)?.reason ?? null,
+        };
+      })
       // newest first: an operator is looking at what just happened
       .reverse(),
     conversion: conversionSignals(mine, now).map((s) => ({

@@ -196,16 +196,31 @@ The tax-free threshold is claimed with **one** employer, nominated by the worker
 other employer withholds at the no-threshold rate, and the accept sheet says so before
 the tap. Casual conversion is read off the engagement chain and **flagged, never decided**.
 
-**What is declared and not yet written.** Five of the nine new `AuditEventType` members
-have no emitter: `engagement.confirmed`, `engagement.cancelled`, `pack.item_verified`,
-`pack.item_revoked` and `conversion.flagged`. The replay folds all five and `/audit`
-renders all five, so the union and the audit screen — the two places a reader checks —
-would between them say hour confirmation and pack verification are supported. They are
-not. Each member's comment in `lib/idara/types.ts` names what it is waiting on: the
-time-clock read, a cancellation flow on either side, the unresolved KYC provider choice
-(§10), and a scheduler that can write a recurring signal exactly once. Three of them
-(`confirmedEvent`, `cancelledEvent`, `conversionEvent`) have builder functions that
-nothing calls, which reads as wiring that exists; those say so at the function too.
+**Hours are settled from the time clock, never from a request.** When a shift has run,
+`lib/shifts/timesheet.ts` joins the clock's completed sessions to the engagements that
+agreed them, and `/settings/employer` shows the venue the hours, the variance against the
+roster and any cl 16.6 loading *before* it offers a Confirm button — a control that posted
+a number would make that screen a payroll input form with an audit chain attached.
+
+The join is overlap plus proximity, and it refuses to guess: two sessions equally near the
+agreed start is a split shift, a double, or a clock-out somebody forgot, and picking either
+would confirm real hours against the wrong agreement. Paid hours come from the break
+actually taken rather than the one the roster planned, so somebody who worked through
+theirs is paid for it. `engagement.confirmed` carries the wages, super and booking fee at
+the moment they were charged, and `data.via` says whether the venue agreed or the 48-hour
+window closed on it. Confirming is keyed on the engagement, so the venue and the sweep
+arriving together bill once. The sweep is `npm run confirm:hours`, scheduled outside the
+app for the reasons `scripts/deliver-weekly-report.mjs` gives.
+
+**What is declared and not yet written.** Four of the nine new `AuditEventType` members
+have no emitter: `engagement.cancelled`, `pack.item_verified`, `pack.item_revoked` and
+`conversion.flagged`. The replay folds all four and `/audit` renders all four, so the union
+and the audit screen — the two places a reader checks — would between them say pack
+verification is supported. It is not. Each member's comment in `lib/idara/types.ts` names
+what it is waiting on: a cancellation flow on either side, the unresolved KYC provider
+choice (§10), and a scheduler that can write a recurring signal exactly once. Two of them
+(`cancelledEvent`, `conversionEvent`) have builder functions that nothing calls, which
+reads as wiring that exists; those say so at the function too.
 
 ### Tests
 
