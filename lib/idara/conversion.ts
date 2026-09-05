@@ -129,6 +129,16 @@ export function conversionSignals(engagements: Engagement[], at: ISODate): Conve
   return signals.sort((a, b) => b.daysEngaged - a.daysEngaged);
 }
 
+/**
+ * NOTHING IN THE APP CALLS THIS YET — only a test. See "conversion.flagged"
+ * in types.ts.
+ *
+ * The signal itself is not dead: conversionSignals() runs on every read of
+ * /api/employer/engagements and the venue sees it. What is missing is putting
+ * it on the CHAIN, which needs something scheduled that writes each signal
+ * exactly once — and once is the hard half, because a signal recomputed daily
+ * would append the same fact thirty times and call it a record.
+ */
 export function conversionEvent(
   signal: ConversionSignal,
   workerName: string,
