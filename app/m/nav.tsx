@@ -19,14 +19,19 @@ const TABS = [
   { href: "/m", label: "Breaks" },
   { href: "/m/shifts", label: "Find" },
   { href: "/m/mine", label: "Mine" },
+  { href: "/m/earnings", label: "Earnings" },
   { href: "/m/profile", label: "Profile" },
 ] as const;
 
 export type MobileTab = (typeof TABS)[number]["href"];
 
+/* Sized to content, not to an equal fifth. `flex: 1` gives every tab the same
+   width whatever its label, so the longest name is always the first to run out
+   of room — and at 320px "Earnings" filled its box to the pixel. The tab whose
+   name is hardest to guess from four letters is the worst one to truncate. */
 const style = (on: boolean): React.CSSProperties => ({
-  flex: 1, textAlign: "center", padding: "8px 0", borderRadius: 10, fontSize: 13, fontWeight: 600,
-  textDecoration: "none",
+  flex: "1 1 auto", textAlign: "center", padding: "8px 4px", borderRadius: 10, fontSize: 13, fontWeight: 600,
+  textDecoration: "none", whiteSpace: "nowrap",
   border: `1px solid ${on ? "var(--accent)" : "var(--border)"}`,
   background: on ? "var(--accent-bg, var(--bg-2))" : "#fff",
   color: on ? "var(--accent-fg, var(--fg-1))" : "var(--fg-3)",
