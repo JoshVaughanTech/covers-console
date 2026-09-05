@@ -54,6 +54,18 @@ CREATE TABLE IF NOT EXISTS audit_event (
 CREATE UNIQUE INDEX IF NOT EXISTS audit_event_client_ref
   ON audit_event (org_id, client_ref) WHERE client_ref IS NOT NULL;
 
+/* CREATE TABLE IF NOT EXISTS is silent on a table that already exists, so a
+   database written before a column was added never receives it — and every
+   insert afterwards fails against a column list that no longer matches. That
+   is invisible in development, where the database is thrown away between
+   runs, and total in a deployment, where it is not.
+
+   Postgres has ADD COLUMN IF NOT EXISTS, so unlike the SQLite version this
+   needs no schema probe: it is idempotent and safe on every open. The column
+   must stay nullable — existing rows get NULL, which toEvent maps to
+   undefined, so their digests are unchanged and the chain keeps verifying. */
+ALTER TABLE audit_event ADD COLUMN IF NOT EXISTS actor_did TEXT;
+
 CREATE TABLE IF NOT EXISTS chain_head (
   org_id TEXT PRIMARY KEY,
   seq    BIGINT NOT NULL,

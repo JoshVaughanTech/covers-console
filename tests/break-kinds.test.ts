@@ -14,15 +14,15 @@ import { classifyBreak } from "../lib/integrations/connecteam";
    ============================================================ */
 
 describe("classifyBreak — the live account's configured types", () => {
-  it("reads an unpaid 30-minute break as the meal break, whatever it is called", () => {
+  it("reads an unpaid 30-minute break as the meal break, whatever it is called", async () => {
     expect(classifyBreak({ id: "8a47c921", name: "Break", isPaid: false, duration: 30 })).toBe("meal");
   });
 
-  it("reads a paid 20-minute break as a rest break", () => {
+  it("reads a paid 20-minute break as a rest break", async () => {
     expect(classifyBreak({ id: "97572c22", name: "Rest Break", isPaid: true, duration: 20 })).toBe("rest");
   });
 
-  it("would have got the meal break wrong on name alone", () => {
+  it("would have got the meal break wrong on name alone", async () => {
     // the guard against reintroducing the old heuristic: "Break" matches none
     // of meal/lunch/dinner/unpaid, so anything name-first fails this case
     const nameOnly = /meal|lunch|dinner|unpaid/i.test("Break");
@@ -32,7 +32,7 @@ describe("classifyBreak — the live account's configured types", () => {
 });
 
 describe("classifyBreak — payment status wins over the name", () => {
-  it("trusts isPaid even when the name suggests otherwise", () => {
+  it("trusts isPaid even when the name suggests otherwise", async () => {
     // a venue calling its paid 20-minute break "Lunch" is still a rest break
     expect(classifyBreak({ id: "x", name: "Lunch", isPaid: true, duration: 20 })).toBe("rest");
     // and an unpaid break called "Tea" is still the meal break
@@ -41,20 +41,20 @@ describe("classifyBreak — payment status wins over the name", () => {
 });
 
 describe("classifyBreak — fallbacks when isPaid is absent", () => {
-  it("falls back to the name", () => {
+  it("falls back to the name", async () => {
     expect(classifyBreak({ id: "x", name: "Meal break" })).toBe("meal");
     expect(classifyBreak({ id: "x", name: "Unpaid break" })).toBe("meal");
     expect(classifyBreak({ id: "x", name: "Rest break" })).toBe("rest");
     expect(classifyBreak({ id: "x", name: "Smoko" })).toBe("rest");
   });
 
-  it("falls back to duration when the name says nothing", () => {
+  it("falls back to duration when the name says nothing", async () => {
     expect(classifyBreak({ id: "x", name: "Break", duration: 30 })).toBe("meal");
     expect(classifyBreak({ id: "x", name: "Break", duration: 45 })).toBe("meal");
     expect(classifyBreak({ id: "x", name: "Break", duration: 20 })).toBe("rest");
   });
 
-  it("defaults to rest when nothing is known", () => {
+  it("defaults to rest when nothing is known", async () => {
     // rest is the safer default: a missed rest break raises an alert, while a
     // wrongly assumed meal break would silently satisfy cl 16.2 and stop the
     // loading clock on a break that may never have happened

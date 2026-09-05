@@ -61,15 +61,15 @@ const at = (when: string) =>
   decide({ person, credentials: [cred("2024-05-16")], action: "be_rostered", site, at: when, verifier });
 
 describe("calendarDate", () => {
-  it("leaves a bare date alone", () => {
+  it("leaves a bare date alone", async () => {
     expect(calendarDate("2024-05-16")).toBe("2024-05-16");
   });
 
-  it("narrows a timestamp to its day", () => {
+  it("narrows a timestamp to its day", async () => {
     expect(calendarDate("2024-05-16T22:10:00.412Z")).toBe("2024-05-16");
   });
 
-  it("does not parse, so no timezone can shift the day", () => {
+  it("does not parse, so no timezone can shift the day", async () => {
     // Date.parse would apply the runtime's zone and could land on the 15th or
     // the 17th depending on where this runs. Slicing cannot.
     expect(calendarDate("2024-05-16T23:59:59Z")).toBe("2024-05-16");
@@ -78,35 +78,35 @@ describe("calendarDate", () => {
 });
 
 describe("isBeforeDay", () => {
-  it("is false for the same day in either form", () => {
+  it("is false for the same day in either form", async () => {
     expect(isBeforeDay("2024-05-16", "2024-05-16")).toBe(false);
     expect(isBeforeDay("2024-05-16", "2024-05-16T12:10:00Z")).toBe(false);
     expect(isBeforeDay("2024-05-16T00:00:00Z", "2024-05-16")).toBe(false);
   });
 
-  it("still orders different days", () => {
+  it("still orders different days", async () => {
     expect(isBeforeDay("2024-05-15", "2024-05-16T00:00:00Z")).toBe(true);
     expect(isBeforeDay("2024-05-17", "2024-05-16T23:59:59Z")).toBe(false);
   });
 });
 
 describe("a credential expiring today", () => {
-  it("is valid when checked with a bare date", () => {
+  it("is valid when checked with a bare date", async () => {
     expect(verifier.verify(cred("2024-05-16"), "2024-05-16").status).toBe("valid");
   });
 
-  it("is still valid when checked with a timestamp on the same day", () => {
+  it("is still valid when checked with a timestamp on the same day", async () => {
     // the whole point: the raw string comparison called this expired
     expect(verifier.verify(cred("2024-05-16"), "2024-05-16T12:10:00Z").status).toBe("valid");
     expect(verifier.verify(cred("2024-05-16"), "2024-05-16T23:59:59Z").status).toBe("valid");
   });
 
-  it("is expired the next day, in either form", () => {
+  it("is expired the next day, in either form", async () => {
     expect(verifier.verify(cred("2024-05-16"), "2024-05-17").status).toBe("expired");
     expect(verifier.verify(cred("2024-05-16"), "2024-05-17T00:00:01Z").status).toBe("expired");
   });
 
-  it("blocks nobody on the day it expires, whichever form the clock arrives in", () => {
+  it("blocks nobody on the day it expires, whichever form the clock arrives in", async () => {
     expect(at("2024-05-16").allowed).toBe(true);
     expect(at("2024-05-16T22:10:00Z").allowed).toBe(true);
   });
@@ -126,20 +126,20 @@ describe("the expiry warning window", () => {
     return warn ? Number(/expires in (\d+) day/.exec(warn.detail)?.[1]) : null;
   };
 
-  it("counts the same number of days from a date and from a timestamp", () => {
+  it("counts the same number of days from a date and from a timestamp", async () => {
     // 22:10 on the 16th used to lose most of a day to Math.round
     expect(daysLeft("2024-05-16")).toBe(18);
     expect(daysLeft("2024-05-16T22:10:00Z")).toBe(18);
     expect(daysLeft("2024-05-16T00:00:00Z")).toBe(18);
   });
 
-  it("keeps the manager-facing number stable across the day", () => {
+  it("keeps the manager-facing number stable across the day", async () => {
     const morning = daysLeft("2024-05-16T06:00:00Z");
     const night = daysLeft("2024-05-16T23:30:00Z");
     expect(morning).toBe(night);
   });
 
-  it("does not move the threshold itself", () => {
+  it("does not move the threshold itself", async () => {
     expect(EXPIRY_WARN_DAYS).toBe(30);
     // exactly on the boundary warns, from either form
     expect(daysLeft("2024-05-04")).toBe(30);

@@ -30,7 +30,7 @@ let store: typeof import("../lib/store/events");
 beforeAll(async () => {
   issue = await import("../app/api/auth/issue/route");
   store = await import("../lib/store/events");
-  op = signInOperator(OPERATOR.did);
+  op = (await signInOperator(OPERATOR.did));
 });
 
 afterEach(() => vi.unstubAllEnvs());
@@ -88,19 +88,19 @@ describe("the cause, recorded", () => {
     const w = someone();
     await issueFor(w.did);
 
-    const e = (await store.eventStore()).all("org-test").filter((x) => x.type === "auth.code_issued").at(-1)!;
+    const e = (await (await store.eventStore()).all("org-test")).filter((x) => x.type === "auth.code_issued").at(-1)!;
     expect(e.actor).toBe(OPERATOR.name);
     expect(e.actorDid).toBe(OPERATOR.did);
     expect(e.subject).toBe(w.did);
     expect(e.summary).toContain(w.name);
-    expect((await store.eventStore()).verify("org-test").ok).toBe(true);
+    expect((await (await store.eventStore()).verify("org-test")).ok).toBe(true);
   });
 
   it("carries the grant id and no secret whatsoever", async () => {
     const w = someone();
     const { body } = await issueFor(w.did);
 
-    const e = (await store.eventStore()).all("org-test").filter((x) => x.type === "auth.code_issued").at(-1)!;
+    const e = (await (await store.eventStore()).all("org-test")).filter((x) => x.type === "auth.code_issued").at(-1)!;
     expect(e.data.grantId).toMatch(/^sg-[0-9a-f]{16}$/);
 
     /* The audit screen is readable by anyone who can reach it, so a code in
@@ -129,11 +129,11 @@ describe("refusing, and saying so", () => {
   it("records nothing when nothing was issued", async () => {
     const w = someone();
     for (let i = 0; i < 5; i++) await issueFor(w.did);
-    const before = (await store.eventStore()).all("org-test").filter((x) => x.type === "auth.code_issued").length;
+    const before = (await (await store.eventStore()).all("org-test")).filter((x) => x.type === "auth.code_issued").length;
 
     await issueFor(w.did);
 
-    const after = (await store.eventStore()).all("org-test").filter((x) => x.type === "auth.code_issued").length;
+    const after = (await (await store.eventStore()).all("org-test")).filter((x) => x.type === "auth.code_issued").length;
     // an issuance that did not happen is worse in the log than no entry at all
     expect(after).toBe(before);
   });
@@ -189,7 +189,7 @@ describe("a mistyped directory", () => {
     // a good code exists first, the way one would after a normal issue
     const good = await issueFor(w.did);
     expect(good.res.status).toBe(200);
-    const before = (await store.eventStore()).all("org-test").filter((x) => x.type === "auth.code_issued").length;
+    const before = (await (await store.eventStore()).all("org-test")).filter((x) => x.type === "auth.code_issued").length;
 
     try {
       vi.stubEnv("AUTH_CODES_DIR", notADir);
@@ -204,11 +204,11 @@ describe("a mistyped directory", () => {
     }
 
     // nothing recorded, because nothing happened
-    const after = (await store.eventStore()).all("org-test").filter((x) => x.type === "auth.code_issued").length;
+    const after = (await (await store.eventStore()).all("org-test")).filter((x) => x.type === "auth.code_issued").length;
     expect(after).toBe(before);
 
     // and the code the worker was already given still signs them in
     const { authStore } = await import("../lib/store/auth");
-    expect((await authStore()).redeemCode(w.did, (good.body.code as string), "their-phone").ok).toBe(true);
+    expect((await (await authStore()).redeemCode(w.did, (good.body.code as string), "their-phone")).ok).toBe(true);
   });
 });

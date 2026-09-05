@@ -65,7 +65,7 @@ const run = (roster: RosterMember[], site: Site = kitchen) =>
   decideRoster({ roster, action: "be_rostered", site, at: AT, verifier });
 
 describe("decideRoster — collective requirements", () => {
-  it("passes when one person on the roster holds the ticket", () => {
+  it("passes when one person on the roster holds the ticket", async () => {
     const r = run([
       member("Ada", "Kitchen Hand"),
       member("Ben", "Head Chef", ["food_safety_supervisor"]),
@@ -75,7 +75,7 @@ describe("decideRoster — collective requirements", () => {
     expect(r.coverage[0].holders.map((h) => h.name)).toEqual(["Ben"]);
   });
 
-  it("blocks when nobody holds it, even though everyone is individually eligible", () => {
+  it("blocks when nobody holds it, even though everyone is individually eligible", async () => {
     const r = run([member("Ada", "Kitchen Hand"), member("Cal", "Kitchen Hand")]);
     expect(r.decisions.every((d) => d.allowed)).toBe(true); // no individual fault
     expect(r.allowed).toBe(false);
@@ -83,7 +83,7 @@ describe("decideRoster — collective requirements", () => {
     expect(r.coverage[0].detail).toContain("No one rostered holds");
   });
 
-  it("does not demand the ticket of everyone", () => {
+  it("does not demand the ticket of everyone", async () => {
     const r = run([
       member("Ada", "Kitchen Hand"),
       member("Ben", "Head Chef", ["food_safety_supervisor"]),
@@ -95,7 +95,7 @@ describe("decideRoster — collective requirements", () => {
     ).toBe(false);
   });
 
-  it("counts only people who are themselves eligible", () => {
+  it("counts only people who are themselves eligible", async () => {
     // Ben holds the FSS but has no induction, so he can't be rostered at all
     const ben: RosterMember = {
       person: {
@@ -112,7 +112,7 @@ describe("decideRoster — collective requirements", () => {
     expect(r.coverage[0].holders).toHaveLength(0);
   });
 
-  it("ignores a holder whose own ticket is expired or revoked", () => {
+  it("ignores a holder whose own ticket is expired or revoked", async () => {
     const stale = member("Ben", "Head Chef");
     stale.credentials.push(
       cred(stale.person.did, "food_safety_supervisor", { expiresAt: "2023-01-01" }),
@@ -126,7 +126,7 @@ describe("decideRoster — collective requirements", () => {
     expect(run([revoked]).coverage[0].met).toBe(false);
   });
 
-  it("honours minHolders above one", () => {
+  it("honours minHolders above one", async () => {
     const site: Site = {
       ...kitchen,
       requiresOnRoster: [{ type: "food_safety_supervisor", minHolders: 2 }],
@@ -146,25 +146,25 @@ describe("decideRoster — collective requirements", () => {
     expect(two.coverage[0].holders).toHaveLength(2);
   });
 
-  it("fails an empty roster that owes coverage", () => {
+  it("fails an empty roster that owes coverage", async () => {
     const r = run([]);
     expect(r.allowed).toBe(false);
     expect(r.coverage[0].met).toBe(false);
   });
 
-  it("allows an empty roster where nothing collective is owed", () => {
+  it("allows an empty roster where nothing collective is owed", async () => {
     const open: Site = { ...kitchen, requires: [], requiresOnRoster: [] };
     expect(run([], open).allowed).toBe(true);
   });
 
-  it("treats a site with no requiresOnRoster as having no coverage duty", () => {
+  it("treats a site with no requiresOnRoster as having no coverage duty", async () => {
     const plain: Site = { id: "s-p", name: "Plain", region: "Vic", kind: "venue", requires: [] };
     const r = run([member("Ada", "Kitchen Hand")], plain);
     expect(r.coverage).toHaveLength(0);
     expect(r.allowed).toBe(true);
   });
 
-  it("respects siteScoped on a collective requirement", () => {
+  it("respects siteScoped on a collective requirement", async () => {
     const scoped: Site = {
       ...kitchen,
       requiresOnRoster: [
@@ -188,7 +188,7 @@ describe("decideRoster — collective requirements", () => {
     expect(run([rightSite], scoped).coverage[0].met).toBe(true);
   });
 
-  it("still blocks on individual failures alongside good coverage", () => {
+  it("still blocks on individual failures alongside good coverage", async () => {
     const noInduction: RosterMember = {
       person: {
         did: "did:web:idara.app:w:dee",
@@ -206,7 +206,7 @@ describe("decideRoster — collective requirements", () => {
     expect(r.allowed).toBe(false);
   });
 
-  it("returns per-person decisions in roster order", () => {
+  it("returns per-person decisions in roster order", async () => {
     const r = run([
       member("Ada", "Kitchen Hand"),
       member("Ben", "Head Chef", ["food_safety_supervisor"]),
@@ -216,12 +216,12 @@ describe("decideRoster — collective requirements", () => {
 });
 
 describe("summariseCoverage", () => {
-  it("is null when everything is covered", () => {
+  it("is null when everything is covered", async () => {
     const r = run([member("Ben", "Head Chef", ["food_safety_supervisor"])]);
     expect(summariseCoverage(r.coverage)).toBeNull();
   });
 
-  it("names the missing cover", () => {
+  it("names the missing cover", async () => {
     const r = run([member("Ada", "Kitchen Hand")]);
     expect(summariseCoverage(r.coverage)).toBe("Roster lacks FSS cover");
   });

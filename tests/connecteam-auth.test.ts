@@ -24,11 +24,11 @@ const json = (body: unknown, status = 200) =>
 afterEach(() => vi.unstubAllGlobals());
 
 describe("credentials", () => {
-  it("refuses to construct with neither an api key nor a client pair", () => {
+  it("refuses to construct with neither an api key nor a client pair", async () => {
     expect(() => new ConnecteamClient({ timeClockId: "1" })).toThrow(/apiKey or clientId/);
   });
 
-  it("accepts either shape", () => {
+  it("accepts either shape", async () => {
     expect(() => new ConnecteamClient({ timeClockId: "1", apiKey: "k" })).not.toThrow();
     expect(() => new ConnecteamClient({ timeClockId: "1", clientId: "a", clientSecret: "b" })).not.toThrow();
   });

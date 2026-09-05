@@ -40,20 +40,20 @@ const did = (name: string) => WORKERS.find((w) => w.name === name)!.did;
    The routes take identity from the cookie now, so a test that skipped this
    would be testing the 401. */
 const sessions = new Map<string, TestSession>();
-const as = (name: string): TestSession => {
+const as = async (name: string): Promise<TestSession> => {
   const key = did(name);
-  if (!sessions.has(key)) sessions.set(key, signIn(key));
+  if (!sessions.has(key)) sessions.set(key, await signIn(key));
   return sessions.get(key)!;
 };
 
 const board = async (who: string) => {
-  const res = await shifts.GET(asCaller(as(who), "http://x/api/shifts"));
+  const res = await shifts.GET(asCaller(await as(who), "http://x/api/shifts"));
   return { res, body: await res.json() };
 };
 
 const putHandUp = async (who: string, postingId: string, clientRef?: string) => {
   const res = await claim.POST(
-    asCaller(as(who), "http://x/api/shifts/claim", {
+    asCaller(await as(who), "http://x/api/shifts/claim", {
       method: "POST",
       body: JSON.stringify({ postingId, clientRef }),
     }),
@@ -63,7 +63,7 @@ const putHandUp = async (who: string, postingId: string, clientRef?: string) => 
 
 const takeHandDown = async (who: string, postingId: string, clientRef?: string) => {
   const res = await withdraw.POST(
-    asCaller(as(who), "http://x/api/shifts/withdraw", {
+    asCaller(await as(who), "http://x/api/shifts/withdraw", {
       method: "POST",
       body: JSON.stringify({ postingId, clientRef }),
     }),
@@ -86,7 +86,7 @@ const findClaimant = async (postingId: string): Promise<string> => {
   const { LocalCredentialVerifier } = await import("../lib/idara/verifier");
   const { SITES } = await import("../lib/idara/seed");
 
-  const b = boardFrom((await store.eventStore()).all("org-test"));
+  const b = boardFrom((await (await store.eventStore()).all("org-test")));
   const p = b.postings.find((x) => x.id === postingId);
   if (!p) throw new Error(`no posting ${postingId}`);
   const verifier = new LocalCredentialVerifier();
@@ -179,7 +179,7 @@ describe("putting a hand up", () => {
   });
 
   it("writes an event the manager's queue can read", async () => {
-    const events = (await store.eventStore()).all("org-test").filter((e) => e.type === "shift.claimed");
+    const events = (await (await store.eventStore()).all("org-test")).filter((e) => e.type === "shift.claimed");
     expect(events.length).toBeGreaterThan(0);
 
     const e = events[events.length - 1];
@@ -188,11 +188,11 @@ describe("putting a hand up", () => {
     expect(e.data.postingId).toBe(BAR);
     expect(e.subject).toBe(did("Darie Roberts"));
     // and the chain still holds
-    expect((await store.eventStore()).verify("org-test").ok).toBe(true);
+    expect((await (await store.eventStore()).verify("org-test")).ok).toBe(true);
   });
 
   it("carries the claimant's identity, not just their display name", async () => {
-    const e = (await (await store.eventStore()).all("org-test"))
+    const e = (await (await (await store.eventStore()).all("org-test")))
       .filter((x) => x.type === "shift.claimed")
       .at(-1)!;
     expect(e.actor).toBe("Darie Roberts");
@@ -208,7 +208,7 @@ describe("putting a hand up", () => {
   });
 
   it("treats a retry with the same client ref as one claim", async () => {
-    const countBefore = (await store.eventStore()).all("org-test").filter((e) => e.type === "shift.claimed").length;
+    const countBefore = (await (await store.eventStore()).all("org-test")).filter((e) => e.type === "shift.claimed").length;
 
     /* Ask the board who is eligible rather than naming someone and hoping.
        A hard-coded name here would fail the day the seed changed, and it
@@ -223,7 +223,7 @@ describe("putting a hand up", () => {
     expect(retry.res.status).toBe(200);
     expect(retry.body.created).toBe(false);
 
-    const countAfter = (await store.eventStore()).all("org-test").filter((e) => e.type === "shift.claimed").length;
+    const countAfter = (await (await store.eventStore()).all("org-test")).filter((e) => e.type === "shift.claimed").length;
     expect(countAfter).toBe(countBefore + 1);
   });
 });
@@ -262,12 +262,12 @@ describe("what the phone cannot talk its way past", () => {
 
   it("rejects a malformed body rather than guessing", async () => {
     const bad = await claim.POST(
-      asCaller(as("Darie Roberts"), "http://x/api/shifts/claim", { method: "POST", body: "not json" }),
+      asCaller(await as("Darie Roberts"), "http://x/api/shifts/claim", { method: "POST", body: "not json" }),
     );
     expect(bad.status).toBe(400);
 
     const missing = await claim.POST(
-      asCaller(as("Darie Roberts"), "http://x/api/shifts/claim", {
+      asCaller(await as("Darie Roberts"), "http://x/api/shifts/claim", {
         method: "POST",
         body: JSON.stringify({}),
       }),
@@ -312,7 +312,7 @@ describe("taking a hand back down", () => {
   });
 
   it("writes an event the board can be rebuilt from, and keeps the chain", async () => {
-    const events = (await store.eventStore()).all("org-test").filter((e) => e.type === "shift.withdrawn");
+    const events = (await (await store.eventStore()).all("org-test")).filter((e) => e.type === "shift.withdrawn");
     expect(events.length).toBeGreaterThan(0);
 
     const e = events[events.length - 1];
@@ -325,7 +325,7 @@ describe("taking a hand back down", () => {
        drops undefined, so an optional field sent as null re-hashes every prior
        event as tampered — a payload mistake here breaks the whole log, not
        just this row. */
-    expect((await store.eventStore()).verify("org-test").ok).toBe(true);
+    expect((await (await store.eventStore()).verify("org-test")).ok).toBe(true);
   });
 
   it("refuses when there is no claim to withdraw", async () => {
@@ -352,11 +352,11 @@ describe("taking a hand back down", () => {
 
   it("rejects a malformed body rather than guessing", async () => {
     const bad = await withdraw.POST(
-      asCaller(as("Darie Roberts"), "http://x/api/shifts/withdraw", { method: "POST", body: "not json" }),
+      asCaller(await as("Darie Roberts"), "http://x/api/shifts/withdraw", { method: "POST", body: "not json" }),
     );
     expect(bad.status).toBe(400);
     const missing = await withdraw.POST(
-      asCaller(as("Darie Roberts"), "http://x/api/shifts/withdraw", {
+      asCaller(await as("Darie Roberts"), "http://x/api/shifts/withdraw", {
         method: "POST",
         body: JSON.stringify({}),
       }),
@@ -368,7 +368,7 @@ describe("taking a hand back down", () => {
     const who = await findClaimant(BAR);
     await putHandUp(who, BAR);
 
-    const before = (await store.eventStore()).all("org-test").filter((e) => e.type === "shift.withdrawn").length;
+    const before = (await (await store.eventStore()).all("org-test")).filter((e) => e.type === "shift.withdrawn").length;
     const ref = `withdraw:${did(who)}:${BAR}`;
     const first = await takeHandDown(who, BAR, ref);
     const retry = await takeHandDown(who, BAR, ref);
@@ -380,7 +380,7 @@ describe("taking a hand back down", () => {
     expect(retry.res.status).toBe(200);
     expect(retry.body.created).toBe(false);
 
-    const after = (await store.eventStore()).all("org-test").filter((e) => e.type === "shift.withdrawn").length;
+    const after = (await (await store.eventStore()).all("org-test")).filter((e) => e.type === "shift.withdrawn").length;
     expect(after).toBe(before + 1);
   });
 });

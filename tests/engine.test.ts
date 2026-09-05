@@ -57,7 +57,7 @@ const run = (credentials: Credential[], where: Site = site) =>
   decide({ person, credentials, action: "be_rostered", site: where, at: AT, verifier });
 
 describe("decide — the eligibility primitive", () => {
-  it("allows a worker holding every required credential", () => {
+  it("allows a worker holding every required credential", async () => {
     const d = run(clean());
     expect(d.allowed).toBe(true);
     expect(d.warnings).toBe(0);
@@ -65,14 +65,14 @@ describe("decide — the eligibility primitive", () => {
     expect(d.reasons.every((r) => r.outcome === "pass")).toBe(true);
   });
 
-  it("blocks a worker with no credentials at all, naming every gap", () => {
+  it("blocks a worker with no credentials at all, naming every gap", async () => {
     const d = run([]);
     expect(d.allowed).toBe(false);
     expect(d.reasons).toHaveLength(3);
     expect(d.reasons.every((r) => r.code === "credential.missing")).toBe(true);
   });
 
-  it("blocks on a missing credential", () => {
+  it("blocks on a missing credential", async () => {
     const d = run(clean().filter((c) => c.type !== "food_handling"));
     expect(d.allowed).toBe(false);
     const fail = d.reasons.find((r) => r.outcome === "fail");
@@ -80,7 +80,7 @@ describe("decide — the eligibility primitive", () => {
     expect(fail?.credentialType).toBe("food_handling");
   });
 
-  it("blocks on an expired credential", () => {
+  it("blocks on an expired credential", async () => {
     const creds = clean();
     creds[2] = cred("food_handling", "2023-11-01");
     const d = run(creds);
@@ -88,7 +88,7 @@ describe("decide — the eligibility primitive", () => {
     expect(d.reasons.find((r) => r.outcome === "fail")?.code).toBe("credential.expired");
   });
 
-  it("blocks on a revoked credential", () => {
+  it("blocks on a revoked credential", async () => {
     const creds = clean();
     creds[0] = cred("rsa", null, { status: "revoked" });
     const d = run(creds);
@@ -96,7 +96,7 @@ describe("decide — the eligibility primitive", () => {
     expect(d.reasons.find((r) => r.outcome === "fail")?.code).toBe("credential.revoked");
   });
 
-  it("blocks on a suspended credential", () => {
+  it("blocks on a suspended credential", async () => {
     const creds = clean();
     creds[0] = cred("rsa", null, { status: "suspended" });
     const d = run(creds);
@@ -104,7 +104,7 @@ describe("decide — the eligibility primitive", () => {
     expect(d.reasons.find((r) => r.outcome === "fail")?.code).toBe("credential.suspended");
   });
 
-  it("reports every failure, not just the first", () => {
+  it("reports every failure, not just the first", async () => {
     const d = run([cred("rsa", null)]);
     expect(d.allowed).toBe(false);
     expect(d.reasons.filter((r) => r.outcome === "fail")).toHaveLength(2);
@@ -112,7 +112,7 @@ describe("decide — the eligibility primitive", () => {
 });
 
 describe("decide — site scoping", () => {
-  it("rejects a site induction issued for a different site", () => {
+  it("rejects a site induction issued for a different site", async () => {
     const creds = clean();
     creds[1] = cred("site_induction", "2025-01-01", {
       claims: { siteId: "s-somewhere-else" },
@@ -124,14 +124,14 @@ describe("decide — site scoping", () => {
     expect(fail?.credentialType).toBe("site_induction");
   });
 
-  it("accepts a portable credential regardless of site claims", () => {
+  it("accepts a portable credential regardless of site claims", async () => {
     // rsa is not siteScoped, so a stray siteId claim is irrelevant
     const creds = clean();
     creds[0] = cred("rsa", null, { claims: { siteId: "s-elsewhere" } });
     expect(run(creds).allowed).toBe(true);
   });
 
-  it("enforces the extra requirement on a stricter site", () => {
+  it("enforces the extra requirement on a stricter site", async () => {
     const stricterSite: Site = {
       ...site,
       requires: [...BASE_REQUIREMENTS, { type: "allergen_management" }],
@@ -147,7 +147,7 @@ describe("decide — expiry warnings", () => {
   const daysFromAt = (days: number) =>
     new Date(Date.parse(AT) + days * 86_400_000).toISOString().slice(0, 10);
 
-  it("warns but still allows inside the warning window", () => {
+  it("warns but still allows inside the warning window", async () => {
     const creds = clean();
     creds[2] = cred("food_handling", daysFromAt(EXPIRY_WARN_DAYS - 1));
     const d = run(creds);
@@ -156,19 +156,19 @@ describe("decide — expiry warnings", () => {
     expect(d.reasons.find((r) => r.outcome === "warn")?.code).toBe("credential.expiring");
   });
 
-  it("warns exactly at the window boundary", () => {
+  it("warns exactly at the window boundary", async () => {
     const creds = clean();
     creds[2] = cred("food_handling", daysFromAt(EXPIRY_WARN_DAYS));
     expect(run(creds).warnings).toBe(1);
   });
 
-  it("does not warn one day outside the window", () => {
+  it("does not warn one day outside the window", async () => {
     const creds = clean();
     creds[2] = cred("food_handling", daysFromAt(EXPIRY_WARN_DAYS + 1));
     expect(run(creds).warnings).toBe(0);
   });
 
-  it("treats a credential expiring today as a warning, not a failure", () => {
+  it("treats a credential expiring today as a warning, not a failure", async () => {
     const creds = clean();
     creds[2] = cred("food_handling", AT);
     const d = run(creds);
@@ -176,7 +176,7 @@ describe("decide — expiry warnings", () => {
     expect(d.warnings).toBe(1);
   });
 
-  it("counts multiple expiring credentials separately", () => {
+  it("counts multiple expiring credentials separately", async () => {
     const creds = clean();
     creds[1] = cred("site_induction", daysFromAt(5), { claims: { siteId: "s-test" } });
     creds[2] = cred("food_handling", daysFromAt(10));
@@ -185,13 +185,13 @@ describe("decide — expiry warnings", () => {
     expect(d.warnings).toBe(2);
   });
 
-  it("never treats a non-expiring credential as expiring", () => {
+  it("never treats a non-expiring credential as expiring", async () => {
     expect(run(clean()).warnings).toBe(0);
   });
 });
 
 describe("decide — decision context", () => {
-  it("records who was checked, for what, where and when", () => {
+  it("records who was checked, for what, where and when", async () => {
     const d = decide({
       person,
       credentials: clean(),
@@ -210,7 +210,7 @@ describe("decide — decision context", () => {
     });
   });
 
-  it("is the same call for every action — only the recorded action differs", () => {
+  it("is the same call for every action — only the recorded action differs", async () => {
     const forRoster = run(clean());
     const forSignOff = decide({
       person,
@@ -224,14 +224,14 @@ describe("decide — decision context", () => {
     expect(forSignOff.context.action).toBe("sign_off");
   });
 
-  it("is pure — it does not mutate the credentials it is given", () => {
+  it("is pure — it does not mutate the credentials it is given", async () => {
     const creds = clean();
     const snapshot = JSON.stringify(creds);
     run(creds);
     expect(JSON.stringify(creds)).toBe(snapshot);
   });
 
-  it("allows a site with no requirements", () => {
+  it("allows a site with no requirements", async () => {
     const open: Site = { ...site, requires: [] };
     const d = run([], open);
     expect(d.allowed).toBe(true);
@@ -240,18 +240,18 @@ describe("decide — decision context", () => {
 });
 
 describe("summarise", () => {
-  it("describes a clean pass", () => {
+  it("describes a clean pass", async () => {
     expect(summarise(run(clean()))).toBe("Eligible");
   });
 
-  it("pluralises warnings correctly", () => {
+  it("pluralises warnings correctly", async () => {
     const one = { ...run(clean()), warnings: 1 };
     const two = { ...run(clean()), warnings: 2 };
     expect(summarise(one)).toBe("Eligible with 1 warning");
     expect(summarise(two)).toBe("Eligible with 2 warnings");
   });
 
-  it("counts unmet requirements when blocked", () => {
+  it("counts unmet requirements when blocked", async () => {
     expect(summarise(run([cred("rsa", null)]))).toBe(
       "Blocked — 2 requirements not met",
     );

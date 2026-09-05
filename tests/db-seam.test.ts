@@ -18,15 +18,15 @@ afterEach(async () => {
 });
 
 describe("the lock key", () => {
-  it("is stable for the same string", () => {
+  it("is stable for the same string", async () => {
     expect(lockKey("org-brightwater")).toBe(lockKey("org-brightwater"));
   });
 
-  it("differs between orgs, so one venue does not block another", () => {
+  it("differs between orgs, so one venue does not block another", async () => {
     expect(lockKey("org-a")).not.toBe(lockKey("org-b"));
   });
 
-  it("fits a signed 64-bit integer, which is what pg accepts", () => {
+  it("fits a signed 64-bit integer, which is what pg accepts", async () => {
     for (const s of ["", "org-brightwater", "x".repeat(200), "üñïçødé"]) {
       const k = lockKey(s);
       expect(k).toBeGreaterThanOrEqual(-(2n ** 63n));

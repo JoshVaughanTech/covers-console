@@ -16,17 +16,17 @@ import type { Identity, Site, Credential } from "../lib/idara/types";
 const row = (shifts: CrewRow["shifts"]): CrewRow => ({ name: "Test", shifts, total: "40h" });
 
 describe("which shifts the engine is asked about", () => {
-  it("drops days off — an unworked shift cannot make anyone ineligible", () => {
+  it("drops days off — an unworked shift cannot make anyone ineligible", async () => {
     const r = row(week(["11a – 7p", OFF, "11a – 7p", OFF, OFF, OFF, OFF]));
     expect(shiftsOf(r).map((s) => s.id)).toEqual(["Mon", "Wed"]);
   });
 
-  it("names each shift by its day, so a reason can say which one", () => {
+  it("names each shift by its day, so a reason can say which one", async () => {
     const r = row(week(["4p – 12a", "4p – 12a", "4p – 12a", "4p – 12a", "4p – 12a", "4p – 12a", "4p – 12a"]));
     expect(shiftsOf(r).map((s) => s.id)).toEqual(DAY_IDS);
   });
 
-  it("carries per-day duties through", () => {
+  it("carries per-day duties through", async () => {
     const r = row(
       week(["4p – 12a", OFF, OFF, OFF, OFF, "4p – 12a", OFF], {
         5: { duties: ["serve_alcohol", "gaming"], label: "gaming floor" },
@@ -40,7 +40,7 @@ describe("which shifts the engine is asked about", () => {
 });
 
 describe("the empty duty list, which is the reason this is guarded", () => {
-  it("collapses an empty list to undefined rather than passing it on", () => {
+  it("collapses an empty list to undefined rather than passing it on", async () => {
     const r = row(week(["4p – 12a", OFF, OFF, OFF, OFF, OFF, OFF], { 0: { duties: [], label: "x" } }));
     const out = shiftsOf(r);
     // NOT `duties: []` — that would assert the shift involves no regulated work
@@ -48,7 +48,7 @@ describe("the empty duty list, which is the reason this is guarded", () => {
     expect("duties" in out[0]).toBe(false);
   });
 
-  it("keeps a bartender gated on their RSA when the duty list arrives empty", () => {
+  it("keeps a bartender gated on their RSA when the duty list arrives empty", async () => {
     /* The hazard, end to end and against the real engine: with duties: [] the
        RSA requirement stops binding and an unlicensed bartender is allowed.
        Routed through shiftsOf they stay blocked. */

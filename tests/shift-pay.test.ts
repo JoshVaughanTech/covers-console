@@ -29,7 +29,7 @@ const fridayNight = (offeredHourlyCents: number): ShiftPay => ({
 });
 
 describe("a posting with no rate set", () => {
-  it("is not priced and is not blocked", () => {
+  it("is not priced and is not blocked", async () => {
     // "no rate yet" is an ordinary state, not a failure — and never a $0
     expect(priceOf(posting())).toBeNull();
     expect(describePay(posting())).toBeNull();
@@ -38,7 +38,7 @@ describe("a posting with no rate set", () => {
 });
 
 describe("the publish gate", () => {
-  it("refuses a rate below the floor for any hour of the shift", () => {
+  it("refuses a rate below the floor for any hour of the shift", async () => {
     const reason = payBlockReason(posting(fridayNight(3700)));
     expect(reason).toContain("$37.00/h is below");
     expect(reason).toContain("MA000009");
@@ -46,16 +46,16 @@ describe("the publish gate", () => {
     expect(reason).toContain("at least $40.62/h");
   });
 
-  it("lets through a rate that clears every hour", () => {
+  it("lets through a rate that clears every hour", async () => {
     expect(payBlockReason(posting(fridayNight(4150)))).toBeNull();
     expect(payBlockReason(posting(fridayNight(4062)))).toBeNull();
   });
 
-  it("refuses one cent under the floor", () => {
+  it("refuses one cent under the floor", async () => {
     expect(payBlockReason(posting(fridayNight(4061)))).not.toBeNull();
   });
 
-  it("refuses a shift it has no rates on file for", () => {
+  it("refuses a shift it has no rates on file for", async () => {
     // June 2026 predates the table. Publishing a shift with an unverifiable
     // compliance claim attached is worse than refusing to publish it.
     const stale = payBlockReason(
@@ -80,31 +80,31 @@ describe("buildPosting refuses to build an underpaying posting", () => {
     duties: ["serve_alcohol", "handle_food"], publish: true, ...over,
   });
 
-  it("builds without a pay block, as before", () => {
+  it("builds without a pay block, as before", async () => {
     const r = buildPosting(draft(), "sp-1", "Fri");
     expect(r.ok).toBe(true);
     if (r.ok) expect(r.posting.pay).toBeUndefined();
   });
 
-  it("carries the pay block onto the posting", () => {
+  it("carries the pay block onto the posting", async () => {
     const r = buildPosting(draft(), "sp-2", "Fri", fridayNight(4150));
     expect(r.ok).toBe(true);
     if (r.ok) expect(r.posting.pay?.offeredHourlyCents).toBe(4150);
   });
 
-  it("reports the shortfall as a validation error", () => {
+  it("reports the shortfall as a validation error", async () => {
     const r = buildPosting(draft(), "sp-3", "Fri", fridayNight(3700));
     expect(r.ok).toBe(false);
     if (!r.ok) expect(r.errors.join(" ")).toContain("below the MA000009 floor");
   });
 
-  it("refuses an underpaying DRAFT too, not just a publish", () => {
+  it("refuses an underpaying DRAFT too, not just a publish", async () => {
     // a draft saved today is published later; telling them then is too late
     const r = buildPosting(draft({ publish: false }), "sp-4", "Fri", fridayNight(3700));
     expect(r.ok).toBe(false);
   });
 
-  it("still reports the ordinary validation errors alongside the rate", () => {
+  it("still reports the ordinary validation errors alongside the rate", async () => {
     const r = buildPosting(draft({ role: "" }), "sp-5", "Fri", fridayNight(3700));
     expect(r.ok).toBe(false);
     if (!r.ok) {
@@ -126,12 +126,12 @@ describe("the form's rate section, parsed", () => {
   const priced = (over: Partial<PostingDraft> = {}) =>
     d({ date: "2026-07-17", startTime: "17:00", endTime: "01:00", level: "2", rate: "41.50", ...over });
 
-  it("returns no pay for an untouched section", () => {
+  it("returns no pay for an untouched section", async () => {
     const r = payFromDraft(d());
     expect(r).toEqual({ ok: true });
   });
 
-  it("refuses a half-filled section rather than dropping it", () => {
+  it("refuses a half-filled section rather than dropping it", async () => {
     // somebody who typed a rate and no date meant to publish a rate; ignoring
     // it would put the shift on the board paying nothing anyone agreed to
     const r = payFromDraft(d({ rate: "41.50" }));
@@ -143,7 +143,7 @@ describe("the form's rate section, parsed", () => {
     }
   });
 
-  it("builds the moments the award is applied to", () => {
+  it("builds the moments the award is applied to", async () => {
     const r = payFromDraft(priced());
     expect(r.ok).toBe(true);
     if (!r.ok || !r.pay) throw new Error("expected a pay block");
@@ -152,7 +152,7 @@ describe("the form's rate section, parsed", () => {
     expect(r.pay.startsAt).toBe(Math.floor(Date.UTC(2026, 6, 17, 7) / 1000));
   });
 
-  it("reads an end before the start as crossing midnight", () => {
+  it("reads an end before the start as crossing midnight", async () => {
     const r = payFromDraft(priced());
     if (!r.ok || !r.pay) throw new Error("expected a pay block");
     expect(r.pay.endsAt - r.pay.startsAt).toBe(8 * 3600);
@@ -163,13 +163,13 @@ describe("the form's rate section, parsed", () => {
     ]);
   });
 
-  it("keeps the introductory level as a name, not a number", () => {
+  it("keeps the introductory level as a name, not a number", async () => {
     const r = payFromDraft(priced({ level: "introductory" }));
     if (!r.ok || !r.pay) throw new Error("expected a pay block");
     expect(r.pay.level).toBe("introductory");
   });
 
-  it("carries the unpaid break through in seconds", () => {
+  it("carries the unpaid break through in seconds", async () => {
     const r = payFromDraft(priced({ unpaidBreakMin: "30" }));
     if (!r.ok || !r.pay) throw new Error("expected a pay block");
     expect(r.pay.unpaidBreakSec).toBe(1800);
@@ -185,7 +185,7 @@ describe("the form's rate section, parsed", () => {
     if (!r.ok) expect(r.errors.some((e) => pattern.test(e))).toBe(true);
   });
 
-  it("refuses the underpaying draft through the form's own path", () => {
+  it("refuses the underpaying draft through the form's own path", async () => {
     /* The form must not be a second opinion. This goes through buildPosting
        with no override, so the rate the manager typed reaches the same
        payBlockReason() that guards every other route in. */
@@ -194,7 +194,7 @@ describe("the form's rate section, parsed", () => {
     if (!r.ok) expect(r.errors.join(" ")).toContain("below the MA000009 floor");
   });
 
-  it("publishes the same posting when the rate clears", () => {
+  it("publishes the same posting when the rate clears", async () => {
     const r = buildPosting(priced(), "sp-form-ok", "Fri");
     expect(r.ok).toBe(true);
     if (r.ok) {
@@ -207,7 +207,7 @@ describe("the form's rate section, parsed", () => {
 describe("what the worker is shown", () => {
   const summary = describePay(posting(fridayNight(4150)))!;
 
-  it("folds the shift into one row per rate band", () => {
+  it("folds the shift into one row per rate band", async () => {
     // the 17:00–19:00 and 19:00–24:00 runs are both weekday and fold together;
     // the hours after midnight are Saturday and stay their own line
     expect(summary.bands.map((b) => [b.label, b.hours])).toEqual([
@@ -217,11 +217,11 @@ describe("what the worker is shown", () => {
     expect(summary.mixedRates).toBe(true);
   });
 
-  it("shows the dearest hour of each band", () => {
+  it("shows the dearest hour of each band", async () => {
     expect(summary.bands.map((b) => fmtAud(b.hourlyCents))).toEqual(["$36.80", "$40.62"]);
   });
 
-  it("quotes the gross for the shift, and the margin over the floor", () => {
+  it("quotes the gross for the shift, and the margin over the floor", async () => {
     expect(fmtAud(summary.estGrossCents)).toBe("$332.00");
     expect(summary.paidHours).toBe(8);
     expect(fmtAud(summary.floorHourlyCents)).toBe("$40.62");
@@ -229,23 +229,23 @@ describe("what the worker is shown", () => {
     expect(summary.atOrAboveFloor).toBe(true);
   });
 
-  it("says when public holidays were not checked", () => {
+  it("says when public holidays were not checked", async () => {
     expect(summary.publicHolidaysChecked).toBe(false);
   });
 
-  it("carries what the figure does not cover", () => {
+  it("carries what the figure does not cover", async () => {
     expect(summary.notModelled).toContain("overtime");
     expect(summary.notModelled.some((n) => /enterprise agreements/.test(n))).toBe(true);
   });
 
-  it("describes an underpaying posting rather than hiding it", () => {
+  it("describes an underpaying posting rather than hiding it", async () => {
     // the manager has to see the shortfall to fix it
     const short = describePay(posting(fridayNight(3700)))!;
     expect(short.atOrAboveFloor).toBe(false);
     expect(fmtAud(short.marginHourlyCents)).toBe("-$3.62");
   });
 
-  it("returns null rather than throwing when no rates cover the shift", () => {
+  it("returns null rather than throwing when no rates cover the shift", async () => {
     // one stale posting must not take the whole board down
     const stale = describePay(
       posting({
@@ -259,27 +259,27 @@ describe("what the worker is shown", () => {
 });
 
 describe("the seeded demo board", () => {
-  it("prices every posting that carries a rate", () => {
+  it("prices every posting that carries a rate", async () => {
     for (const p of POSTINGS) {
       expect(p.pay, `${p.id} has no pay block`).toBeDefined();
       expect(describePay(p), `${p.id} could not be priced`).not.toBeNull();
     }
   });
 
-  it("has the Friday bar shift crossing into Saturday rates", () => {
+  it("has the Friday bar shift crossing into Saturday rates", async () => {
     const s = describePay(POSTINGS.find((p) => p.id === "sp-fridaylive-bar")!)!;
     expect(s.bands.map((b) => b.label)).toEqual(["Weekday", "Saturday"]);
     expect(fmtAud(s.floorHourlyCents)).toBe("$40.62");
     expect(s.atOrAboveFloor).toBe(true);
   });
 
-  it("keeps every published posting at or above the floor", () => {
+  it("keeps every published posting at or above the floor", async () => {
     for (const p of POSTINGS.filter((x) => x.status === "open")) {
       expect(payBlockReason(p), `${p.id} is on the board underpaying`).toBeNull();
     }
   });
 
-  it("has one underpaying draft, so the refusal is reachable in the demo", () => {
+  it("has one underpaying draft, so the refusal is reachable in the demo", async () => {
     const draft = POSTINGS.find((p) => p.id === "sp-quayside-wait")!;
     expect(draft.status).toBe("draft");
     expect(payBlockReason(draft)).toContain("Sunday");

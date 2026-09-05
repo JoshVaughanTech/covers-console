@@ -39,7 +39,7 @@ const shift = (over: Partial<ShiftSession> = {}): ShiftSession => ({
 const report = (sessions: ShiftSession[]) => weeklyReport(sessions, WEEK_START, WEEK_END, { timezone: TZ });
 
 describe("weeklyReport — what counts as a breach", () => {
-  it("costs a missed meal on a >6h shift", () => {
+  it("costs a missed meal on a >6h shift", async () => {
     const r = report([shift()]);
     expect(r.rows).toHaveLength(1);
     expect(r.rows[0].code).toBe("MEAL_MISSED");
@@ -48,7 +48,7 @@ describe("weeklyReport — what counts as a breach", () => {
     expect(r.rows[0].loadingAud).toBe(30);
   });
 
-  it("costs a late meal from the deadline to the break", () => {
+  it("costs a late meal from the deadline to the break", async () => {
     const start = day(1, 6);
     const r = report([
       shift({
@@ -63,7 +63,7 @@ describe("weeklyReport — what counts as a breach", () => {
     expect(r.rows[0].loadingHours).toBeCloseTo(0.67, 2);
   });
 
-  it("does not charge a meal taken inside the window", () => {
+  it("does not charge a meal taken inside the window", async () => {
     const start = day(0, 9);
     const r = report([
       shift({ breaks: [{ kind: "meal", start: start + 3 * H, end: start + 3.5 * H }] }),
@@ -74,13 +74,13 @@ describe("weeklyReport — what counts as a breach", () => {
 
   /* ---- the false-positive guards ---- */
 
-  it("does not charge a 5h30 shift with no meal — elective zone, cl 16.4", () => {
+  it("does not charge a 5h30 shift with no meal — elective zone, cl 16.4", async () => {
     const start = day(2, 12);
     const r = report([shift({ clockIn: start, clockOut: start + 5.5 * H, plannedEnd: start + 5.5 * H })]);
     expect(r.rows).toHaveLength(0);
   });
 
-  it("charges nothing for rest-break shortfalls — only the meal clause carries money", () => {
+  it("charges nothing for rest-break shortfalls — only the meal clause carries money", async () => {
     const start = day(3, 8);
     const r = report([
       shift({
@@ -97,7 +97,7 @@ describe("weeklyReport — what counts as a breach", () => {
 });
 
 describe("weeklyReport — pricing", () => {
-  it("reports unpriced loading in hours and keeps it out of the money total", () => {
+  it("reports unpriced loading in hours and keeps it out of the money total", async () => {
     const r = report([
       shift({ userId: "w:priced" }),
       shift({ userId: "w:unpriced", name: "No Rate", ordinaryHourlyRate: null, clockIn: day(1, 9), clockOut: day(1, 9) + 8 * H }),
@@ -111,13 +111,13 @@ describe("weeklyReport — pricing", () => {
     expect(r.totals.loadingHours).toBe(4);
   });
 
-  it("gives a person no dollar figure when every row of theirs is unpriced", () => {
+  it("gives a person no dollar figure when every row of theirs is unpriced", async () => {
     const r = report([shift({ ordinaryHourlyRate: null })]);
     expect(r.byPerson[0].loadingAud).toBeNull();
     expect(r.byPerson[0].loadingHours).toBe(2);
   });
 
-  it("aggregates a person's breaches across the week", () => {
+  it("aggregates a person's breaches across the week", async () => {
     const r = report([
       shift({ clockIn: day(0, 9), clockOut: day(0, 9) + 8 * H }),
       shift({ clockIn: day(3, 9), clockOut: day(3, 9) + 8 * H }),
@@ -129,14 +129,14 @@ describe("weeklyReport — pricing", () => {
 });
 
 describe("weeklyReport — scope", () => {
-  it("excludes open shifts and counts them", () => {
+  it("excludes open shifts and counts them", async () => {
     const r = report([shift(), shift({ userId: "w:open", clockIn: day(4, 9), clockOut: null })]);
     expect(r.rows).toHaveLength(1);
     expect(r.openShifts).toBe(1);
     expect(r.totals.shiftsAssessed).toBe(1);
   });
 
-  it("assigns an overnight shift to the week it started in", () => {
+  it("assigns an overnight shift to the week it started in", async () => {
     // clocks in Sunday 20:00, out Monday 04:00 — belongs to this week
     const start = day(6, 20);
     const s = shift({ clockIn: start, clockOut: start + 8 * H });
@@ -144,13 +144,13 @@ describe("weeklyReport — scope", () => {
     expect(report([s]).rows).toHaveLength(1);
   });
 
-  it("excludes a shift starting after the week ends", () => {
+  it("excludes a shift starting after the week ends", async () => {
     const s = shift({ clockIn: WEEK_END + H, clockOut: WEEK_END + 9 * H });
     expect(inWeek(s, WEEK_START, WEEK_END)).toBe(false);
     expect(report([s]).totals.shiftsAssessed).toBe(0);
   });
 
-  it("filters to one venue", () => {
+  it("filters to one venue", async () => {
     const r = weeklyReport(
       [shift(), shift({ userId: "w:other", siteName: "Northside Tavern", clockIn: day(1, 9), clockOut: day(1, 9) + 8 * H })],
       WEEK_START,
@@ -163,14 +163,14 @@ describe("weeklyReport — scope", () => {
 });
 
 describe("weeklyReport — totals reconcile", () => {
-  it("row hours sum to the reported total", () => {
+  it("row hours sum to the reported total", async () => {
     const r = report(DEMO_WEEK_SESSIONS.map((s) => ({ ...s, clockIn: s.clockIn - DEMO_WEEK.start + WEEK_START, clockOut: s.clockOut == null ? null : s.clockOut - DEMO_WEEK.start + WEEK_START })));
     const summed = +r.rows.reduce((a, x) => a + x.loadingHours, 0).toFixed(2);
     expect(summed).toBe(r.totals.loadingHours);
     expect(r.totals.pricedRows + r.totals.unpricedRows).toBe(r.totals.breaches);
   });
 
-  it("is deterministic — folding the same week twice is identical", () => {
+  it("is deterministic — folding the same week twice is identical", async () => {
     const a = report([shift(), shift({ userId: "w:b", clockIn: day(2, 9), clockOut: day(2, 9) + 9 * H })]);
     const b = report([shift(), shift({ userId: "w:b", clockIn: day(2, 9), clockOut: day(2, 9) + 9 * H })]);
     expect(a).toEqual(b);
@@ -178,21 +178,21 @@ describe("weeklyReport — totals reconcile", () => {
 });
 
 describe("CSV", () => {
-  it("escapes commas and quotes per RFC 4180", () => {
+  it("escapes commas and quotes per RFC 4180", async () => {
     expect(csvField("plain")).toBe("plain");
     expect(csvField("Tan, Michael")).toBe('"Tan, Michael"');
     expect(csvField('He said "go"')).toBe('"He said ""go"""');
     expect(csvField(null)).toBe("");
   });
 
-  it("quotes a name containing a comma in the rendered file", () => {
+  it("quotes a name containing a comma in the rendered file", async () => {
     const r = report([shift({ name: "Tan, Michael", role: 'Bar "lead"' })]);
     const csv = reportToCsv(r, TZ);
     expect(csv).toContain('"Tan, Michael"');
     expect(csv).toContain('"Bar ""lead"""');
   });
 
-  it("carries provenance and a total row", () => {
+  it("carries provenance and a total row", async () => {
     const r = report([shift()]);
     const lines = reportToCsv(r, TZ).split("\n");
     expect(lines[1]).toContain("MA000009");
@@ -200,20 +200,20 @@ describe("CSV", () => {
     expect(reportToCsv(r, TZ)).toContain("TOTAL (1 priced row)");
   });
 
-  it("reports unpriced rows separately in the file, never folded into the total", () => {
+  it("reports unpriced rows separately in the file, never folded into the total", async () => {
     const csv = reportToCsv(report([shift({ ordinaryHourlyRate: null })]), TZ);
     expect(csv).toContain("UNPRICED (1 row, no hourly rate)");
     expect(csv).toContain("TOTAL (0 priced rows)");
   });
 
-  it("names the file by venue and week", () => {
+  it("names the file by venue and week", async () => {
     const r = weeklyReport([shift()], WEEK_START, WEEK_END, { timezone: TZ, siteName: "Brightwater Hotel" });
     expect(csvFilename(r, TZ)).toBe("break-loading_brightwater-hotel_2025-08-25_2025-08-31.csv");
   });
 });
 
 describe("week helpers", () => {
-  it("lastCompleteWeek returns a Monday-to-Monday span of exactly 7 days", () => {
+  it("lastCompleteWeek returns a Monday-to-Monday span of exactly 7 days", async () => {
     const w = lastCompleteWeek(Math.floor(Date.parse("2025-09-03T05:00:00Z") / 1000), TZ);
     expect(w.end - w.start).toBe(7 * 86400);
     // the week must be complete — it ends on or before now
@@ -223,7 +223,7 @@ describe("week helpers", () => {
 });
 
 describe("demo week", () => {
-  it("is mostly clean, with both breach codes and an unpriced row present", () => {
+  it("is mostly clean, with both breach codes and an unpriced row present", async () => {
     const r = weeklyReport(DEMO_WEEK_SESSIONS, DEMO_WEEK.start, DEMO_WEEK.end, { timezone: TZ });
     expect(r.totals.shiftsAssessed).toBeGreaterThan(r.totals.breaches);
     expect(r.rows.some((x) => x.code === "MEAL_MISSED")).toBe(true);
@@ -232,7 +232,7 @@ describe("demo week", () => {
     expect(r.openShifts).toBe(1);
   });
 
-  it("does not flag its two guard shifts", () => {
+  it("does not flag its two guard shifts", async () => {
     const r = weeklyReport(DEMO_WEEK_SESSIONS, DEMO_WEEK.start, DEMO_WEEK.end, { timezone: TZ });
     expect(r.rows.some((x) => x.name === "Liam O'Brien")).toBe(false);
     expect(r.rows.some((x) => x.name === "Sophie Nguyen")).toBe(false);

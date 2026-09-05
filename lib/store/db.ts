@@ -218,6 +218,11 @@ class PgliteDb implements Db {
 /* ---------- choosing one ---------- */
 
 let cached: Db | null = null;
+/* The open in flight, not just the one that finished. Opening is async, so
+   two requests arriving on a cold start would both see an empty cache and
+   both build a pool — one of which nothing would ever close. Sharing the
+   promise makes the second caller wait for the first rather than repeat it. */
+let opening: Promise<Db> | null = null;
 
 /**
  * The database this process should use.
@@ -229,7 +234,26 @@ let cached: Db | null = null;
  */
 export async function db(): Promise<Db> {
   if (cached) return cached;
+  opening ??= freshDb().then(
+    (d) => (cached = d),
+    (e) => { opening = null; throw e; },   // a failed open must not be cached
+  );
+  return opening;
+}
 
+/**
+ * A database of its own — unshared, and not remembered by db().
+ *
+ * db() hands every caller the same connection, which is what a running
+ * process wants and what a test asserting isolation cannot use. "A restarted
+ * scheduler, which knows nothing about the last run" is a real property with
+ * a real test, and running it against the shared connection would assert the
+ * opposite while passing.
+ *
+ * Follows DATABASE_URL the same way, so the same test runs against a real
+ * server when there is one.
+ */
+export async function freshDb(): Promise<Db> {
   const url = process.env.DATABASE_URL;
   if (url) {
     const { Pool } = await import("pg");
@@ -240,8 +264,7 @@ export async function db(): Promise<Db> {
       max: Number(process.env.PGPOOL_MAX ?? 3),
       ssl: url.includes("sslmode=disable") ? undefined : { rejectUnauthorized: false },
     });
-    cached = new PgDb(pool as unknown as PgPool);
-    return cached;
+    return new PgDb(pool as unknown as PgPool);
   }
 
   if (process.env.NODE_ENV === "production") {
@@ -249,11 +272,11 @@ export async function db(): Promise<Db> {
   }
 
   const { PGlite } = await import("@electric-sql/pglite");
-  cached = new PgliteDb((await PGlite.create()) as unknown as PgliteInstance);
-  return cached;
+  return new PgliteDb((await PGlite.create()) as unknown as PgliteInstance);
 }
 
 /** Tests replace the database between cases. */
 export function setDb(next: Db | null): void {
   cached = next;
+  opening = next ? Promise.resolve(next) : null;
 }

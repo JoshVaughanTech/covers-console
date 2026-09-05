@@ -26,21 +26,21 @@ const base: Credential = {
 };
 
 describe("LocalCredentialVerifier", () => {
-  it("passes a current credential", () => {
+  it("passes a current credential", async () => {
     expect(verifier.verify(base, AT).status).toBe("valid");
   });
 
-  it("passes a non-expiring credential", () => {
+  it("passes a non-expiring credential", async () => {
     expect(verifier.verify({ ...base, expiresAt: null }, AT).status).toBe("valid");
   });
 
-  it("reports expiry only once the date has passed", () => {
+  it("reports expiry only once the date has passed", async () => {
     expect(verifier.verify({ ...base, expiresAt: "2024-05-15" }, AT).status).toBe("expired");
     expect(verifier.verify({ ...base, expiresAt: AT }, AT).status).toBe("valid");
     expect(verifier.verify({ ...base, expiresAt: "2024-05-17" }, AT).status).toBe("valid");
   });
 
-  it("honours revocation and suspension ahead of expiry", () => {
+  it("honours revocation and suspension ahead of expiry", async () => {
     expect(verifier.verify({ ...base, status: "revoked" }, AT).status).toBe("revoked");
     expect(verifier.verify({ ...base, status: "suspended" }, AT).status).toBe("suspended");
     // a revoked credential stays revoked even if it is also in date
@@ -49,7 +49,7 @@ describe("LocalCredentialVerifier", () => {
     ).toBe("revoked");
   });
 
-  it("always returns a human-readable detail string", () => {
+  it("always returns a human-readable detail string", async () => {
     for (const s of ["valid", "revoked", "suspended"] as const) {
       expect(verifier.verify({ ...base, status: s }, AT).detail.length).toBeGreaterThan(0);
     }
@@ -72,7 +72,7 @@ describe("the verifier seam", () => {
     requires: [{ type: "first_aid" }],
   };
 
-  it("lets the engine's verdict be driven entirely by the injected verifier", () => {
+  it("lets the engine's verdict be driven entirely by the injected verifier", async () => {
     // a stub that rejects everything stands in for a failing signature check
     const rejectAll: CredentialVerifier = {
       verify: () => ({ status: "revoked", detail: "Issuer signature invalid." }),
@@ -87,7 +87,7 @@ describe("the verifier seam", () => {
     expect(denied.reasons[0].detail).toContain("Issuer signature invalid.");
   });
 
-  it("is consulted for every required credential, not just the first", () => {
+  it("is consulted for every required credential, not just the first", async () => {
     const seen: string[] = [];
     const spy: CredentialVerifier = {
       verify: (c) => {

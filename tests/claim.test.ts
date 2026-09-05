@@ -29,7 +29,7 @@ const posting = (id: string): ShiftPosting => {
 const empty = () => posting("sp-2041-bar");
 
 describe("the gate", () => {
-  it("refuses a claim when the caller reports a block", () => {
+  it("refuses a claim when the caller reports a block", async () => {
     const r = claimShift(empty(), DID, AT, "RSA expired on 2 May 2024");
     expect(r.ok).toBe(false);
     if (r.ok) throw new Error("unreachable");
@@ -37,7 +37,7 @@ describe("the gate", () => {
     expect(r.reason).toMatch(/RSA/);
   });
 
-  it("refuses before considering anything else", () => {
+  it("refuses before considering anything else", async () => {
     // a posting that would also fail the duplicate check: blocked still wins,
     // so the person is told the real reason rather than a procedural one
     const p = empty();
@@ -48,7 +48,7 @@ describe("the gate", () => {
     expect(r.kind).toBe("blocked");
   });
 
-  it("does not mutate the posting it refuses", () => {
+  it("does not mutate the posting it refuses", async () => {
     const p = empty();
     claimShift(p, DID, AT, "blocked");
     expect(p.claims).toHaveLength(0);
@@ -56,7 +56,7 @@ describe("the gate", () => {
 });
 
 describe("a successful claim", () => {
-  it("adds the claim and leaves everything else alone", () => {
+  it("adds the claim and leaves everything else alone", async () => {
     const p = empty();
     const r = claimShift(p, DID, AT, null);
     expect(r.ok).toBe(true);
@@ -67,13 +67,13 @@ describe("a successful claim", () => {
     expect(r.posting.status).toBe(p.status);
   });
 
-  it("is a request, not a roster change — nobody is assigned by claiming", () => {
+  it("is a request, not a roster change — nobody is assigned by claiming", async () => {
     const r = claimShift(empty(), DID, AT, null);
     if (!r.ok) throw new Error("unreachable");
     expect(r.posting.assigned).not.toContain(DID);
   });
 
-  it("does not mutate the original posting", () => {
+  it("does not mutate the original posting", async () => {
     const p = empty();
     claimShift(p, DID, AT, null);
     expect(p.claims).toHaveLength(0);
@@ -81,7 +81,7 @@ describe("a successful claim", () => {
 });
 
 describe("duplicates and capacity", () => {
-  it("refuses a second claim from the same person", () => {
+  it("refuses a second claim from the same person", async () => {
     const p = empty();
     const first = claimShift(p, DID, AT, null);
     if (!first.ok) throw new Error("unreachable");
@@ -91,7 +91,7 @@ describe("duplicates and capacity", () => {
     expect(second.kind).toBe("duplicate");
   });
 
-  it("lets a different person claim the same shift", () => {
+  it("lets a different person claim the same shift", async () => {
     const p = empty();
     const first = claimShift(p, DID, AT, null);
     if (!first.ok) throw new Error("unreachable");
@@ -101,14 +101,14 @@ describe("duplicates and capacity", () => {
     expect(second.posting.claims).toHaveLength(2);
   });
 
-  it("allows a fresh claim after an earlier one was refused by a manager", () => {
+  it("allows a fresh claim after an earlier one was refused by a manager", async () => {
     const p = empty();
     p.claims = [{ did: DID, at: "2024-05-15", refused: "Needed elsewhere" }];
     expect(hasClaimed(p, DID)).toBe(false);
     expect(claimShift(p, DID, AT, null).ok).toBe(true);
   });
 
-  it("refuses someone already assigned to the shift", () => {
+  it("refuses someone already assigned to the shift", async () => {
     const p = empty();
     p.assigned = [DID];
     const r = claimShift(p, DID, AT, null);
@@ -117,7 +117,7 @@ describe("duplicates and capacity", () => {
     expect(r.kind).toBe("duplicate");
   });
 
-  it("refuses a shift that is already filled", () => {
+  it("refuses a shift that is already filled", async () => {
     const p = empty();
     p.status = "filled";
     const r = claimShift(p, "did:web:idara.app:w:other", AT, null);
@@ -126,7 +126,7 @@ describe("duplicates and capacity", () => {
     expect(r.kind).toBe("full");
   });
 
-  it("refuses when every seat is taken even if the status lags behind", () => {
+  it("refuses when every seat is taken even if the status lags behind", async () => {
     const p = empty();
     p.assigned = ["did:a", "did:b"]; // seats === 2
     const r = claimShift(p, DID, AT, null);
@@ -137,11 +137,11 @@ describe("duplicates and capacity", () => {
 });
 
 describe("hasClaimed", () => {
-  it("is false on a posting with no claims", () => {
+  it("is false on a posting with no claims", async () => {
     expect(hasClaimed(empty(), DID)).toBe(false);
   });
 
-  it("is true once claimed, and only for that person", () => {
+  it("is true once claimed, and only for that person", async () => {
     const r = claimShift(empty(), DID, AT, null);
     if (!r.ok) throw new Error("unreachable");
     expect(hasClaimed(r.posting, DID)).toBe(true);

@@ -68,7 +68,7 @@ const run = (duties: WorkFunction[] | undefined, credentials: Credential[] = [])
   });
 
 describe("decide — duties from the assignment", () => {
-  it("falls back to the job title when no assignment is given", () => {
+  it("falls back to the job title when no assignment is given", async () => {
     // a bartender's title carries no gaming duty
     expect(functionsForRole("Bartender")).not.toContain("gaming");
     const d = run(undefined);
@@ -76,20 +76,20 @@ describe("decide — duties from the assignment", () => {
     expect(d.reasons[0].outcome).toBe("n/a");
   });
 
-  it("closes the hole: a bartender rostered onto gaming now needs RSG", () => {
+  it("closes the hole: a bartender rostered onto gaming now needs RSG", async () => {
     const d = run(["serve_alcohol", "gaming"]);
     expect(d.allowed).toBe(false);
     expect(d.reasons[0].outcome).toBe("fail");
     expect(d.reasons[0].credentialType).toBe("rsg");
   });
 
-  it("and passes once they hold it", () => {
+  it("and passes once they hold it", async () => {
     const d = run(["serve_alcohol", "gaming"], [cred("rsg")]);
     expect(d.allowed).toBe(true);
     expect(d.reasons[0].outcome).toBe("pass");
   });
 
-  it("the assignment replaces the title rather than adding to it", () => {
+  it("the assignment replaces the title rather than adding to it", async () => {
     const foodSite: Site = {
       ...venue,
       requires: [{ type: "food_handling", appliesTo: ["handle_food"] }],
@@ -109,14 +109,14 @@ describe("decide — duties from the assignment", () => {
     expect(d.reasons[0].outcome).toBe("n/a");
   });
 
-  it("an explicitly empty assignment is honoured, not treated as unknown", () => {
+  it("an explicitly empty assignment is honoured, not treated as unknown", async () => {
     // distinct from an unmapped title, which fails safe to every duty
     const d = run([]);
     expect(d.allowed).toBe(true);
     expect(d.reasons[0].outcome).toBe("n/a");
   });
 
-  it("an unmapped title still fails safe when no assignment is given", () => {
+  it("an unmapped title still fails safe when no assignment is given", async () => {
     const d = decide({
       person: { ...bartender, role: "Sommelier" },
       credentials: [],
@@ -128,13 +128,13 @@ describe("decide — duties from the assignment", () => {
     expect(d.allowed).toBe(false);
   });
 
-  it("names the assignment as the basis when a check does not bind", () => {
+  it("names the assignment as the basis when a check does not bind", async () => {
     expect(run(["serve_alcohol"]).reasons[0].detail).toContain("this assignment");
     // …and the title when there is no assignment
     expect(run(undefined).reasons[0].detail).toContain("Bartender");
   });
 
-  it("does not affect unscoped requirements", () => {
+  it("does not affect unscoped requirements", async () => {
     const inducted: Site = { ...venue, requires: [{ type: "site_induction" }] };
     for (const duties of [undefined, [], ["gaming"] as WorkFunction[]]) {
       const d = decide({
@@ -158,7 +158,7 @@ describe("decideRoster — assignments travel with the roster", () => {
     shifts: [{ id: "Sat", duties }],
   });
 
-  it("applies each member's own assignment", () => {
+  it("applies each member's own assignment", async () => {
     const r = decideRoster({
       roster: [member(["gaming"]), member(undefined)],
       action: "be_rostered",
@@ -171,7 +171,7 @@ describe("decideRoster — assignments travel with the roster", () => {
     expect(r.allowed).toBe(false);
   });
 
-  it("an under-qualified assignment also removes them from coverage", () => {
+  it("an under-qualified assignment also removes them from coverage", async () => {
     const covered: Site = {
       ...venue,
       requiresOnRoster: [{ type: "food_safety_supervisor", minHolders: 1 }],

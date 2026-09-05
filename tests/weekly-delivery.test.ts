@@ -7,6 +7,7 @@ import { FileSink, MemorySink } from "../lib/reports/delivery";
 import { EventStore } from "../lib/store/events";
 import { sha256Hex } from "../lib/idara/hash";
 import type { ShiftSession } from "../lib/awards";
+import { db, setDb, freshDb } from "../lib/store/db";
 
 /* ============================================================
    Delivering the weekly report.
@@ -45,12 +46,14 @@ const breach = (userId: string, dayOffset: number): ShiftSession => ({
 let store: EventStore;
 let dir: string;
 
-beforeEach(() => {
-  store = new EventStore(":memory:");
+beforeEach(async () => {
+  setDb(null);
+  store = new EventStore(await db());
   dir = mkdtempSync(join(tmpdir(), "covers-reports-"));
 });
-afterEach(() => {
-  store.close();
+afterEach(async () => {
+  await store.close();
+  setDb(null);
   rmSync(dir, { recursive: true, force: true });
 });
 
@@ -74,7 +77,7 @@ describe("delivering the report", () => {
   it("records the delivery in the chain, with the hash of what was sent", async () => {
     const r = await run([breach("w:a", 0)]);
 
-    const events = store.all(ORG).filter((e) => e.type === "report.delivered");
+    const events = (await store.all(ORG)).filter((e) => e.type === "report.delivered");
     expect(events).toHaveLength(1);
 
     const e = events[0];
@@ -83,7 +86,7 @@ describe("delivering the report", () => {
     expect(e.data.filename).toBe(r.filename);
     expect(e.data.breaches).toBe(1);
     expect(e.summary).toContain("Break loading report for w/e 31 Aug 2025 delivered");
-    expect(store.verify(ORG).ok).toBe(true);
+    expect((await store.verify(ORG)).ok).toBe(true);
   });
 
   it("still delivers, and records, a week with nothing owed", async () => {
@@ -91,7 +94,7 @@ describe("delivering the report", () => {
     const r = await run([]);
     expect(r.delivered).toBe(true);
     expect(r.report.totals.breaches).toBe(0);
-    expect(store.all(ORG).filter((e) => e.type === "report.delivered")).toHaveLength(1);
+    expect((await store.all(ORG)).filter((e) => e.type === "report.delivered")).toHaveLength(1);
   });
 });
 
@@ -105,7 +108,7 @@ describe("running twice", () => {
     expect(second.delivered).toBe(false);
     expect(second.eventSeq).toBeNull();
     // one file, one event — not two of either
-    expect(store.all(ORG).filter((e) => e.type === "report.delivered")).toHaveLength(1);
+    expect((await store.all(ORG)).filter((e) => e.type === "report.delivered")).toHaveLength(1);
   });
 
   it("delivers again when the underlying figures have changed", async () => {
@@ -114,7 +117,7 @@ describe("running twice", () => {
     const second = await run([breach("w:a", 0), breach("w:b", 2)]);
 
     expect(second.delivered).toBe(true);
-    const events = store.all(ORG).filter((e) => e.type === "report.delivered");
+    const events = (await store.all(ORG)).filter((e) => e.type === "report.delivered");
     // the clientRef keys one delivery per week, so the chain still holds one —
     // the file is rewritten, and the first record stands as what was sent then
     expect(events).toHaveLength(1);
@@ -125,15 +128,16 @@ describe("running twice", () => {
     const first = await run([breach("w:a", 0)]);
     const body = readFileSync(first.target, "utf8");
 
-    // a fresh store, as a restarted scheduler would have
-    const other = new EventStore(":memory:");
+    // a fresh store, as a restarted scheduler would have — and its own
+    // database, so the only way it can know about the first run is the file
+    const other = new EventStore(await freshDb());
     const again = await runWeeklyReport({
       store: other, orgId: ORG, sink: new FileSink(dir),
       sessions: [breach("w:a", 0)], week: WEEK, timezone: TZ, siteName: "Brightwater Hotel",
     });
     expect(again.delivered).toBe(false);
     expect(readFileSync(first.target, "utf8")).toBe(body);
-    other.close();
+    await other.close();
   });
 });
 
@@ -179,14 +183,14 @@ describe("a file changed underneath us", () => {
 describe("who delivered it", () => {
   it("records a scheduled run as nobody, with the trigger in the data", async () => {
     await run([breach("w:a", 0)]);
-    const e = store.all(ORG).find((x) => x.type === "report.delivered")!;
+    const e = (await store.all(ORG)).find((x) => x.type === "report.delivered")!;
 
     expect(e.actor).toBe("system");
     expect(e.data.trigger).toBe("schedule");
     // a schedule is not a person, so it must not be given an invented identity
     expect(e.actorDid).toBeUndefined();
     expect("actorDid" in e && e.actorDid === null).toBe(false);
-    expect(store.verify(ORG).ok).toBe(true);
+    expect((await store.verify(ORG)).ok).toBe(true);
   });
 
   it("records the person when someone sends it by hand", async () => {
@@ -197,11 +201,11 @@ describe("who delivered it", () => {
     });
     expect(r.delivered).toBe(true);
 
-    const e = store.all(ORG).find((x) => x.type === "report.delivered")!;
+    const e = (await store.all(ORG)).find((x) => x.type === "report.delivered")!;
     expect(e.actor).toBe("Priya Raman");
     // a display name is not unique; the DID is what a dispute can rely on
     expect(e.actorDid).toBe("did:web:idara.app:w:priya-raman");
     expect(e.data.trigger).toBe("manual");
-    expect(store.verify(ORG).ok).toBe(true);
+    expect((await store.verify(ORG)).ok).toBe(true);
   });
 });
