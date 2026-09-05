@@ -35,10 +35,10 @@ export async function GET(req: Request) {
   const since = Number(new URL(req.url).searchParams.get("since") ?? -1);
   const store = (await eventStore());
   // a fresh database would otherwise serve an empty audit screen
-  store.seedIfEmpty(ORG, SEED_AUDIT_EVENTS);
+  await store.seedIfEmpty(ORG, SEED_AUDIT_EVENTS);
   return NextResponse.json({
-    events: store.since(ORG, Number.isFinite(since) ? since : -1),
-    head: store.head(ORG),
+    events: await store.since(ORG, Number.isFinite(since) ? since : -1),
+    head: await store.head(ORG),
   });
 }
 

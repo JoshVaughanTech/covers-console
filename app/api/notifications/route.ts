@@ -26,8 +26,8 @@ export async function GET(req: Request) {
 
   const store = (await notificationStore());
   return NextResponse.json({
-    offers: store.forWorker(ORG, caller.did),
-    unseen: store.unseenCount(ORG, caller.did),
+    offers: await store.forWorker(ORG, caller.did),
+    unseen: await store.unseenCount(ORG, caller.did),
   });
 }
 
@@ -41,6 +41,6 @@ export async function POST(req: Request) {
     : undefined;
 
   const store = (await notificationStore());
-  const seen = store.markSeen(ORG, caller.did, new Date().toISOString(), ids);
-  return NextResponse.json({ seen, unseen: store.unseenCount(ORG, caller.did) });
+  const seen = await store.markSeen(ORG, caller.did, new Date().toISOString(), ids);
+  return NextResponse.json({ seen, unseen: await store.unseenCount(ORG, caller.did) });
 }

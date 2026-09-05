@@ -113,19 +113,19 @@ describe("a mixed chain — the case a fresh database cannot produce", () => {
   };
 
   it("verifies end to end", async () => {
-    mixed();
+    await mixed();
     expect((await store.verify(ORG))).toEqual({ ok: true, brokenAt: null });
   });
 
   it("verifies again after a full read-back, which is what a reload does", async () => {
-    mixed();
+    await mixed();
     const rows = (await store.all(ORG));
     expect(rows).toHaveLength(5);
     expect(verifyChain(rows).ok).toBe(true);
   });
 
   it("keeps each event's own actor identity through the round trip", async () => {
-    mixed();
+    await mixed();
     const rows = (await store.all(ORG));
     expect(rows[0].actorDid).toBeUndefined();
     expect(rows[2].actorDid).toBe(CONSOLE_OPERATOR.did);
@@ -134,7 +134,7 @@ describe("a mixed chain — the case a fresh database cannot produce", () => {
   });
 
   it("does not disturb the display name either way", async () => {
-    mixed();
+    await mixed();
     const rows = (await store.all(ORG));
     expect(rows[0].actor).toBe("Supervisor");
     expect(rows[2].actor).toBe(CONSOLE_OPERATOR.name);

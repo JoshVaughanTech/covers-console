@@ -84,7 +84,7 @@ export async function pushOffer(
     if (r.ok) delivered++;
     else if (r.gone) {
       // the attempt is the only way to learn this, so it is also the cleanup
-      store.remove(orgId, r.endpoint);
+      await store.remove(orgId, r.endpoint);
       pruned++;
     } else failed++;
   }

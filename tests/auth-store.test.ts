@@ -8,7 +8,7 @@ import {
   mint,
   normaliseCode,
 } from "../lib/auth/token";
-import { db, setDb } from "../lib/store/db";
+import { db, setDb, type Db } from "../lib/store/db";
 
 /* ============================================================
    Sign-in.
@@ -64,14 +64,16 @@ describe("issuing a grant", () => {
 });
 
 describe("what the database holds", () => {
+  /* Straight past the store's own API to the rows themselves. The point of
+     these two tests is that nothing usable survives a dump, so reading them
+     back through a method that knows to hash would prove nothing. */
+  const raw = async (table: string) =>
+    (await (store as unknown as { database: Db }).database.query(`SELECT * FROM ${table}`)).rows;
+
   it("stores no secret that would let anyone sign in", async () => {
     const g = (await issue(DARIE));
     // read the raw rows the way a dump or a leaked backup would
-    const rows = JSON.stringify(
-      (store as unknown as { db: { prepare(q: string): { all(): unknown[] } } }).db
-        .prepare("SELECT * FROM signin_grant")
-        .all(),
-    );
+    const rows = JSON.stringify(await raw("signin_grant"));
     expect(rows).not.toContain(g.token);
     expect(rows).not.toContain(g.code);
     expect(rows).toContain(hash(g.code));
@@ -82,11 +84,7 @@ describe("what the database holds", () => {
     const r = (await store.redeemCode(DARIE, g.code, "ip", T));
     expect(r.ok).toBe(true);
     const secret = r.ok ? r.session.secret : "";
-    const rows = JSON.stringify(
-      (store as unknown as { db: { prepare(q: string): { all(): unknown[] } } }).db
-        .prepare("SELECT * FROM session")
-        .all(),
-    );
+    const rows = JSON.stringify(await raw("session"));
     expect(rows).not.toContain(secret);
   });
 });
@@ -206,9 +204,9 @@ describe("sessions", () => {
   it("can sign out every device a person has", async () => {
     const a = (await signIn());
     const b = (await signIn());
-    expect(store.sessionsOf(DARIE, T)).toHaveLength(2);
+    expect(await store.sessionsOf(DARIE, T)).toHaveLength(2);
 
-    expect(store.revokeAllFor(DARIE, T)).toBe(2);
+    expect(await store.revokeAllFor(DARIE, T)).toBe(2);
     expect((await store.resolve(a.secret, T))).toBeNull();
     expect((await store.resolve(b.secret, T))).toBeNull();
   });
@@ -216,7 +214,7 @@ describe("sessions", () => {
   it("leaves other people's sessions alone", async () => {
     const mine = (await signIn(DARIE));
     const theirs = (await signIn(MITCH));
-    store.revokeAllFor(DARIE, T);
+    await store.revokeAllFor(DARIE, T);
     expect((await store.resolve(mine.secret, T))).toBeNull();
     expect((await store.resolve(theirs.secret, T))?.did).toBe(MITCH);
   });
@@ -225,12 +223,12 @@ describe("sessions", () => {
 describe("housekeeping", () => {
   it("sweeps grants that are long dead", async () => {
     (await issue(DARIE));
-    expect(store.sweep(T + TOKEN_TTL_SECONDS + 3601)).toBe(1);
+    expect(await store.sweep(T + TOKEN_TTL_SECONDS + 3601)).toBe(1);
   });
 
   it("keeps a grant that is merely expired, so 'expired' can still be said", async () => {
     const g = (await issue(DARIE));
-    store.sweep(T + TOKEN_TTL_SECONDS + 1);
+    await store.sweep(T + TOKEN_TTL_SECONDS + 1);
     // "that code has expired" is a better answer than "unknown", and it needs
     // the row to still be there to give it
     expect((await store.redeemCode(DARIE, g.code, "ip", T + TOKEN_TTL_SECONDS + 1)))
