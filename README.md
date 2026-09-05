@@ -196,6 +196,17 @@ The tax-free threshold is claimed with **one** employer, nominated by the worker
 other employer withholds at the no-threshold rate, and the accept sheet says so before
 the tap. Casual conversion is read off the engagement chain and **flagged, never decided**.
 
+**What is declared and not yet written.** Five of the nine new `AuditEventType` members
+have no emitter: `engagement.confirmed`, `engagement.cancelled`, `pack.item_verified`,
+`pack.item_revoked` and `conversion.flagged`. The replay folds all five and `/audit`
+renders all five, so the union and the audit screen — the two places a reader checks —
+would between them say hour confirmation and pack verification are supported. They are
+not. Each member's comment in `lib/idara/types.ts` names what it is waiting on: the
+time-clock read, a cancellation flow on either side, the unresolved KYC provider choice
+(§10), and a scheduler that can write a recurring signal exactly once. Three of them
+(`confirmedEvent`, `cancelledEvent`, `conversionEvent`) have builder functions that
+nothing calls, which reads as wiring that exists; those say so at the function too.
+
 ### Tests
 
 `npm test` — 827 tests over the engine, verifier, hash chain, role scoping, roster coverage,

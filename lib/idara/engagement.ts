@@ -585,6 +585,15 @@ export function provisionedEvent(
   };
 }
 
+/**
+ * NOTHING CALLS THIS YET. See "engagement.confirmed" in types.ts.
+ *
+ * A builder with no caller is worse than a missing one: it reads as wiring
+ * that exists, and the compiler is happy either way. It is kept because the
+ * hours it takes are the venue's confirmation of what was actually worked,
+ * and that shape should be settled before the time-clock read is written
+ * against it — not because anything is using it.
+ */
 export function confirmedEvent(
   e: Engagement,
   input: { at: string; actor: string; actorDid?: DID; hours: number; breaks: number },
@@ -608,6 +617,7 @@ export function confirmedEvent(
   };
 }
 
+/** NOTHING CALLS THIS YET. See "engagement.cancelled" in types.ts. */
 export function cancelledEvent(
   e: Engagement,
   input: { at: string; actor: string; actorDid?: DID; reason: string },

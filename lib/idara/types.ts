@@ -304,12 +304,52 @@ export type AuditEventType =
    * need; the number itself has no business in a log that a screen renders.
    */
   | "engagement.provisioned"
-  /** hours confirmed by the venue (or by the 48-hour auto-confirm). */
+  /* ---- declared, and nothing writes them yet ----
+
+     The five below are part of the model §5 and §8 of
+     docs/plans/2026-09-05-one-tap-employment-design.md describe, and the
+     replay in engagement.ts already folds them, so an event of any of these
+     types would be handled correctly today. Nothing emits one.
+
+     Stated here rather than only in the design note, because the union and
+     eventMeta() in app/(console)/audit/page.tsx are what a reader consults —
+     and between them they would say pack verification and hour confirmation
+     are supported. A type surface that promises what the system cannot do is
+     the shape this repo has spent two days cataloguing: it looks like
+     coverage because every check of it passes.
+
+     Each names what it is waiting on. When you write the emitter, delete its
+     line. */
+
+  /**
+   * Hours confirmed by the venue (or by the 48-hour auto-confirm).
+   *
+   * NO WRITER YET. confirmedEvent() exists and is called by nothing: the
+   * hours have to come from the time clock, and reading a completed shift
+   * back out of Connecteam is the piece that is missing.
+   */
   | "engagement.confirmed"
+  /**
+   * NO WRITER YET. cancelledEvent() exists and is called by nothing. There is
+   * no screen on either side that cancels an engagement — a venue standing
+   * somebody down and a worker pulling out are different facts with different
+   * consequences, and neither is designed.
+   */
   | "engagement.cancelled"
-  /** a pack item verified — the moment "verified, not self-declared" becomes true. */
+  /**
+   * A pack item verified — the moment "verified, not self-declared" becomes true.
+   *
+   * NO WRITER YET, and no builder either. The packs are seeded; §10 names KYC
+   * provider selection (Stripe Identity / Onfido / GreenID) as an unresolved
+   * P0, and this is the event its callback would write.
+   */
   | "pack.item_verified"
-  /** a pack item withdrawn or revoked, by its issuer or by the worker. */
+  /**
+   * A pack item withdrawn or revoked, by its issuer or by the worker.
+   *
+   * NO WRITER YET, and no builder either. Same blocker as pack.item_verified:
+   * revocation arrives from the issuer that did the verifying.
+   */
   | "pack.item_revoked"
   /**
    * A casual working a regular pattern with one venue is approaching the point
@@ -319,6 +359,13 @@ export type AuditEventType =
    * venue has just delegated its record-keeping to us. Flagged, never decided
    * — whether the pattern is regular and systematic is a judgement, and this
    * says only that it is time somebody made it.
+   *
+   * NO WRITER YET. conversionSignals() computes the signal live and
+   * /settings/employer renders it, so the venue does see it; conversionEvent()
+   * exists and only a test calls it. Putting it ON THE CHAIN needs something
+   * that runs on a schedule and writes each signal once — and "once" is the
+   * hard half, because a signal that re-fires daily is thirty events saying
+   * the same thing.
    */
   | "conversion.flagged";
 
