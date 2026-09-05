@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, type CSSProperties, type ReactNode } from "react";
+import Link from "next/link";
 import {
   Card,
   Tabs,
@@ -419,6 +420,39 @@ export default function SettingsPage() {
     body = (
       <Card>
         <CardHead title="Integrations" right={<Badge tone="neutral" icon="blocks">Connections</Badge>} />
+
+        {/* Payroll is not one row among these. Connecting it is what lets a
+            venue employ somebody with a tap, and it comes with an ABN, a
+            workers' compensation policy and a set of award classifications
+            behind it — so it gets a screen rather than a toggle. */}
+        <Link
+          href="/settings/employer"
+          style={{
+            display: "flex", alignItems: "center", gap: 14, padding: "14px 16px",
+            borderRadius: 12, border: "1px solid var(--fs-teal)", background: "var(--fs-teal-tint)",
+            textDecoration: "none", marginBottom: 12,
+          }}
+        >
+          <span
+            style={{
+              display: "inline-flex", alignItems: "center", justifyContent: "center",
+              width: 42, height: 42, flexShrink: 0, borderRadius: 11,
+              background: "#fff", border: "1px solid var(--border)", color: "var(--fs-teal)",
+            }}
+          >
+            <Icon name="briefcase" size={20} />
+          </span>
+          <span style={{ flex: 1, minWidth: 0 }}>
+            <span style={{ display: "block", fontSize: 14.5, fontWeight: 600, color: "var(--fg-1)" }}>
+              Employment &amp; payroll
+            </span>
+            <span style={{ display: "block", fontSize: 12.5, color: "var(--fg-3)", marginTop: 3 }}>
+              One-tap employment — payroll connection, award classifications, engagements
+            </span>
+          </span>
+          <Icon name="arrow-right" size={18} />
+        </Link>
+
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
           {INTEGRATIONS.map((it) => {
             const isOn = connected[it.key];

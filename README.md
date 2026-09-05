@@ -48,8 +48,13 @@ npm test         # Idara Core test suite (vitest)
 | `/audit` | Audit Log — hash-chained decision trail *(Idara)* |
 | `/reports` | Reports (labour cost, fairness, compliance) |
 | `/settings` | Settings (org, venues, credential rules, notifications) |
+| `/settings/employer` | Employment — payroll connection, award classifications, engagements, casual-conversion signals |
 
 `/` redirects to `/overview`.
+
+The worker-facing app is at `/m` — `/m` (breaks), `/m/shifts` (find work), `/m/mine`
+(what they have on, and any engagement waiting on their signature), `/m/pack` (their
+employment pack), `/m/profile`.
 
 ## Project structure
 
@@ -70,6 +75,9 @@ components/
 lib/
   status.ts              # STATUS tone map (success/warning/danger/info/teal/neutral)
   idara/                 # Idara Core — the trust layer (see below)
+  awards/                # what a shift owes in TIME (cl 16) and in MONEY (cl 18 & 29)
+  shifts/                # the marketplace: postings, claims, the gate, booking → engagement
+  payroll/               # the connector interface, the demo payroll, and provision()
   store/shell.tsx        # app-shell context: company, notifications, global search
   data/search.ts         # static search index
 tests/                   # vitest suite over Idara Core
@@ -92,6 +100,11 @@ themselves — they ask the engine, and consequential answers land in the audit 
 | `hospitality.ts` | The hospitality credential taxonomy + the role → duty map. Swapping verticals = swapping this file. |
 | `seed.ts` | Demo dataset — deliberately mixed: eligible, expiring, and blocked staff. |
 | `provider.tsx` | React binding: `useIdara()`, the publish gate (individual + roster coverage), credential revocation. |
+| `pack.ts` | The worker's employment pack — kinds, completeness, hashing, the tax-free-threshold rule. |
+| `vault.ts` | The encrypted half: AES-256-GCM per-worker keys. The **only** place a payload is decrypted is `provision()`. |
+| `employer.ts` | The venue's side — ABN, payroll connection, workers' comp, award classifications, its pre-signature. |
+| `engagement.ts` | The credential a booking creates: propose / accept / provision, pure, and rebuilt by folding the chain. |
+| `conversion.ts` | Casual conversion read off the engagement chain. Flags; never decides. |
 
 Roster eligibility, verified clock-in, function-room access and verified sign-off are all
 the same `decide()` call with a different `action`.
@@ -145,10 +158,49 @@ chef holds no RSA at all and is still eligible, because the licence never bound 
 kitchen. And a bartender rostered onto the gaming floor is blocked for RSG while another
 bartender, same title but no gaming assignment, is not.
 
+## One-tap employment
+
+Design: `docs/plans/2026-09-05-one-tap-employment-design.md`.
+
+The paperwork does not move to a better form; it stops happening. Every worker holds a
+verified **pack** (identity, right to work, tax declaration, super, bank, emergency
+contact, the casual agreement and the two Fair Work statements). Every venue holds an
+**employer profile** (ABN, payroll connection, workers' comp, award classifications, its
+own pre-signature). Assigning somebody assembles an **engagement** — this worker, this
+venue, this shift, this rate — and the worker signs it with one tap.
+
+```
+manager assigns  ─► engagement proposed + venue's countersignature       [lib/shifts/engage.ts]
+                     rate ≥ the award floor for EVERY hour of the shift  [lib/awards/rates.ts]
+                     pack complete · eligible · role classified          [lib/idara/*]
+worker taps      ─► engagement.accepted (worker)  ─► both sides in
+                 ─► provision(): create employee, lodge the TFN declaration,
+                    record the fund, deliver both statements, add the clock user
+                 ─► engagement.provisioned {connector, released: kinds}
+```
+
+Four things it is worth knowing are true rather than intended:
+
+- **The venue is the employer.** Covers charges a booking fee and never touches wages,
+  so it needs no labour-hire licence, no float and no workers' comp policy of its own.
+- **The engagement is a credential, not a row.** It pins the pack items and the employer
+  profile by hash, and it is rebuilt by folding the audit chain — so an auditor can check
+  what was signed without trusting this database.
+- **A payload is decrypted in exactly one function.** `provision()`. The chain records
+  which *kinds* were released and to which payroll, never a value, and the worker sees
+  that same list on `/m/pack`.
+- **The second shift at a venue releases nothing.** The employee already exists there.
+  That skip is the whole argument for employing once rather than per booking.
+
+The tax-free threshold is claimed with **one** employer, nominated by the worker; every
+other employer withholds at the no-threshold rate, and the accept sheet says so before
+the tap. Casual conversion is read off the engagement chain and **flagged, never decided**.
+
 ### Tests
 
-`npm test` — 136 tests over the engine, verifier, hash chain, role scoping, roster coverage,
-shift assignments and seed dataset.
+`npm test` — 827 tests over the engine, verifier, hash chain, role scoping, roster coverage,
+shift assignments, award rates, the employment pack, engagements, provisioning and the seed
+dataset.
 Notably `tests/demo.test.ts` pins the demo's *narrative*: if a seeded credential date
 is edited and a blocked staff member quietly becomes eligible, the suite fails before
 the demo does. `tests/hash.test.ts` checks the SHA-256 implementation against published

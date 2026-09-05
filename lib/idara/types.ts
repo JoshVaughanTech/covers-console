@@ -275,7 +275,52 @@ export type AuditEventType =
    * `data`, because the board is rebuilt by folding this log over the seed —
    * a posting whose creation went unrecorded could not survive a reload.
    */
-  | "shift.posted";
+  | "shift.posted"
+  /**
+   * An employment offer assembled from a worker's pack and a venue's employer
+   * profile: this worker, this venue, this shift, this rate. Carries the
+   * engagement itself in `data` for the same reason shift.posted carries the
+   * posting — engagements are rebuilt by folding this log, and one whose terms
+   * went unrecorded could not be reconstructed, which is the only thing that
+   * makes it evidence rather than an assertion.
+   */
+  | "engagement.proposed"
+  /**
+   * One side signing. `data.side` says which, because the two are different
+   * facts with different actors: the worker taps Accept on their own phone,
+   * where the venue signed its half in advance and the assignment is the act.
+   *
+   * The event's own hash is the signature. Nothing else is stored to prove
+   * somebody agreed — the chain position is the evidence, and it is checkable
+   * by an auditor who does not trust this database.
+   */
+  | "engagement.accepted"
+  /**
+   * The payroll has what it needs: the employee exists, the TFN declaration is
+   * lodged, the fund is recorded, the statements are delivered.
+   *
+   * `data.released` carries pack item KINDS and never payloads. "A TFN was
+   * released to Xero on Friday" is the fact an auditor and the worker both
+   * need; the number itself has no business in a log that a screen renders.
+   */
+  | "engagement.provisioned"
+  /** hours confirmed by the venue (or by the 48-hour auto-confirm). */
+  | "engagement.confirmed"
+  | "engagement.cancelled"
+  /** a pack item verified — the moment "verified, not self-declared" becomes true. */
+  | "pack.item_verified"
+  /** a pack item withdrawn or revoked, by its issuer or by the worker. */
+  | "pack.item_revoked"
+  /**
+   * A casual working a regular pattern with one venue is approaching the point
+   * where the employer owes them a conversion offer.
+   *
+   * Recorded rather than ignored: it is the employer's obligation, and the
+   * venue has just delegated its record-keeping to us. Flagged, never decided
+   * — whether the pattern is regular and systematic is a judgement, and this
+   * says only that it is time somebody made it.
+   */
+  | "conversion.flagged";
 
 export interface AuditEvent {
   /** monotonic sequence number, 0-based. */

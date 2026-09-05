@@ -60,20 +60,68 @@ function eventMeta(e: AuditEvent): EventMeta {
       return e.data.overdue
         ? { icon: "coffee", tone: "warning", kind: "Break sent (late)" }
         : { icon: "coffee", tone: "info", kind: "Break sent" };
+    /* The employment chain. An auditor reading these in order should be able
+       to follow one person onto one venue's payroll: the offer, both
+       signatures, what was released to get them there, and the hours that
+       were confirmed against it. Labelling them all "Event" would collapse
+       five different legal acts into one word. */
+    case "engagement.proposed":
+      return { icon: "file-pen", tone: "info", kind: "Engagement proposed" };
+    case "engagement.accepted":
+      return e.data.side === "employer"
+        ? { icon: "building-2", tone: "info", kind: "Signed by the venue" }
+        : { icon: "handshake", tone: "success", kind: "Signed by the worker" };
+    case "engagement.provisioned":
+      return { icon: "briefcase-business", tone: "success", kind: "Payroll provisioned" };
+    case "engagement.confirmed":
+      return { icon: "file-check", tone: "success", kind: "Hours confirmed" };
+    case "engagement.cancelled":
+      return { icon: "file-x", tone: "neutral", kind: "Engagement cancelled" };
+    case "pack.item_verified":
+      return { icon: "badge-check", tone: "success", kind: "Pack item verified" };
+    case "pack.item_revoked":
+      return { icon: "shield-off", tone: "danger", kind: "Pack item revoked" };
+    case "conversion.flagged":
+      return { icon: "repeat", tone: "warning", kind: "Casual conversion" };
     default:
       return { icon: "dot", tone: "neutral", kind: "Event" };
   }
 }
 
-const TABS = ["All", "Publishes", "Decisions", "Credentials"] as const;
+const TABS = ["All", "Publishes", "Decisions", "Credentials", "Employment"] as const;
 type TabKey = (typeof TABS)[number];
 
 function matchesTab(e: AuditEvent, tab: TabKey): boolean {
   if (tab === "All") return true;
   if (tab === "Publishes") return e.type === "roster.published";
   if (tab === "Decisions") return e.type === "decision";
+  /* Employment is its own trail. A pack item, an engagement and a conversion
+     flag are the three halves of the same question — how did this person come
+     to be employed here — and reading them among the roster publishes is how
+     the answer gets lost. */
+  if (tab === "Employment") {
+    return (
+      e.type.startsWith("engagement.") ||
+      e.type.startsWith("pack.") ||
+      e.type === "conversion.flagged"
+    );
+  }
   return e.type.startsWith("credential.");
 }
+
+/** Pack item kinds are stored as codes; an auditor reads names. */
+const PACK_LABEL: Record<string, string> = {
+  identity: "Identity",
+  right_to_work: "Right to work",
+  tfn_declaration: "Tax declaration",
+  super_choice: "Super fund",
+  bank_account: "Bank account",
+  emergency_contact: "Emergency contact",
+  casual_agreement: "Casual agreement",
+  fwis_ack: "Fair Work Information Statement",
+  ceis_ack: "Casual Employment Information Statement",
+  credential: "Tickets and licences",
+};
 
 export default function AuditPage() {
   const toast = useToast();
@@ -139,6 +187,68 @@ export default function AuditPage() {
       const reason = e.data.reason ? ` · ${String(e.data.reason)}` : "";
       return <div style={{ fontSize: 12, color: "var(--fg-3)", marginTop: 6 }}>{t}{reason}</div>;
     }
+
+    /* The terms, as signed. Read out of the event rather than out of a
+       database, which is the whole point of carrying the engagement in
+       `data`: this line is reproducible from the chain alone by somebody who
+       does not have our tables. */
+    if (e.type === "engagement.proposed") {
+      const eng = e.data.engagement as
+        | {
+            shift?: { role?: string; date?: string; siteId?: string };
+            pay?: { offeredRateCents?: number; baseRateCents?: number };
+            employment?: { firstEngagementWithEmployer?: boolean; claimsTaxFreeThreshold?: boolean };
+          }
+        | undefined;
+      if (!eng) return null;
+      const money = (c?: number) =>
+        typeof c === "number" ? `$${Math.floor(c / 100)}.${String(c % 100).padStart(2, "0")}` : "—";
+      return (
+        <div style={{ fontSize: 12, color: "var(--fg-3)", marginTop: 6, lineHeight: 1.6 }}>
+          {eng.shift?.role} · {eng.shift?.date} · {money(eng.pay?.offeredRateCents)}/h against an
+          award floor of {money(eng.pay?.baseRateCents)}/h
+          <br />
+          {eng.employment?.firstEngagementWithEmployer ? "First engagement with this employer" : "Returning worker"}
+          {" · "}
+          {eng.employment?.claimsTaxFreeThreshold ? "claims the tax-free threshold here" : "no threshold claimed here"}
+        </div>
+      );
+    }
+
+    /* Kinds, never payloads. This is the line that answers "where did my tax
+       file number go", and it can answer it precisely because the number
+       itself was never written here. */
+    if (e.type === "engagement.provisioned") {
+      const released = (e.data.released as string[] | undefined) ?? [];
+      const connector = String(e.data.connector ?? "");
+      return (
+        <div style={{ fontSize: 12, color: "var(--fg-3)", marginTop: 6, lineHeight: 1.6 }}>
+          {released.length === 0
+            ? `Nothing released — already on ${connector}. Roster line only.`
+            : `Released to ${connector}: ${released.map((r) => PACK_LABEL[r] ?? r).join(", ")}.`}
+        </div>
+      );
+    }
+
+    if (e.type === "engagement.confirmed") {
+      const fee = Number(e.data.bookingFeeCents ?? 0);
+      return (
+        <div style={{ fontSize: 12, color: "var(--fg-3)", marginTop: 6 }}>
+          {String(e.data.hours ?? "—")}h · wages ${(Number(e.data.wagesCents ?? 0) / 100).toFixed(2)} ·
+          super ${(Number(e.data.superCents ?? 0) / 100).toFixed(2)} · booking fee ${(fee / 100).toFixed(2)}
+        </div>
+      );
+    }
+
+    if (e.type === "conversion.flagged") {
+      return (
+        <div style={{ fontSize: 12, color: "var(--fg-3)", marginTop: 6 }}>
+          {String(e.data.shifts ?? 0)} shifts since {String(e.data.since ?? "")} · worked in{" "}
+          {String(e.data.weeksWorkedInWindow ?? 0)} of the last 12 weeks
+        </div>
+      );
+    }
+
     return null;
   };
 
