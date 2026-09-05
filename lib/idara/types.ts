@@ -275,7 +275,99 @@ export type AuditEventType =
    * `data`, because the board is rebuilt by folding this log over the seed —
    * a posting whose creation went unrecorded could not survive a reload.
    */
-  | "shift.posted";
+  | "shift.posted"
+  /**
+   * An employment offer assembled from a worker's pack and a venue's employer
+   * profile: this worker, this venue, this shift, this rate. Carries the
+   * engagement itself in `data` for the same reason shift.posted carries the
+   * posting — engagements are rebuilt by folding this log, and one whose terms
+   * went unrecorded could not be reconstructed, which is the only thing that
+   * makes it evidence rather than an assertion.
+   */
+  | "engagement.proposed"
+  /**
+   * One side signing. `data.side` says which, because the two are different
+   * facts with different actors: the worker taps Accept on their own phone,
+   * where the venue signed its half in advance and the assignment is the act.
+   *
+   * The event's own hash is the signature. Nothing else is stored to prove
+   * somebody agreed — the chain position is the evidence, and it is checkable
+   * by an auditor who does not trust this database.
+   */
+  | "engagement.accepted"
+  /**
+   * The payroll has what it needs: the employee exists, the TFN declaration is
+   * lodged, the fund is recorded, the statements are delivered.
+   *
+   * `data.released` carries pack item KINDS and never payloads. "A TFN was
+   * released to Xero on Friday" is the fact an auditor and the worker both
+   * need; the number itself has no business in a log that a screen renders.
+   */
+  | "engagement.provisioned"
+  /* ---- declared, and nothing writes them yet ----
+
+     The five below are part of the model §5 and §8 of
+     docs/plans/2026-09-05-one-tap-employment-design.md describe, and the
+     replay in engagement.ts already folds them, so an event of any of these
+     types would be handled correctly today. Nothing emits one.
+
+     Stated here rather than only in the design note, because the union and
+     eventMeta() in app/(console)/audit/page.tsx are what a reader consults —
+     and between them they would say pack verification and hour confirmation
+     are supported. A type surface that promises what the system cannot do is
+     the shape this repo has spent two days cataloguing: it looks like
+     coverage because every check of it passes.
+
+     Each names what it is waiting on. When you write the emitter, delete its
+     line. */
+
+  /**
+   * Hours confirmed by the venue (or by the 48-hour auto-confirm).
+   *
+   * NO WRITER YET. confirmedEvent() exists and is called by nothing: the
+   * hours have to come from the time clock, and reading a completed shift
+   * back out of Connecteam is the piece that is missing.
+   */
+  | "engagement.confirmed"
+  /**
+   * NO WRITER YET. cancelledEvent() exists and is called by nothing. There is
+   * no screen on either side that cancels an engagement — a venue standing
+   * somebody down and a worker pulling out are different facts with different
+   * consequences, and neither is designed.
+   */
+  | "engagement.cancelled"
+  /**
+   * A pack item verified — the moment "verified, not self-declared" becomes true.
+   *
+   * NO WRITER YET, and no builder either. The packs are seeded; §10 names KYC
+   * provider selection (Stripe Identity / Onfido / GreenID) as an unresolved
+   * P0, and this is the event its callback would write.
+   */
+  | "pack.item_verified"
+  /**
+   * A pack item withdrawn or revoked, by its issuer or by the worker.
+   *
+   * NO WRITER YET, and no builder either. Same blocker as pack.item_verified:
+   * revocation arrives from the issuer that did the verifying.
+   */
+  | "pack.item_revoked"
+  /**
+   * A casual working a regular pattern with one venue is approaching the point
+   * where the employer owes them a conversion offer.
+   *
+   * Recorded rather than ignored: it is the employer's obligation, and the
+   * venue has just delegated its record-keeping to us. Flagged, never decided
+   * — whether the pattern is regular and systematic is a judgement, and this
+   * says only that it is time somebody made it.
+   *
+   * NO WRITER YET. conversionSignals() computes the signal live and
+   * /settings/employer renders it, so the venue does see it; conversionEvent()
+   * exists and only a test calls it. Putting it ON THE CHAIN needs something
+   * that runs on a schedule and writes each signal once — and "once" is the
+   * hard half, because a signal that re-fires daily is thirty events saying
+   * the same thing.
+   */
+  | "conversion.flagged";
 
 export interface AuditEvent {
   /** monotonic sequence number, 0-based. */
