@@ -101,12 +101,12 @@ const routes = routeFiles(API).map((file) => ({
 }));
 
 describe("every API route", () => {
-  it("finds routes to check at all", () => {
+  it("finds routes to check at all", async () => {
     // a glob that silently matches nothing would pass every assertion below
     expect(routes.length).toBeGreaterThan(10);
   });
 
-  it("either decides who is calling, or is on the public list with a reason", () => {
+  it("either decides who is calling, or is on the public list with a reason", async () => {
     const ungated = routes.filter((r) => !r.gate && !(r.name in PUBLIC));
 
     expect(
@@ -119,7 +119,7 @@ describe("every API route", () => {
     ).toEqual([]);
   });
 
-  it("keeps the public list honest, with nothing stale on it", () => {
+  it("keeps the public list honest, with nothing stale on it", async () => {
     const names = new Set(routes.map((r) => r.name));
     const gone = Object.keys(PUBLIC).filter((n) => !names.has(n));
     // a deleted route left on the list would quietly excuse a future one that
@@ -127,7 +127,7 @@ describe("every API route", () => {
     expect(gone).toEqual([]);
   });
 
-  it("does not let a gated route sit on the public list", () => {
+  it("does not let a gated route sit on the public list", async () => {
     const both = routes.filter((r) => r.gate && r.name in PUBLIC);
     // it would still be gated, but the list would be lying about why
     expect(both.map((r) => r.name)).toEqual([]);
@@ -139,20 +139,20 @@ describe("the routes that carry the venue's data", () => {
      where getting the KIND wrong matters rather than merely having a gate. */
   const gate = (name: string) => routes.find((r) => r.name === name)?.gate;
 
-  it("keeps the chain to operators", () => {
+  it("keeps the chain to operators", async () => {
     expect(gate("events")).toBe("operator");
     expect(gate("events/stream")).toBe("either kind");
   });
 
-  it("lets both kinds see the floor, because the phone is where breaks are noticed", () => {
+  it("lets both kinds see the floor, because the phone is where breaks are noticed", async () => {
     expect(gate("breaks")).toBe("either kind");
   });
 
-  it("keeps a priced week to operators", () => {
+  it("keeps a priced week to operators", async () => {
     expect(gate("breaks/week")).toBe("operator");
   });
 
-  it("keeps minting codes to operators, and claiming shifts to workers", () => {
+  it("keeps minting codes to operators, and claiming shifts to workers", async () => {
     expect(gate("auth/issue")).toBe("operator");
     expect(gate("shifts")).toBe("worker");
     expect(gate("shifts/claim")).toBe("worker");

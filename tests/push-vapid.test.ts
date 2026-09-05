@@ -30,7 +30,7 @@ const parse = (header: string) => {
 };
 
 describe("the token", () => {
-  it("verifies against the public key it advertises", () => {
+  it("verifies against the public key it advertises", async () => {
     const t = parse(vapidHeader({ endpoint: ENDPOINT, subject: SUBJECT, ...keys }));
 
     const pub = createPublicKey({
@@ -48,7 +48,7 @@ describe("the token", () => {
     expect(ok).toBe(true);
   });
 
-  it("is scoped to the origin, not the subscription", () => {
+  it("is scoped to the origin, not the subscription", async () => {
     const t = parse(vapidHeader({ endpoint: ENDPOINT, subject: SUBJECT, ...keys }));
     // the path identifies one person's browser; putting it in the token would
     // leak which endpoints exist to anyone who saw the header
@@ -57,14 +57,14 @@ describe("the token", () => {
     expect(t.claims.sub).toBe(SUBJECT);
   });
 
-  it("never asks for longer than the spec allows", () => {
+  it("never asks for longer than the spec allows", async () => {
     const now = 1_800_000_000;
     const t = parse(vapidHeader({ endpoint: ENDPOINT, subject: SUBJECT, ...keys, expiresIn: 99999999, now }));
     // services reject anything past 24h outright, so clamping beats being told
     expect(t.claims.exp).toBe(now + 24 * 3600);
   });
 
-  it("advertises the same key it was given", () => {
+  it("advertises the same key it was given", async () => {
     const t = parse(vapidHeader({ endpoint: ENDPOINT, subject: SUBJECT, ...keys }));
     expect(t.k).toBe(keys.publicKey);
     expect(t.header).toEqual({ typ: "JWT", alg: "ES256" });
@@ -72,17 +72,17 @@ describe("the token", () => {
 });
 
 describe("the keypair", () => {
-  it("is an uncompressed P-256 point the browser will accept", () => {
+  it("is an uncompressed P-256 point the browser will accept", async () => {
     const raw = Buffer.from(keys.publicKey, "base64url");
     expect(raw).toHaveLength(65);
     expect(raw[0]).toBe(0x04);
   });
 
-  it("is different every time", () => {
+  it("is different every time", async () => {
     expect(generateVapidKeys().publicKey).not.toBe(generateVapidKeys().publicKey);
   });
 
-  it("refuses a public key that is not one", () => {
+  it("refuses a public key that is not one", async () => {
     // a key pasted with whitespace, or hex instead of base64url, fails here
     // rather than as a 401 that looks like the push service being down
     expect(() => publicJwkFrom("nope")).toThrow(/65 uncompressed bytes/);
@@ -90,7 +90,7 @@ describe("the keypair", () => {
 });
 
 describe("DER to raw", () => {
-  it("left-pads a short r or s rather than shifting the signature", () => {
+  it("left-pads a short r or s rather than shifting the signature", async () => {
     /* DER strips leading zeros, so a signature with a small r yields fewer
        than 32 bytes. Copying it flush left would move every byte and the
        signature would fail to verify — intermittently, on roughly one

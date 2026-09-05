@@ -69,7 +69,7 @@ export async function sendOnBreak(
   const willPush = pusher.available();
 
   /* phase 1 — ours, and it always succeeds */
-  const first = store.append(
+  const first = await store.append(
     orgId,
     {
       type: "break.decision",
@@ -109,25 +109,25 @@ export async function sendOnBreak(
   /* phase 2 — the customer's system of record, which may refuse */
   try {
     const { ctBreakId } = await pusher.push(input);
-    const outcome = store.append(orgId, {
+    const outcome = (await store.append(orgId, {
       type: "break.pushed",
       at: new Date().toISOString(),
       actor: "system",
       subject: input.subject,
       summary: `${input.name}'s ${input.kind} break written to Connecteam`,
       data: { decisionSeq: first.event.seq, ok: true, ctBreakId },
-    }).event;
+    })).event;
     return { decision: first.event, outcome, pushed: "ok", ctBreakId, created: true };
   } catch (e) {
     const reason = e instanceof Error ? e.message : String(e);
-    const outcome = store.append(orgId, {
+    const outcome = (await store.append(orgId, {
       type: "break.push_failed",
       at: new Date().toISOString(),
       actor: "system",
       subject: input.subject,
       summary: `${input.name}'s ${input.kind} break could not be written to Connecteam`,
       data: { decisionSeq: first.event.seq, ok: false, reason, retryable: RETRYABLE.test(reason) },
-    }).event;
+    })).event;
     return { decision: first.event, outcome, pushed: "failed", reason, created: true };
   }
 }
@@ -139,8 +139,8 @@ export async function sendOnBreak(
  * break was given while the timesheet disagrees is the exact divergence
  * write-through exists to prevent.
  */
-export function unresolvedPushes(store: EventStore, orgId: string, olderThanMs = 5 * 60_000) {
-  const events = store.withMeta(orgId);
+export async function unresolvedPushes(store: EventStore, orgId: string, olderThanMs = 5 * 60_000) {
+  const events = await store.withMeta(orgId);
   const resolved = new Set(
     events
       .filter((m) => m.event.type === "break.pushed" || m.event.type === "break.push_failed")

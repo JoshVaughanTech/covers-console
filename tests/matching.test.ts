@@ -54,7 +54,7 @@ const run = (postingId: string) => {
 };
 
 describe("the Idara gate", () => {
-  it("excludes ineligible people from the ranking entirely", () => {
+  it("excludes ineligible people from the ranking entirely", async () => {
     const r = run("sp-fridaylive-bar");
     const ranked = r.candidates.map((c) => c.name);
     // Jake's RSA expired; Michael's was revoked; Liam has no induction
@@ -63,7 +63,7 @@ describe("the Idara gate", () => {
     }
   });
 
-  it("does not merely rank them last — they have no position at all", () => {
+  it("does not merely rank them last — they have no position at all", async () => {
     const r = run("sp-fridaylive-bar");
     const excludedNames = r.excluded.map((e) => e.name);
     expect(excludedNames).toContain("Jake Morrison");
@@ -73,7 +73,7 @@ describe("the Idara gate", () => {
     expect(jake.reason).toMatch(/RSA/i);
   });
 
-  it("a strong profile cannot buy a way past the gate", () => {
+  it("a strong profile cannot buy a way past the gate", async () => {
     // give Jake a perfect profile: top rating, every skill at lead, no hours
     const p = posting("sp-fridaylive-bar");
     const jake = WORKERS.find((w) => w.name === "Jake Morrison")!;
@@ -103,7 +103,7 @@ describe("the Idara gate", () => {
     expect(r.excluded[0].kind).toBe("idara");
   });
 
-  it("separates a business rule from a compliance failure", () => {
+  it("separates a business rule from a compliance failure", async () => {
     // Michael is excluded from Meridian Group, but that is availability,
     // not eligibility — and at this site his RSA blocks him first anyway
     const r = run("sp-2038-wait");
@@ -112,7 +112,7 @@ describe("the Idara gate", () => {
     expect(["idara", "availability"]).toContain(michael!.kind);
   });
 
-  it("excludes people already assigned to the shift", () => {
+  it("excludes people already assigned to the shift", async () => {
     const r = run("sp-fridaylive-bar");
     const darie = r.excluded.find((e) => e.name === "Darie Roberts");
     expect(darie?.kind).toBe("assigned");
@@ -121,7 +121,7 @@ describe("the Idara gate", () => {
 });
 
 describe("explanations", () => {
-  it("every candidate's chips sum exactly to their score", () => {
+  it("every candidate's chips sum exactly to their score", async () => {
     for (const id of POSTINGS.map((p) => p.id)) {
       for (const c of run(id).candidates) {
         const sum = c.reasons.reduce((s, r) => s + r.points, 0);
@@ -130,19 +130,19 @@ describe("explanations", () => {
     }
   });
 
-  it("gives every candidate at least one reason", () => {
+  it("gives every candidate at least one reason", async () => {
     for (const c of run("sp-fridaylive-bar").candidates) {
       expect(c.reasons.length).toBeGreaterThan(0);
       for (const r of c.reasons) expect(r.detail.length).toBeGreaterThan(0);
     }
   });
 
-  it("ranks highest score first", () => {
+  it("ranks highest score first", async () => {
     const scores = run("sp-fridaylive-bar").candidates.map((c) => c.score);
     expect([...scores].sort((a, b) => b - a)).toEqual(scores);
   });
 
-  it("never scores an Idara warning — it notes it instead", () => {
+  it("never scores an Idara warning — it notes it instead", async () => {
     // Leanne's RSA expires inside the warning window
     const r = run("sp-fridaylive-bar");
     const leanne = r.candidates.find((c) => c.name === "Leanne Vidal");
@@ -153,7 +153,7 @@ describe("explanations", () => {
 });
 
 describe("the scoring components", () => {
-  it("rewards a met skill and penalises a missing one", () => {
+  it("rewards a met skill and penalises a missing one", async () => {
     const r = run("sp-fridaylive-bar");
     const aaron = r.candidates.find((c) => c.name === "Aaron Patel")!;
     const cocktails = aaron.reasons.find((x) => /Can run Cocktails/.test(x.detail));
@@ -162,7 +162,7 @@ describe("the scoring components", () => {
     expect(till!.points).toBeLessThan(0);
   });
 
-  it("gives partial credit for a skill held below the level wanted", () => {
+  it("gives partial credit for a skill held below the level wanted", async () => {
     // Mitch has cocktails at basic; the shift wants solid
     const mitch = run("sp-fridaylive-bar").candidates.find((c) => c.name === "Mitch Egan")!;
     const below = mitch.reasons.find((x) => /below the level wanted/.test(x.detail))!;
@@ -170,7 +170,7 @@ describe("the scoring components", () => {
     expect(below.points).toBeLessThan(WEIGHTS.skill);
   });
 
-  it("turns fairness negative past a full week", () => {
+  it("turns fairness negative past a full week", async () => {
     const r = run("sp-fridaylive-bar");
     const sophie = r.candidates.find((c) => c.name === "Sophie Nguyen")!;
     const fairness = sophie.reasons.find((x) => x.component === "fairness")!;
@@ -179,7 +179,7 @@ describe("the scoring components", () => {
     expect(fairness.detail).toContain("overtime risk");
   });
 
-  it("treats exactly a full week as no room left, not room for more", () => {
+  it("treats exactly a full week as no room left, not room for more", async () => {
     // Leanne sits on exactly FULL_WEEK_HOURS. The boundary belongs to the
     // overtime branch: at a full week there is no spare capacity to reward,
     // and reading "room for more" there would invite the extra shift.
@@ -192,14 +192,14 @@ describe("the scoring components", () => {
     expect(Object.is(fairness.points, -0)).toBe(false);
   });
 
-  it("rewards spare capacity", () => {
+  it("rewards spare capacity", async () => {
     const aaron = run("sp-fridaylive-bar").candidates.find((c) => c.name === "Aaron Patel")!;
     const fairness = aaron.reasons.find((x) => x.component === "fairness")!;
     expect(fairness.points).toBeGreaterThan(0);
     expect(fairness.detail).toContain("room for more");
   });
 
-  it("applies client preference only where there is a client", () => {
+  it("applies client preference only where there is a client", async () => {
     // in-house: no client component at all
     const inHouse = run("sp-fridaylive-bar").candidates;
     expect(inHouse.every((c) => !c.reasons.some((r) => r.component === "client"))).toBe(true);
@@ -210,7 +210,7 @@ describe("the scoring components", () => {
     expect(clientPaid.every((c) => c.reasons.some((r) => r.component === "client"))).toBe(true);
   });
 
-  it("scores an exact role above a merely related one", () => {
+  it("scores an exact role above a merely related one", async () => {
     const r = run("sp-fridaylive-bar");
     const aaron = r.candidates.find((c) => c.name === "Aaron Patel")!; // Bartender
     const mitch = r.candidates.find((c) => c.name === "Mitch Egan")!; // Gaming Attendant
@@ -221,12 +221,12 @@ describe("the scoring components", () => {
     expect(mRole).toBeGreaterThan(0);
   });
 
-  it("rewards the home venue", () => {
+  it("rewards the home venue", async () => {
     const aaron = run("sp-fridaylive-bar").candidates.find((c) => c.name === "Aaron Patel")!;
     expect(aaron.reasons.find((x) => x.component === "locality")?.points).toBe(WEIGHTS.locality);
   });
 
-  it("weights are the published ones and total 100", () => {
+  it("weights are the published ones and total 100", async () => {
     const total = Object.values(WEIGHTS).reduce((a, b) => a + b, 0);
     expect(total).toBe(100);
     expect(WEIGHTS.skill).toBe(32);
@@ -235,16 +235,16 @@ describe("the scoring components", () => {
 });
 
 describe("the seeded postings", () => {
-  it("every posting can be ranked without throwing", () => {
+  it("every posting can be ranked without throwing", async () => {
     for (const p of POSTINGS) expect(() => run(p.id)).not.toThrow();
   });
 
-  it("every seeded worker has a profile", () => {
+  it("every seeded worker has a profile", async () => {
     for (const w of WORKERS) expect(profileOf(w.did), w.name).toBeDefined();
     expect(PROFILES).toHaveLength(WORKERS.length);
   });
 
-  it("finds somebody eligible for the Friday bar shift", () => {
+  it("finds somebody eligible for the Friday bar shift", async () => {
     expect(run("sp-fridaylive-bar").candidates.length).toBeGreaterThan(0);
   });
 });

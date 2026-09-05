@@ -55,25 +55,25 @@ export function isOfferable(e: { type: string; data?: Record<string, unknown> })
  * with an empty audience is worth recording as such, so `told: 0` is a
  * result rather than a silence.
  */
-export function offerPosting(
+export async function offerPosting(
   events: EventStore,
   notifications: NotificationStore,
   orgId: string,
   e: AuditEvent,
-): OfferResult | null {
+): Promise<OfferResult | null> {
   if (!isOfferable(e)) return null;
   const posting = e.data.posting as ShiftPosting;
 
   const audience = audienceFor({
     posting,
-    credentials: credentialsNow(events.all(orgId)),
+    credentials: credentialsNow(await events.all(orgId)),
     at: TODAY,
   });
 
   const at = new Date().toISOString();
   const siteName = siteIndex.get(posting.siteId)?.name ?? posting.siteId;
 
-  notifications.offer(orgId, audience.eligible, {
+  await notifications.offer(orgId, audience.eligible, {
     postingId: posting.id,
     role: posting.role,
     functionName: posting.functionName,
@@ -82,7 +82,7 @@ export function offerPosting(
     siteName,
   }, at);
 
-  events.append(
+  await events.append(
     orgId,
     {
       type: "shift.offered",

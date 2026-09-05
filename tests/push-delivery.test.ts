@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { PushStore } from "../lib/store/push";
 import { sendPush } from "../lib/push/send";
 import { generateVapidKeys } from "../lib/push/vapid";
+import { db, setDb } from "../lib/store/db";
 
 /* ============================================================
    Delivery, as distinct from encryption.
@@ -35,42 +36,42 @@ const sub = (over: Partial<{ did: string; endpoint: string; p256dh: string; auth
 });
 
 let store: PushStore;
-beforeEach(() => { store = new PushStore(":memory:"); });
-afterEach(() => { store.close(); vi.restoreAllMocks(); });
+beforeEach(async () => { setDb(null); store = new PushStore(await db()); });
+afterEach(async () => { await store.close(); setDb(null); vi.restoreAllMocks(); });
 
 describe("remembering a device", () => {
-  it("keeps one row per device, not per person", () => {
-    store.save(ORG, sub(), AT);
-    store.save(ORG, sub({ endpoint: "https://push.example.test/sub/tablet" }), AT);
+  it("keeps one row per device, not per person", async () => {
+    await store.save(ORG, sub(), AT);
+    await store.save(ORG, sub({ endpoint: "https://push.example.test/sub/tablet" }), AT);
     // a phone and a tablet should both light up
-    expect(store.countFor(ORG, sub().did)).toBe(2);
+    expect(await store.countFor(ORG, sub().did)).toBe(2);
   });
 
-  it("replaces the keys when a browser re-subscribes on the same endpoint", () => {
-    store.save(ORG, sub(), AT);
-    store.save(ORG, sub({ auth: "ZZZZZZZZZZZZZZZZZZZZZZ" }), AT);
+  it("replaces the keys when a browser re-subscribes on the same endpoint", async () => {
+    await store.save(ORG, sub(), AT);
+    await store.save(ORG, sub({ auth: "ZZZZZZZZZZZZZZZZZZZZZZ" }), AT);
 
-    expect(store.countFor(ORG, sub().did)).toBe(1);
+    expect(await store.countFor(ORG, sub().did)).toBe(1);
     /* Keeping the old keys would encrypt to something the device can no
        longer read: a push that succeeds and silently never appears. */
-    expect(store.forWorker(ORG, sub().did)[0].auth).toBe("ZZZZZZZZZZZZZZZZZZZZZZ");
+    expect((await store.forWorker(ORG, sub().did))[0].auth).toBe("ZZZZZZZZZZZZZZZZZZZZZZ");
   });
 
-  it("moves a device to whoever signed in on it last", () => {
+  it("moves a device to whoever signed in on it last", async () => {
     const mitch = "did:web:idara.app:w:mitch-egan";
-    store.save(ORG, sub(), AT);
-    store.save(ORG, sub({ did: mitch }), AT);
+    await store.save(ORG, sub(), AT);
+    await store.save(ORG, sub({ did: mitch }), AT);
 
     // a shared phone must stop showing the previous person's shifts
-    expect(store.countFor(ORG, sub().did)).toBe(0);
-    expect(store.countFor(ORG, mitch)).toBe(1);
+    expect(await store.countFor(ORG, sub().did)).toBe(0);
+    expect(await store.countFor(ORG, mitch)).toBe(1);
   });
 
-  it("forgets one on request", () => {
-    store.save(ORG, sub(), AT);
-    expect(store.remove(ORG, sub().endpoint)).toBe(true);
-    expect(store.remove(ORG, sub().endpoint)).toBe(false);
-    expect(store.countFor(ORG, sub().did)).toBe(0);
+  it("forgets one on request", async () => {
+    await store.save(ORG, sub(), AT);
+    expect(await store.remove(ORG, sub().endpoint)).toBe(true);
+    expect(await store.remove(ORG, sub().endpoint)).toBe(false);
+    expect(await store.countFor(ORG, sub().did)).toBe(0);
   });
 });
 

@@ -79,7 +79,7 @@ export async function POST(req: Request) {
 
   try {
     const result = await runWeeklyReport({
-      store: eventStore(),
+      store: (await eventStore()),
       orgId: ORG,
       sink,
       sessions: await sessionsFor(week),

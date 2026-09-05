@@ -23,14 +23,14 @@ const build = (n: number): AuditEvent[] =>
   );
 
 describe("appendEvent", () => {
-  it("anchors the first event to the genesis hash", () => {
+  it("anchors the first event to the genesis hash", async () => {
     const [first] = appendEvent([], ev("first"));
     expect(first.seq).toBe(0);
     expect(first.prevHash).toBe(GENESIS_HASH);
     expect(GENESIS_HASH).toMatch(/^0{64}$/);
   });
 
-  it("links each event to its predecessor and increments seq", () => {
+  it("links each event to its predecessor and increments seq", async () => {
     const log = build(4);
     expect(log.map((e) => e.seq)).toEqual([0, 1, 2, 3]);
     for (let i = 1; i < log.length; i++) {
@@ -38,7 +38,7 @@ describe("appendEvent", () => {
     }
   });
 
-  it("does not mutate the input log (append-only, immutably)", () => {
+  it("does not mutate the input log (append-only, immutably)", async () => {
     const log = build(2);
     const snapshot = JSON.stringify(log);
     const next = appendEvent(log, ev("third"));
@@ -47,11 +47,11 @@ describe("appendEvent", () => {
     expect(next).toHaveLength(3);
   });
 
-  it("produces SHA-256-width hashes", () => {
+  it("produces SHA-256-width hashes", async () => {
     for (const e of build(3)) expect(e.hash).toMatch(/^[0-9a-f]{64}$/);
   });
 
-  it("gives different hashes to otherwise-identical events at different positions", () => {
+  it("gives different hashes to otherwise-identical events at different positions", async () => {
     const log = build(3).concat();
     const a = appendEvent(log, ev("same text"));
     const b = appendEvent(a, ev("same text"));
@@ -60,21 +60,21 @@ describe("appendEvent", () => {
 });
 
 describe("verifyChain", () => {
-  it("accepts an untouched chain", () => {
+  it("accepts an untouched chain", async () => {
     expect(verifyChain(build(5))).toEqual({ ok: true, brokenAt: null });
   });
 
-  it("accepts an empty log", () => {
+  it("accepts an empty log", async () => {
     expect(verifyChain([])).toEqual({ ok: true, brokenAt: null });
   });
 
-  it("survives a JSON round-trip (canonical encoding, not key order)", () => {
+  it("survives a JSON round-trip (canonical encoding, not key order)", async () => {
     const log = build(5);
     const reloaded: AuditEvent[] = JSON.parse(JSON.stringify(log));
     expect(verifyChain(reloaded)).toEqual({ ok: true, brokenAt: null });
   });
 
-  it("survives a round-trip that reorders object keys", () => {
+  it("survives a round-trip that reorders object keys", async () => {
     const log = build(3);
     // simulates a store/transport that re-serialises members in another order
     const shuffled = log.map((e) => {
@@ -84,44 +84,44 @@ describe("verifyChain", () => {
     expect(verifyChain(shuffled)).toEqual({ ok: true, brokenAt: null });
   });
 
-  it("detects an edited summary", () => {
+  it("detects an edited summary", async () => {
     const log = build(5);
     log[2] = { ...log[2], summary: "quietly rewritten" };
     expect(verifyChain(log)).toEqual({ ok: false, brokenAt: 2 });
   });
 
-  it("detects an edited nested data payload", () => {
+  it("detects an edited nested data payload", async () => {
     const log = build(4);
     log[1] = { ...log[1], data: { blocked: 0 } };
     expect(verifyChain(log)).toEqual({ ok: false, brokenAt: 1 });
   });
 
-  it("detects a changed actor", () => {
+  it("detects a changed actor", async () => {
     const log = build(3);
     log[0] = { ...log[0], actor: "Someone Else" };
     expect(verifyChain(log)).toEqual({ ok: false, brokenAt: 0 });
   });
 
-  it("detects a deleted event", () => {
+  it("detects a deleted event", async () => {
     const log = build(5);
     const withHole = [...log.slice(0, 2), ...log.slice(3)];
     // event #3 no longer follows the hash it claims to
     expect(verifyChain(withHole)).toEqual({ ok: false, brokenAt: 3 });
   });
 
-  it("detects reordered events", () => {
+  it("detects reordered events", async () => {
     const log = build(5);
     const swapped = [log[0], log[1], log[3], log[2], log[4]];
     expect(verifyChain(swapped).ok).toBe(false);
   });
 
-  it("detects a forged hash that does not match its own body", () => {
+  it("detects a forged hash that does not match its own body", async () => {
     const log = build(3);
     log[1] = { ...log[1], hash: "f".repeat(64) };
     expect(verifyChain(log)).toEqual({ ok: false, brokenAt: 1 });
   });
 
-  it("cannot be repaired by rewriting one event's hash alone", () => {
+  it("cannot be repaired by rewriting one event's hash alone", async () => {
     // the tamperer edits event 2 and recomputes only its own hash;
     // event 3 still points at the old hash, so the break just moves.
     const log = build(5);
@@ -130,7 +130,7 @@ describe("verifyChain", () => {
     expect(verifyChain(forged).ok).toBe(false);
   });
 
-  it("reports the first break when several events are altered", () => {
+  it("reports the first break when several events are altered", async () => {
     const log = build(6);
     log[4] = { ...log[4], summary: "later edit" };
     log[2] = { ...log[2], summary: "earlier edit" };
@@ -139,7 +139,7 @@ describe("verifyChain", () => {
 });
 
 describe("shortHash", () => {
-  it("truncates for display without altering the stored value", () => {
+  it("truncates for display without altering the stored value", async () => {
     const [e] = appendEvent([], ev("x"));
     expect(shortHash(e.hash)).toHaveLength(12);
     expect(e.hash.startsWith(shortHash(e.hash))).toBe(true);

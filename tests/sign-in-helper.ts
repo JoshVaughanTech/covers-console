@@ -13,10 +13,10 @@ export interface TestSession {
   cookie: string;
 }
 
-export function signIn(did: string): TestSession {
-  const issued = authStore().issue(did, "worker");
+export async function signIn(did: string): Promise<TestSession> {
+  const issued = await (await authStore()).issue(did, "worker");
   if (!issued.ok) throw new Error("test sign-in could not get a code: rate limited");
-  const result = authStore().redeemCode(did, issued.grant.code, "test");
+  const result = await (await authStore()).redeemCode(did, issued.grant.code, "test");
   if (!result.ok) throw new Error(`test sign-in failed: ${result.reason}`);
   return { did, cookie: `${COOKIE}=${encodeURIComponent(result.session.secret)}` };
 }
@@ -37,10 +37,10 @@ export function asCaller(session: TestSession, url: string, init: RequestInit = 
  * the session. A helper that forged the row would keep passing on the day that
  * stopped being true, which is the one thing these tests exist to catch.
  */
-export function signInOperator(did: string): TestSession {
-  const issued = authStore().issue(did, "operator");
+export async function signInOperator(did: string): Promise<TestSession> {
+  const issued = await (await authStore()).issue(did, "operator");
   if (!issued.ok) throw new Error("test operator sign-in could not get a code: rate limited");
-  const result = authStore().redeemCode(did, issued.grant.code, "test");
+  const result = await (await authStore()).redeemCode(did, issued.grant.code, "test");
   if (!result.ok) throw new Error(`test operator sign-in failed: ${result.reason}`);
   if (result.kind !== "operator") throw new Error("grant did not carry the operator kind");
   return { did, cookie: `${COOKIE}=${encodeURIComponent(result.session.secret)}` };

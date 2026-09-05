@@ -67,7 +67,7 @@ export async function POST(req: Request) {
      which put the strongest identity claim in the chain — a DID — entirely
      in the gift of whoever held the phone. An unverifiable name is a weak
      record; an unverifiable DID that looks verifiable is worse. */
-  const caller = workerOf(req);
+  const caller = await workerOf(req);
   if (!caller) return NextResponse.json({ error: "not signed in" }, { status: 401 });
 
   if (!body?.subject || !body.name || !body.kind || !body.at) {
@@ -80,7 +80,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "kind must be meal or rest" }, { status: 400 });
   }
 
-  const result = await sendOnBreak(eventStore(), ORG, connecteamPusher(), {
+  const result = await sendOnBreak((await eventStore()), ORG, connecteamPusher(), {
     ...(body as BreakDecisionInput),
     // whatever the phone said, these are who it actually is
     actor: caller.person.name,

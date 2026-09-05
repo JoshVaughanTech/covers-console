@@ -40,7 +40,7 @@ const EXPECTED =
   "pK4Mqgkf1CXztLVBSt2Ks3oZwbuwXPXLWyouBWLVWGNWQexSgSxsj_Qulcy4a-fN";
 
 describe("RFC 8291 §5", () => {
-  it("produces the exact ciphertext the spec publishes", () => {
+  it("produces the exact ciphertext the spec publishes", async () => {
     const { body, encoding } = encryptPayload(
       PLAINTEXT,
       { p256dh: RECEIVER_PUBLIC, auth: AUTH_SECRET },
@@ -55,7 +55,7 @@ describe("RFC 8291 §5", () => {
     expect(body.toString("base64url")).toBe(EXPECTED);
   });
 
-  it("puts the header the receiver needs where the spec says", () => {
+  it("puts the header the receiver needs where the spec says", async () => {
     const { body } = encryptPayload(
       PLAINTEXT,
       { p256dh: RECEIVER_PUBLIC, auth: AUTH_SECRET },
@@ -77,7 +77,7 @@ describe("RFC 8291 §5", () => {
 });
 
 describe("what must never repeat", () => {
-  it("uses a fresh salt and a fresh keypair each time", () => {
+  it("uses a fresh salt and a fresh keypair each time", async () => {
     const sub = { p256dh: RECEIVER_PUBLIC, auth: AUTH_SECRET };
     const a = encryptPayload(PLAINTEXT, sub).body;
     const b = encryptPayload(PLAINTEXT, sub).body;
@@ -93,7 +93,7 @@ describe("what must never repeat", () => {
 });
 
 describe("a subscription that is not one", () => {
-  it("refuses a key of the wrong length rather than producing garbage", () => {
+  it("refuses a key of the wrong length rather than producing garbage", async () => {
     // a truncated or url-decoded-wrongly p256dh would otherwise encrypt to
     // something no browser can read, and the push service would still say 201
     expect(() =>

@@ -58,7 +58,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "did and code are required" }, { status: 400 });
   }
 
-  const result = authStore().redeemCode(did, code, bucketOf(req, did));
+  const result = await (await authStore()).redeemCode(did, code, bucketOf(req, did));
   if (!result.ok) {
     return NextResponse.json(
       { error: MESSAGE[result.reason] ?? MESSAGE.unknown, reason: result.reason },
@@ -78,7 +78,7 @@ export async function POST(req: Request) {
      person, it never stops being true, and a claim later disputed is read
      alongside it. The secret that let them in does not, and does not leave
      the auth store. */
-  eventStore().append(ORG, {
+  await (await eventStore()).append(ORG, {
     type: "auth.signed_in",
     at: new Date().toISOString(),
     actor: person?.name ?? result.did,

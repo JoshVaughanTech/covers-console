@@ -76,7 +76,7 @@ describe("demo dataset — Brightwater Hotel roster", () => {
     expect(d.warnings).toBe(0);
   });
 
-  it("Leanne Vidal is eligible but flagged — RSA expiring", () => {
+  it("Leanne Vidal is eligible but flagged — RSA expiring", async () => {
     const d = check("Leanne Vidal");
     expect(d.allowed).toBe(true);
     expect(d.warnings).toBe(1);
@@ -84,35 +84,35 @@ describe("demo dataset — Brightwater Hotel roster", () => {
     expect(summarise(d)).toBe("Eligible with 1 warning");
   });
 
-  it("Jake Morrison is blocked — RSA expired", () => {
+  it("Jake Morrison is blocked — RSA expired", async () => {
     const d = check("Jake Morrison");
     expect(d.allowed).toBe(false);
     expect(failCodes(d)).toEqual(["credential.expired"]);
     expect(failTypes(d)).toEqual(["rsa"]);
   });
 
-  it("Liam O'Brien is blocked — no induction for this location", () => {
+  it("Liam O'Brien is blocked — no induction for this location", async () => {
     const d = check("Liam O'Brien");
     expect(d.allowed).toBe(false);
     expect(failCodes(d)).toEqual(["credential.missing"]);
     expect(failTypes(d)).toEqual(["site_induction"]);
   });
 
-  it("Michael Tan is blocked — RSA revoked by the regulator", () => {
+  it("Michael Tan is blocked — RSA revoked by the regulator", async () => {
     const d = check("Michael Tan");
     expect(d.allowed).toBe(false);
     expect(failCodes(d)).toEqual(["credential.revoked"]);
     expect(failTypes(d)).toEqual(["rsa"]);
   });
 
-  it("blocks exactly three of the ten seeded staff", () => {
+  it("blocks exactly three of the ten seeded staff", async () => {
     const blocked = WORKERS.filter((w) => !check(w.name).allowed).map((w) => w.name);
     expect(blocked.sort()).toEqual(
       ["Jake Morrison", "Liam O'Brien", "Michael Tan"].sort(),
     );
   });
 
-  it("gives every blocked worker a reason a manager can act on", () => {
+  it("gives every blocked worker a reason a manager can act on", async () => {
     for (const w of WORKERS) {
       const d = check(w.name);
       if (d.allowed) continue;
@@ -125,7 +125,7 @@ describe("demo dataset — Brightwater Hotel roster", () => {
 });
 
 describe("demo dataset — same building, different licence", () => {
-  it("Darie works the hotel floor but is blocked from the gaming room — no RSG", () => {
+  it("Darie works the hotel floor but is blocked from the gaming room — no RSG", async () => {
     expect(check("Darie Roberts", HOTEL).allowed).toBe(true);
 
     const d = check("Darie Roberts", GAMING);
@@ -135,12 +135,12 @@ describe("demo dataset — same building, different licence", () => {
     expect(failCodes(d)).toEqual(["credential.missing"]);
   });
 
-  it("Mitch clears both the floor and the gaming room", () => {
+  it("Mitch clears both the floor and the gaming room", async () => {
     expect(check("Mitch Egan", HOTEL).allowed).toBe(true);
     expect(check("Mitch Egan", GAMING).allowed).toBe(true);
   });
 
-  it("Sophie, as venue manager, clears the floor, the gaming room and the tavern", () => {
+  it("Sophie, as venue manager, clears the floor, the gaming room and the tavern", async () => {
     expect(check("Sophie Nguyen", HOTEL).allowed).toBe(true);
     expect(check("Sophie Nguyen", GAMING).allowed).toBe(true);
     expect(check("Sophie Nguyen", TAVERN).allowed).toBe(true);
@@ -148,7 +148,7 @@ describe("demo dataset — same building, different licence", () => {
 });
 
 describe("demo dataset — requirements bind to duties, not to everyone", () => {
-  it("Hassan holds no RSA at all, and is still eligible on the floor", () => {
+  it("Hassan holds no RSA at all, and is still eligible on the floor", async () => {
     const rsas = CREDENTIALS.filter(
       (c) => c.subject === didOf("Hassan Ali") && c.type === "rsa",
     );
@@ -161,19 +161,19 @@ describe("demo dataset — requirements bind to duties, not to everyone", () => 
     expect(rsaCheck?.detail).toContain("Head Chef");
   });
 
-  it("the same missing RSA still blocks people who do serve alcohol", () => {
+  it("the same missing RSA still blocks people who do serve alcohol", async () => {
     // Jake is a Bar Attendant — the licence binds, and his has expired
     expect(check("Jake Morrison").allowed).toBe(false);
     expect(failTypes(check("Jake Morrison"))).toEqual(["rsa"]);
   });
 
-  it("records the skipped check rather than dropping it from the trail", () => {
+  it("records the skipped check rather than dropping it from the trail", async () => {
     const d = check("Hassan Ali");
     // one entry per requirement at this location, none silently missing
     expect(d.reasons).toHaveLength(siteOf(HOTEL).requires.length);
   });
 
-  it("a bartender is still blocked from the gaming room — the room implies the duty", () => {
+  it("a bartender is still blocked from the gaming room — the room implies the duty", async () => {
     // RSG is not role-scoped: rostering someone into the gaming room IS the
     // gaming duty, so a bartender without RSG cannot work it.
     const d = check("Darie Roberts", GAMING);
@@ -181,7 +181,7 @@ describe("demo dataset — requirements bind to duties, not to everyone", () => 
     expect(failTypes(d)).toEqual(["rsg"]);
   });
 
-  it("food tickets bind to the kitchen, not to the bar", () => {
+  it("food tickets bind to the kitchen, not to the bar", async () => {
     // allergen training is genuinely per-person, so it binds to Hassan.
     // FSS is not: it's owed by the operation, so it never appears here.
     expect(failTypes(check("Hassan Ali", WEDDING))).toEqual(["allergen_management"]);
@@ -194,7 +194,7 @@ describe("demo dataset — requirements bind to duties, not to everyone", () => 
 });
 
 describe("demo dataset — venues vs. off-premise catering", () => {
-  it("Hassan clears the hotel but is blocked at the wedding", () => {
+  it("Hassan clears the hotel but is blocked at the wedding", async () => {
     expect(check("Hassan Ali", HOTEL).allowed).toBe(true);
 
     const d = check("Hassan Ali", WEDDING);
@@ -204,7 +204,7 @@ describe("demo dataset — venues vs. off-premise catering", () => {
     expect(failTypes(d)).toEqual(["allergen_management"]);
   });
 
-  it("Priya carries one RSA across the venue and both catering operations", () => {
+  it("Priya carries one RSA across the venue and both catering operations", async () => {
     for (const where of [HOTEL, WEDDING, LUNCH]) {
       expect(check("Priya Sharma", where).allowed, where).toBe(true);
     }
@@ -218,12 +218,12 @@ describe("demo dataset — venues vs. off-premise catering", () => {
     ).toHaveLength(1);
   });
 
-  it("a hotel-eligible worker is not automatically eligible off-premise", () => {
+  it("a hotel-eligible worker is not automatically eligible off-premise", async () => {
     expect(check("Aaron Patel", HOTEL).allowed).toBe(true);
     expect(check("Aaron Patel", WEDDING).allowed).toBe(false);
   });
 
-  it("every location is reachable by at least one worker", () => {
+  it("every location is reachable by at least one worker", async () => {
     for (const s of SITES) {
       const anyEligible = WORKERS.some((w) => check(w.name, s.id).allowed);
       expect(anyEligible, `nobody can work ${s.name}`).toBe(true);
@@ -247,7 +247,7 @@ describe("demo dataset — obligations owed by the roster, not the person", () =
       verifier,
     });
 
-  it("blocks a tavern shift with no Food Safety Supervisor on, though nobody is at fault", () => {
+  it("blocks a tavern shift with no Food Safety Supervisor on, though nobody is at fault", async () => {
     // Darie is personally eligible at the tavern — RSA, induction, food handling
     const alone = rosterAt(["Darie Roberts"], TAVERN);
     expect(alone.decisions.every((d) => d.allowed)).toBe(true);
@@ -258,20 +258,20 @@ describe("demo dataset — obligations owed by the roster, not the person", () =
     expect(alone.coverage[0].detail).toContain("No one rostered holds");
   });
 
-  it("the same shift publishes once a supervisor is on it", () => {
+  it("the same shift publishes once a supervisor is on it", async () => {
     const withSophie = rosterAt(["Darie Roberts", "Sophie Nguyen"], TAVERN);
     expect(withSophie.allowed).toBe(true);
     expect(withSophie.coverage[0].holders.map((h) => h.name)).toEqual(["Sophie Nguyen"]);
     expect(summariseCoverage(withSophie.coverage)).toBeNull();
   });
 
-  it("the wedding is covered by its functions coordinator", () => {
+  it("the wedding is covered by its functions coordinator", async () => {
     const r = rosterAt(["Priya Sharma"], WEDDING);
     expect(r.allowed).toBe(true);
     expect(r.coverage[0].holders.map((h) => h.name)).toEqual(["Priya Sharma"]);
   });
 
-  it("does not demand the FSS ticket of every cook", () => {
+  it("does not demand the FSS ticket of every cook", async () => {
     const r = rosterAt(["Priya Sharma", "Hassan Ali"], TAVERN);
     // Hassan holds no FSS and is not personally faulted for it
     expect(
@@ -281,7 +281,7 @@ describe("demo dataset — obligations owed by the roster, not the person", () =
     ).toBe(false);
   });
 
-  it("won't accept a supervisor who can't be rostered anyway", () => {
+  it("won't accept a supervisor who can't be rostered anyway", async () => {
     // Sophie holds the FSS but has no induction for the wedding site
     const r = rosterAt(["Sophie Nguyen"], WEDDING);
     expect(r.decisions[0].allowed).toBe(false);
@@ -289,14 +289,14 @@ describe("demo dataset — obligations owed by the roster, not the person", () =
     expect(r.coverage[0].met).toBe(false);
   });
 
-  it("the hotel bistro owes a supervisor, and the seeded crew covers it", () => {
+  it("the hotel bistro owes a supervisor, and the seeded crew covers it", async () => {
     const r = rosterAt(["Sophie Nguyen", "Darie Roberts", "Aaron Patel"], HOTEL);
     expect(r.coverage[0].met).toBe(true);
     expect(r.coverage[0].holders.map((h) => h.name)).toEqual(["Sophie Nguyen"]);
     expect(r.allowed).toBe(true);
   });
 
-  it("the gaming room owes no collective ticket", () => {
+  it("the gaming room owes no collective ticket", async () => {
     expect(rosterAt(["Mitch Egan"], GAMING).coverage).toHaveLength(0);
   });
 });
@@ -308,23 +308,23 @@ describe("demo dataset — the publish gate", () => {
     return { decisions, blocked, published: blocked.length === 0 };
   };
 
-  it("refuses to publish a roster containing an ineligible worker", () => {
+  it("refuses to publish a roster containing an ineligible worker", async () => {
     const r = roster(["Darie Roberts", "Aaron Patel", "Michael Tan"]);
     expect(r.published).toBe(false);
     expect(r.blocked).toHaveLength(1);
   });
 
-  it("one bad worker is enough to block the whole roster", () => {
+  it("one bad worker is enough to block the whole roster", async () => {
     expect(roster(WORKERS.map((w) => w.name)).published).toBe(false);
   });
 
-  it("publishes once the ineligible workers are removed", () => {
+  it("publishes once the ineligible workers are removed", async () => {
     const eligible = WORKERS.map((w) => w.name).filter((n) => check(n).allowed);
     expect(roster(eligible).published).toBe(true);
     expect(eligible).toHaveLength(7);
   });
 
-  it("still publishes when the only issue is an expiring credential", () => {
+  it("still publishes when the only issue is an expiring credential", async () => {
     const r = roster(["Darie Roberts", "Leanne Vidal"]);
     expect(r.published).toBe(true);
     expect(r.decisions.some((d) => d.warnings > 0)).toBe(true);
@@ -332,16 +332,16 @@ describe("demo dataset — the publish gate", () => {
 });
 
 describe("demo dataset — the audit trail", () => {
-  it("ships with an intact hash chain", () => {
+  it("ships with an intact hash chain", async () => {
     expect(verifyChain(SEED_AUDIT)).toEqual({ ok: true, brokenAt: null });
   });
 
-  it("is sequential and fully linked from genesis", () => {
+  it("is sequential and fully linked from genesis", async () => {
     expect(SEED_AUDIT.length).toBeGreaterThan(0);
     SEED_AUDIT.forEach((e, i) => expect(e.seq).toBe(i));
   });
 
-  it("explains Michael Tan's block with a dated, recorded revocation", () => {
+  it("explains Michael Tan's block with a dated, recorded revocation", async () => {
     // the demo claim: "there's a dated record of why"
     const revocation = SEED_AUDIT.find(
       (e) => e.type === "credential.revoked" && e.subject === didOf("Michael Tan"),

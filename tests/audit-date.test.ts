@@ -18,19 +18,19 @@ import { describe, it, expect } from "vitest";
 import { fmtDate } from "../app/(console)/audit/format";
 
 describe("fmtDate", () => {
-  it("renders a bare calendar date", () => {
+  it("renders a bare calendar date", async () => {
     expect(fmtDate("2024-05-16")).toBe("16 May 2024");
   });
 
-  it("renders a full timestamp as the day it happened", () => {
+  it("renders a full timestamp as the day it happened", async () => {
     expect(fmtDate("2024-05-16T12:10:00Z")).toBe("16 May 2024");
   });
 
-  it("renders a timestamp with milliseconds, which is what toISOString gives", () => {
+  it("renders a timestamp with milliseconds, which is what toISOString gives", async () => {
     expect(fmtDate("2024-05-16T12:10:00.000Z")).toBe("16 May 2024");
   });
 
-  it("never renders NaN for anything a real event carries", () => {
+  it("never renders NaN for anything a real event carries", async () => {
     for (const at of [
       "2024-05-16",
       "2024-05-16T00:00:00Z",
@@ -41,11 +41,11 @@ describe("fmtDate", () => {
     }
   });
 
-  it("drops a leading zero on the day, as it always did", () => {
+  it("drops a leading zero on the day, as it always did", async () => {
     expect(fmtDate("2024-05-06")).toBe("6 May 2024");
   });
 
-  it("handles every month boundary", () => {
+  it("handles every month boundary", async () => {
     expect(fmtDate("2024-01-01")).toBe("1 Jan 2024");
     expect(fmtDate("2024-12-31")).toBe("31 Dec 2024");
   });

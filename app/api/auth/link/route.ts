@@ -26,7 +26,7 @@ export async function GET(req: Request) {
   const token = url.searchParams.get("t");
   if (!token) return NextResponse.redirect(new URL("/m?signin=missing", url.origin));
 
-  const result = authStore().redeemToken(token);
+  const result = await (await authStore()).redeemToken(token);
   if (!result.ok) {
     return NextResponse.redirect(new URL(`/m?signin=${result.reason}`, url.origin));
   }
@@ -43,7 +43,7 @@ export async function GET(req: Request) {
   const res = NextResponse.redirect(new URL(isOperator ? "/overview" : "/m/shifts", url.origin));
   setSessionCookie(res, req, result.session.secret);
 
-  eventStore().append(ORG, {
+  await (await eventStore()).append(ORG, {
     type: "auth.signed_in",
     at: new Date().toISOString(),
     actor: name,

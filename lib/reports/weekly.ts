@@ -90,7 +90,7 @@ export async function runWeeklyReport(input: WeeklyRunInput): Promise<WeeklyRunR
     };
   }
 
-  const { event } = input.store.append(
+  const { event } = await input.store.append(
     input.orgId,
     {
       type: "report.delivered",

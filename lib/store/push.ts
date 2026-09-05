@@ -14,9 +14,7 @@
    already in the chain as shift.offered, and it belongs to the
    offer rather than to the transport that carried it.
    ============================================================ */
-import { DatabaseSync } from "node:sqlite";
-import { mkdirSync } from "node:fs";
-import { dirname } from "node:path";
+import { db, type Db } from "./db";
 
 const DDL = `
 CREATE TABLE IF NOT EXISTS push_subscription (
@@ -39,17 +37,14 @@ export interface PushSubscriptionRow {
   auth: string;
 }
 
-type Row = { did: string; endpoint: string; p256dh: string; auth: string };
-
 export class PushStore {
-  private db: DatabaseSync;
+  private ready: Promise<void> | null = null;
 
-  constructor(path: string) {
-    if (path !== ":memory:") mkdirSync(dirname(path), { recursive: true });
-    this.db = new DatabaseSync(path);
-    if (path !== ":memory:") this.db.exec("PRAGMA journal_mode = WAL");
-    this.db.exec("PRAGMA busy_timeout = 5000");
-    this.db.exec(DDL);
+  constructor(private readonly database: Db) {}
+
+  private async migrate(): Promise<void> {
+    if (!this.ready) this.ready = this.database.exec(DDL);
+    return this.ready;
   }
 
   /**
@@ -64,50 +59,56 @@ export class PushStore {
    * signed out and signed back in as somebody else must stop receiving the
    * first person's shifts.
    */
-  save(orgId: string, sub: PushSubscriptionRow, at: string): void {
-    this.db
-      .prepare(
-        `INSERT INTO push_subscription (org_id, did, endpoint, p256dh, auth, created_at)
-         VALUES (?,?,?,?,?,?)
-         ON CONFLICT (org_id, endpoint) DO UPDATE SET
-           did = excluded.did, p256dh = excluded.p256dh,
-           auth = excluded.auth, created_at = excluded.created_at`,
-      )
-      .run(orgId, sub.did, sub.endpoint, sub.p256dh, sub.auth, at);
-  }
-
-  forWorker(orgId: string, did: string): PushSubscriptionRow[] {
-    return this.db
-      .prepare("SELECT did, endpoint, p256dh, auth FROM push_subscription WHERE org_id = ? AND did = ?")
-      .all(orgId, did) as Row[];
-  }
-
-  /** Forget one device — on sign-out, or when the service says it is gone. */
-  remove(orgId: string, endpoint: string): boolean {
-    return (
-      (this.db
-        .prepare("DELETE FROM push_subscription WHERE org_id = ? AND endpoint = ?")
-        .run(orgId, endpoint).changes as number) > 0
+  async save(orgId: string, sub: PushSubscriptionRow, at: string): Promise<void> {
+    await this.migrate();
+    await this.database.query(
+      `INSERT INTO push_subscription (org_id, did, endpoint, p256dh, auth, created_at)
+       VALUES ($1,$2,$3,$4,$5,$6)
+       ON CONFLICT (org_id, endpoint) DO UPDATE SET
+         did = EXCLUDED.did, p256dh = EXCLUDED.p256dh,
+         auth = EXCLUDED.auth, created_at = EXCLUDED.created_at`,
+      [orgId, sub.did, sub.endpoint, sub.p256dh, sub.auth, at],
     );
   }
 
-  countFor(orgId: string, did: string): number {
-    const { n } = this.db
-      .prepare("SELECT COUNT(*) AS n FROM push_subscription WHERE org_id = ? AND did = ?")
-      .get(orgId, did) as { n: number };
-    return n;
+  async forWorker(orgId: string, did: string): Promise<PushSubscriptionRow[]> {
+    await this.migrate();
+    const r = await this.database.query<PushSubscriptionRow>(
+      "SELECT did, endpoint, p256dh, auth FROM push_subscription WHERE org_id = $1 AND did = $2",
+      [orgId, did],
+    );
+    return r.rows;
   }
 
-  close(): void {
-    this.db.close();
+  /** Forget one device — on sign-out, or when the service says it is gone. */
+  async remove(orgId: string, endpoint: string): Promise<boolean> {
+    await this.migrate();
+    const r = await this.database.query(
+      "DELETE FROM push_subscription WHERE org_id = $1 AND endpoint = $2",
+      [orgId, endpoint],
+    );
+    return r.rowCount > 0;
+  }
+
+  async countFor(orgId: string, did: string): Promise<number> {
+    await this.migrate();
+    const r = await this.database.query<{ n: string }>(
+      "SELECT COUNT(*) AS n FROM push_subscription WHERE org_id = $1 AND did = $2",
+      [orgId, did],
+    );
+    return Number(r.rows[0].n);
+  }
+
+  async close(): Promise<void> {
+    await this.database.close();
   }
 }
 
 const KEY = Symbol.for("covers.pushStore");
-type Holder = { [KEY]?: PushStore };
+type Holder = { [KEY]?: Promise<PushStore> };
 
-export function pushStore(): PushStore {
+export function pushStore(): Promise<PushStore> {
   const g = globalThis as Holder;
-  if (!g[KEY]) g[KEY] = new PushStore(process.env.COVERS_DB ?? ".data/covers.db");
+  if (!g[KEY]) g[KEY] = db().then((d) => new PushStore(d));
   return g[KEY];
 }

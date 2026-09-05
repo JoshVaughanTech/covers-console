@@ -61,8 +61,8 @@ export async function pushOffer(
     return { delivered: 0, pruned: 0, failed: 0, attempted: false };
   }
 
-  const store = pushStore();
-  const subs = dids.flatMap((did) => store.forWorker(orgId, did));
+  const store = await pushStore();
+  const subs = (await Promise.all(dids.map((did) => store.forWorker(orgId, did)))).flat();
   if (subs.length === 0) return { delivered: 0, pruned: 0, failed: 0, attempted: true };
 
   /* What the service worker renders. Deliberately thin: enough to decide
@@ -84,7 +84,7 @@ export async function pushOffer(
     if (r.ok) delivered++;
     else if (r.gone) {
       // the attempt is the only way to learn this, so it is also the cleanup
-      store.remove(orgId, r.endpoint);
+      await store.remove(orgId, r.endpoint);
       pruned++;
     } else failed++;
   }

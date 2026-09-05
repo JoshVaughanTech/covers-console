@@ -33,7 +33,7 @@ const FRI = 17;
 
 describe("the published pay guide regenerates from the stored model", () => {
   /* Full-time & part-time, Table 1 of 3 — "Hourly pay rate" column. */
-  it("matches the printed permanent hourly rates", () => {
+  it("matches the printed permanent hourly rates", async () => {
     const printed: [Level, string][] = [
       ["introductory", "$25.74"],
       [1, "$26.44"],
@@ -51,7 +51,7 @@ describe("the published pay guide regenerates from the stored model", () => {
   });
 
   /* The weekly rates in clause 18 Table 3, ÷ 38, as the guide prints them. */
-  it("derives the hourly rate from the printed weekly rate", () => {
+  it("derives the hourly rate from the printed weekly rate", async () => {
     const weekly: [Level, number][] = [
       ["introductory", 978.1],
       [1, 1004.9],
@@ -67,7 +67,7 @@ describe("the published pay guide regenerates from the stored model", () => {
   });
 
   /* Casual, Table 1 of 2 — "Hourly pay rate", "Saturday", "Sunday" columns. */
-  it("matches the printed casual weekday, Saturday and Sunday rates", () => {
+  it("matches the printed casual weekday, Saturday and Sunday rates", async () => {
     const printed: [Level, string, string, string][] = [
       ["introductory", "$32.18", "$38.61", "$45.05"],
       [1, "$33.05", "$39.66", "$46.27"],
@@ -82,7 +82,7 @@ describe("the published pay guide regenerates from the stored model", () => {
   });
 
   /* Permanent Table 2 of 3, and casual Table 2 of 2 — public holiday columns. */
-  it("matches the printed Sunday and public holiday rates", () => {
+  it("matches the printed Sunday and public holiday rates", async () => {
     expect(fmtAud(floorHourly("introductory", "full_time", "saturday"))).toBe("$32.18");
     expect(fmtAud(floorHourly("introductory", "full_time", "sunday"))).toBe("$38.61");
     expect(fmtAud(floorHourly("introductory", "full_time", "public_holiday"))).toBe("$57.92");
@@ -90,14 +90,14 @@ describe("the published pay guide regenerates from the stored model", () => {
     expect(fmtAud(floorHourly(2, "casual", "public_holiday"))).toBe("$67.70");
   });
 
-  it("rounds the half-cent cells the way the guide prints them", () => {
+  it("rounds the half-cent cells the way the guide prints them", async () => {
     // 2574 × 1.25 = 3217.5 and the guide says $32.18, not $32.17
     expect(floorHourly("introductory", "casual")).toBe(3218);
     // 3213 × 1.5 = 4819.5 and the guide says $48.20
     expect(floorHourly(6, "casual", "saturday")).toBe(4820);
   });
 
-  it("refuses a classification it has no rate for", () => {
+  it("refuses a classification it has no rate for", async () => {
     expect(() => floorHourly(9 as Level, "casual")).toThrow(/classification/);
   });
 });
@@ -107,7 +107,7 @@ describe("a shift is priced hour by hour, not as one rate", () => {
      Three bands — ordinary, evening, then Saturday after midnight. */
   const fridayNight = { level: 2 as Level, employment: "casual" as const, start: aest(FRI, 17), end: aest(FRI + 1, 1) };
 
-  it("splits at 19:00 and at midnight", () => {
+  it("splits at 19:00 and at midnight", async () => {
     const p = priceShift(fridayNight);
     expect(p.segments.map((s) => [s.band, s.adder, s.seconds / 3600])).toEqual([
       ["ordinary", null, 2],
@@ -116,7 +116,7 @@ describe("a shift is priced hour by hour, not as one rate", () => {
     ]);
   });
 
-  it("prices each band at its own rate", () => {
+  it("prices each band at its own rate", async () => {
     const p = priceShift(fridayNight);
     expect(p.segments.map((s) => fmtAud(s.effectiveHourlyCents))).toEqual(["$33.85", "$36.80", "$40.62"]);
     expect(fmtAud(p.floorCents)).toBe("$292.32");
@@ -124,14 +124,14 @@ describe("a shift is priced hour by hour, not as one rate", () => {
     expect(fmtAud(p.minimumFlatHourlyCents)).toBe("$40.62");
   });
 
-  it("charges no night loading on Saturday morning", () => {
+  it("charges no night loading on Saturday morning", async () => {
     // the guide's night column is headed "Monday to Friday"; 00:00–01:00 on a
     // Saturday is Saturday-rated and attracts no adder
     const p = priceShift(fridayNight);
     expect(p.segments[2]).toMatchObject({ band: "saturday", adder: null, adderCents: 0 });
   });
 
-  it("charges the night loading when the hours really are a weekday night", () => {
+  it("charges the night loading when the hours really are a weekday night", async () => {
     // Tuesday 04:00–06:00
     const p = priceShift({ level: 2, employment: "casual", start: aest(21, 4), end: aest(21, 6) });
     expect(p.segments).toHaveLength(1);
@@ -139,21 +139,21 @@ describe("a shift is priced hour by hour, not as one rate", () => {
     expect(fmtAud(p.segments[0].effectiveHourlyCents)).toBe("$38.27"); // $33.85 + $4.42
   });
 
-  it("charges a part of an hour as a whole hour of loading", () => {
+  it("charges a part of an hour as a whole hour of loading", async () => {
     // 19:00–20:10 is one hour and ten minutes of evening: two adders, not 1.17
     const p = priceShift({ level: 2, employment: "casual", start: aest(FRI, 19), end: aest(FRI, 20, 10) });
     expect(p.segments[0].adderHours).toBe(2);
     expect(p.segments[0].adderCents).toBe(590);
   });
 
-  it("takes the unpaid meal break off the paid hours", () => {
+  it("takes the unpaid meal break off the paid hours", async () => {
     const p = priceShift({ ...fridayNight, unpaidBreakSec: 30 * 60 });
     expect(p.paidSeconds).toBe(7.5 * 3600);
     expect(p.unpaidSeconds).toBe(1800);
     expect(fmtAud(p.floorCents)).toBe("$272.01"); // the last half-hour, at the Saturday rate
   });
 
-  it("keeps every band the shift spans, break or no break", () => {
+  it("keeps every band the shift spans, break or no break", async () => {
     /* The break comes out of the money, never out of the bands. It is the
        difference between a shift that is priced short and a shift whose
        Saturday hours stop existing — and the second is a hole in the gate,
@@ -164,26 +164,26 @@ describe("a shift is priced hour by hour, not as one rate", () => {
     expect(fmtAud(p.minimumFlatHourlyCents)).toBe("$40.62");
   });
 
-  it("prices a Sunday brunch as Sunday throughout", () => {
+  it("prices a Sunday brunch as Sunday throughout", async () => {
     const p = priceShift({ level: 2, employment: "casual", start: aest(19, 7), end: aest(19, 14) });
     expect(p.segments).toHaveLength(1);
     expect(p.segments[0].band).toBe("sunday");
     expect(fmtAud(p.floorCents)).toBe("$331.73"); // 7h × $47.39
   });
 
-  it("refuses a shift that does not go forwards", () => {
+  it("refuses a shift that does not go forwards", async () => {
     expect(() => priceShift({ level: 2, employment: "casual", start: aest(FRI, 17), end: aest(FRI, 17) })).toThrow();
   });
 });
 
 describe("public holidays are checked only when a calendar is supplied", () => {
-  it("says so when none was given", () => {
+  it("says so when none was given", async () => {
     const p = priceShift({ level: 2, employment: "casual", start: aest(FRI, 10), end: aest(FRI, 14) });
     expect(p.publicHolidaysChecked).toBe(false);
     expect(p.segments[0].band).toBe("ordinary");
   });
 
-  it("prices the day at the public holiday rate when it is one", () => {
+  it("prices the day at the public holiday rate when it is one", async () => {
     const p = priceShift({
       level: 2,
       employment: "casual",
@@ -196,7 +196,7 @@ describe("public holidays are checked only when a calendar is supplied", () => {
     expect(fmtAud(p.segments[0].effectiveHourlyCents)).toBe("$67.70");
   });
 
-  it("drops the evening loading on a public holiday", () => {
+  it("drops the evening loading on a public holiday", async () => {
     // the evening column is a Monday-to-Friday ORDINARY-hours loading; the
     // public holiday rate is not an ordinary rate and does not stack with it
     const p = priceShift({
@@ -214,7 +214,7 @@ describe("an offer is tested against every hour, not the average", () => {
   const fridayNight = { level: 2 as Level, employment: "casual" as const, start: aest(FRI, 17), end: aest(FRI + 1, 1) };
 
   /* The bug this whole module is shaped around. */
-  it("refuses a flat rate that beats the average but underpays an hour", () => {
+  it("refuses a flat rate that beats the average but underpays an hour", async () => {
     const a = assessOffer(3700, fridayNight); // $37.00/h
 
     expect(a.atOrAboveFloor).toBe(false);
@@ -231,7 +231,7 @@ describe("an offer is tested against every hour, not the average", () => {
     expect(a.summary).toContain("Saturday");
   });
 
-  it("accepts a rate that clears the dearest hour", () => {
+  it("accepts a rate that clears the dearest hour", async () => {
     const a = assessOffer(4150, fridayNight); // $41.50/h
     expect(a.atOrAboveFloor).toBe(true);
     expect(a.shortSegments).toEqual([]);
@@ -240,14 +240,14 @@ describe("an offer is tested against every hour, not the average", () => {
     expect(a.summary).toContain("clears the award floor");
   });
 
-  it("accepts a rate sitting exactly on the floor", () => {
+  it("accepts a rate sitting exactly on the floor", async () => {
     const a = assessOffer(4062, fridayNight);
     expect(a.atOrAboveFloor).toBe(true);
     expect(a.marginHourlyCents).toBe(0);
     expect(a.summary).toContain("exactly at the floor");
   });
 
-  it("still sees the Saturday hours when the break would have eaten them", () => {
+  it("still sees the Saturday hours when the break would have eaten them", async () => {
     /* The bug this guards. 17:00–00:20 with a 30-minute unpaid break: deduct
        the break from the end first and the 20-minute Saturday run vanishes,
        the dearest rate on file becomes the $36.80 evening one, and $37.00/h
@@ -265,26 +265,26 @@ describe("an offer is tested against every hour, not the average", () => {
     expect(fmtAud(a.requiredHourlyCents)).toBe("$40.62");
   });
 
-  it("names every period an offer is short of, dearest first", () => {
+  it("names every period an offer is short of, dearest first", async () => {
     const a = assessOffer(3400, fridayNight); // clears only the 17:00–19:00 hours
     expect(a.shortSegments.map((s) => s.band)).toEqual(["saturday", "ordinary"]);
   });
 });
 
 describe("the rate table knows what it can price", () => {
-  it("covers dates from its effective date", () => {
+  it("covers dates from its effective date", async () => {
     expect(covers(HIGA_RATES_2026, "2026-06-30")).toBe(false);
     expect(covers(HIGA_RATES_2026, "2026-07-01")).toBe(true);
     expect(covers(HIGA_RATES_2026, "2027-05-01")).toBe(true);
   });
 
-  it("stops covering dates once superseded", () => {
+  it("stops covering dates once superseded", async () => {
     const old = { ...HIGA_RATES_2026, supersededFrom: "2027-07-01" };
     expect(covers(old, "2027-06-30")).toBe(true);
     expect(covers(old, "2027-07-01")).toBe(false);
   });
 
-  it("refuses to price a shift outside the table rather than extrapolating", () => {
+  it("refuses to price a shift outside the table rather than extrapolating", async () => {
     // June 2026 is last year's floor; answering with this table would report a
     // number that is confidently wrong in the direction of underpaying
     expect(() =>
@@ -292,7 +292,7 @@ describe("the rate table knows what it can price", () => {
     ).toThrow(RateTableRangeError);
   });
 
-  it("explains itself when it refuses", () => {
+  it("explains itself when it refuses", async () => {
     try {
       priceShift({ level: 2, employment: "casual", start: Math.floor(Date.UTC(2026, 5, 20, 2) / 1000), end: Math.floor(Date.UTC(2026, 5, 20, 8) / 1000) });
       expect.unreachable();
@@ -304,14 +304,14 @@ describe("the rate table knows what it can price", () => {
 });
 
 describe("classification is suggested, never assumed", () => {
-  it("suggests a level for roles it recognises", () => {
+  it("suggests a level for roles it recognises", async () => {
     expect(suggestedLevel("Bartender")).toBe(2);
     expect(suggestedLevel("Barback")).toBe(1);
     expect(suggestedLevel("Head Chef")).toBe(5);
     expect(suggestedLevel("Duty Manager")).toBe(5);
   });
 
-  it("returns null rather than guessing", () => {
+  it("returns null rather than guessing", async () => {
     // a wrong default is indistinguishable from a confirmed one downstream
     expect(suggestedLevel("Sommelier")).toBeNull();
     expect(suggestedLevel("")).toBeNull();
@@ -319,7 +319,7 @@ describe("classification is suggested, never assumed", () => {
 });
 
 describe("money formatting", () => {
-  it("pads the cents and keeps the sign", () => {
+  it("pads the cents and keeps the sign", async () => {
     expect(fmtAud(3385)).toBe("$33.85");
     expect(fmtAud(3400)).toBe("$34.00");
     expect(fmtAud(5)).toBe("$0.05");

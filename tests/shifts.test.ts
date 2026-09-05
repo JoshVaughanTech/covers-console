@@ -62,56 +62,56 @@ const run = (shifts: ShiftAssignment[], credentials: Credential[] = [], site: Si
   });
 
 describe("decideMember — one week, several shifts", () => {
-  it("blocks the week when a single shift demands something they lack", () => {
+  it("blocks the week when a single shift demands something they lack", async () => {
     const d = run([bar("Mon"), bar("Tue"), bar("Wed"), bar("Thu"), gaming("Sat")]);
     expect(d.allowed).toBe(false);
     expect(d.reasons[0].outcome).toBe("fail");
   });
 
-  it("names the offending shift rather than just failing", () => {
+  it("names the offending shift rather than just failing", async () => {
     const d = run([bar("Mon"), bar("Tue"), gaming("Sat")]);
     expect(d.reasons[0].shifts).toEqual(["Sat"]);
     expect(d.reasons[0].detail).toContain("(Sat)");
   });
 
-  it("keeps the shifts in roster order when several are implicated", () => {
+  it("keeps the shifts in roster order when several are implicated", async () => {
     const d = run([gaming("Tue"), bar("Wed"), gaming("Sat")]);
     expect(d.reasons[0].shifts).toEqual(["Tue", "Sat"]);
   });
 
-  it("does not annotate a reason that applies to every shift", () => {
+  it("does not annotate a reason that applies to every shift", async () => {
     const d = run([gaming("Fri"), gaming("Sat")]);
     expect(d.reasons[0].outcome).toBe("fail");
     expect(d.reasons[0].shifts).toBeUndefined();
     expect(d.reasons[0].detail).not.toContain("(");
   });
 
-  it("passes the whole week once the credential is held", () => {
+  it("passes the whole week once the credential is held", async () => {
     const d = run([bar("Mon"), gaming("Sat")], [cred("rsg")]);
     expect(d.allowed).toBe(true);
   });
 
-  it("is unaffected by shifts that demand nothing extra", () => {
+  it("is unaffected by shifts that demand nothing extra", async () => {
     const onlyBar = run([bar("Mon"), bar("Tue"), bar("Wed")]);
     expect(onlyBar.allowed).toBe(true);
     expect(onlyBar.reasons[0].outcome).toBe("n/a");
   });
 
-  it("falls back to the job title for shifts with no duties of their own", () => {
+  it("falls back to the job title for shifts with no duties of their own", async () => {
     // a Bartender's title carries no gaming duty
     const d = run([{ id: "Mon" }, { id: "Tue" }]);
     expect(d.allowed).toBe(true);
     expect(d.reasons[0].outcome).toBe("n/a");
   });
 
-  it("treats a title-based shift as distinct from an explicit duty set", () => {
+  it("treats a title-based shift as distinct from an explicit duty set", async () => {
     // "Mon" uses the title (no gaming); "Sat" explicitly adds it
     const d = run([{ id: "Mon" }, gaming("Sat")]);
     expect(d.allowed).toBe(false);
     expect(d.reasons[0].shifts).toEqual(["Sat"]);
   });
 
-  it("behaves exactly like a single decision when no shifts are given", () => {
+  it("behaves exactly like a single decision when no shifts are given", async () => {
     const noShifts = decideMember({
       person: bartender,
       credentials: [],
@@ -124,7 +124,7 @@ describe("decideMember — one week, several shifts", () => {
     expect(noShifts.reasons[0].shifts).toBeUndefined();
   });
 
-  it("keeps the worst outcome when shifts disagree", () => {
+  it("keeps the worst outcome when shifts disagree", async () => {
     const site: Site = {
       ...venue,
       requires: [{ type: "first_aid" }], // binds to every shift
@@ -136,7 +136,7 @@ describe("decideMember — one week, several shifts", () => {
     expect(d.reasons[0].shifts).toBeUndefined();
   });
 
-  it("counts warnings once per requirement, not once per shift", () => {
+  it("counts warnings once per requirement, not once per shift", async () => {
     const site: Site = { ...venue, requires: [{ type: "first_aid" }] };
     const many = run(
       [bar("Mon"), bar("Tue"), bar("Wed"), gaming("Sat")],
@@ -146,14 +146,14 @@ describe("decideMember — one week, several shifts", () => {
     expect(many.warnings).toBe(1);
   });
 
-  it("reports one reason per requirement however many shifts there are", () => {
+  it("reports one reason per requirement however many shifts there are", async () => {
     const d = run([bar("Mon"), bar("Tue"), bar("Wed"), gaming("Sat")]);
     expect(d.reasons).toHaveLength(venue.requires.length);
   });
 });
 
 describe("decideRoster — per-shift duties inside a roster", () => {
-  it("blocks the person whose Saturday is the problem, not their colleague", () => {
+  it("blocks the person whose Saturday is the problem, not their colleague", async () => {
     const other: Identity = { ...bartender, did: "did:web:idara.app:w:other", name: "Other" };
     const r = decideRoster({
       roster: [

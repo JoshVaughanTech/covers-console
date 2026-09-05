@@ -35,7 +35,7 @@ describe("every shift counted actually opens", () => {
   /* The guard that makes the number safe to act on. For each unlock and each
      posting it names, the gate is asked directly: blocked now, and clear with
      the credential. Nothing here trusts unlocksFor's own arithmetic. */
-  it("is blocked before and claimable after, for every posting named", () => {
+  it("is blocked before and claimable after, for every posting named", async () => {
     for (const name of WORKERS.map((w) => w.name)) {
       const person = worker(name);
       const credentials = credsOf(person.did);
@@ -76,7 +76,7 @@ describe("every shift counted actually opens", () => {
 });
 
 describe("what it does not count", () => {
-  it("says nothing when every shift is already open to them", () => {
+  it("says nothing when every shift is already open to them", async () => {
     // somebody fully credentialled has nothing to go and get
     const person = worker("Darie Roberts");
     const open = POSTINGS.filter(
@@ -90,7 +90,7 @@ describe("what it does not count", () => {
     expect(unlocks).toEqual([]);
   });
 
-  it("ignores drafts and filled shifts", () => {
+  it("ignores drafts and filled shifts", async () => {
     /* A certificate does not get you onto a shift nobody is offering, and it
        does not get you a seat that is taken. Counting either inflates the
        number in the direction that costs the worker a course fee. */
@@ -102,7 +102,7 @@ describe("what it does not count", () => {
     expect(run("Michael Tan", { postings: filled })).toEqual([]);
   });
 
-  it("does not offer a credential they already hold, current and in scope", () => {
+  it("does not offer a credential they already hold, current and in scope", async () => {
     for (const name of WORKERS.map((w) => w.name)) {
       const valid = credsOf(worker(name).did).filter((c) => verifier.verify(c, TODAY).status === "valid");
       for (const u of run(name)) {
@@ -114,7 +114,7 @@ describe("what it does not count", () => {
     }
   });
 
-  it("still offers a site induction for a venue they are NOT inducted at", () => {
+  it("still offers a site induction for a venue they are NOT inducted at", async () => {
     /* The bug this replaced. Darie holds inductions at several venues, so
        keying "already held" on the type alone marked site_induction as held
        and skipped it — and the one venue he is actually blocked at vanished
@@ -147,7 +147,7 @@ describe("a lapsed credential is a renewal, not a silence", () => {
     expect(rsa!.postingIds.length).toBeGreaterThan(0);
   });
 
-  it("gives the seeded revoked-RSA worker something to act on", () => {
+  it("gives the seeded revoked-RSA worker something to act on", async () => {
     // Michael Tan's RSA is revoked in the seed; the board has work he could
     // take with it back, and saying nothing is the one useless answer
     const rsa = run("Michael Tan").find((u) => u.type === "rsa");
@@ -157,7 +157,7 @@ describe("a lapsed credential is a renewal, not a silence", () => {
 });
 
 describe("site-scoped credentials are one row per venue", () => {
-  it("never merges two venues into one instruction", () => {
+  it("never merges two venues into one instruction", async () => {
     /* "Induction · unlocks 2 shifts" reads as one errand. An induction at
        Brightwater does nothing for a shift at Werribee, so the merged row is
        an instruction that cannot be followed. */
@@ -174,13 +174,13 @@ describe("site-scoped credentials are one row per venue", () => {
     }
   });
 
-  it("gives the un-inducted worker a row per venue rather than one merged row", () => {
+  it("gives the un-inducted worker a row per venue rather than one merged row", async () => {
     const liam = run("Liam O'Brien").filter((u) => u.type === "site_induction");
     expect(liam.length).toBeGreaterThan(1);
     expect(new Set(liam.map((u) => u.siteId)).size).toBe(liam.length);
   });
 
-  it("leaves a portable credential without a venue", () => {
+  it("leaves a portable credential without a venue", async () => {
     const hassan = run("Hassan Ali").find((u) => u.type === "rsa");
     expect(hassan).toBeDefined();
     expect(hassan!.siteScoped).toBe(false);
@@ -224,13 +224,13 @@ describe("never tells someone to buy a credential they already hold", () => {
     };
   };
 
-  it("offers no RSA to someone holding a current one, whatever the gate says", () => {
+  it("offers no RSA to someone holding a current one, whatever the gate says", async () => {
     const { person, credentials } = shape();
     const unlocks = unlocksFor({ person, credentials, postings: POSTINGS, siteOf, at: TODAY, verifier });
     expect(unlocks.some((u) => u.type === "rsa")).toBe(false);
   });
 
-  it("still offers the things they genuinely lack", () => {
+  it("still offers the things they genuinely lack", async () => {
     // the guard must not become "say nothing when anything is ambiguous"
     const { person, credentials } = shape();
     const unlocks = unlocksFor({ person, credentials, postings: POSTINGS, siteOf, at: TODAY, verifier });
@@ -251,7 +251,7 @@ describe("a shift needing two missing credentials is claimed by neither", () => 
      counterfactual, and it is the safe direction to be wrong in — the
      alternative sends somebody to pay for a course that changes nothing.
      If combinations are ever enumerated, this test is what should fail. */
-  it("does not offer the induction that would only half-unlock Aaron's shifts", () => {
+  it("does not offer the induction that would only half-unlock Aaron's shifts", async () => {
     const person = worker("Aaron Patel");
     const credentials = credsOf(person.did);
     const docklands = POSTINGS.find((p) => p.id === "sp-2038-wait")!;
@@ -279,14 +279,14 @@ describe("a shift needing two missing credentials is claimed by neither", () => 
 });
 
 describe("how it reads", () => {
-  it("puts the credential that opens the most shifts first", () => {
+  it("puts the credential that opens the most shifts first", async () => {
     for (const name of WORKERS.map((w) => w.name)) {
       const counts = run(name).map((u) => u.postingIds.length);
       expect([...counts].sort((a, b) => b - a)).toEqual(counts);
     }
   });
 
-  it("carries the label and issuer, so the row can say who to ask", () => {
+  it("carries the label and issuer, so the row can say who to ask", async () => {
     const person = worker("Michael Tan");
     const lapsed = credsOf(person.did).map((c) =>
       c.type === "rsa" ? { ...c, status: "revoked" as const } : c,
@@ -299,7 +299,7 @@ describe("how it reads", () => {
     expect(typeof first.siteScoped).toBe("boolean");
   });
 
-  it("never returns an unlock with no shifts behind it", () => {
+  it("never returns an unlock with no shifts behind it", async () => {
     for (const name of WORKERS.map((w) => w.name)) {
       for (const u of run(name)) expect(u.postingIds.length).toBeGreaterThan(0);
     }

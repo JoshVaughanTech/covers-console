@@ -34,7 +34,7 @@ const event = (over: Partial<AuditEvent> & Pick<AuditEvent, "type">): AuditEvent
   }) as AuditEvent;
 
 describe("withdrawing a claim", () => {
-  it("removes it from the posting", () => {
+  it("removes it from the posting", async () => {
     const claimed = claimShift(posting(), DID, "2024-05-16", null);
     expect(claimed.ok).toBe(true);
     if (!claimed.ok) return;
@@ -47,7 +47,7 @@ describe("withdrawing a claim", () => {
     expect(r.posting.claims).toHaveLength(0);
   });
 
-  it("leaves everybody else's claims alone", () => {
+  it("leaves everybody else's claims alone", async () => {
     const p = posting({ claims: [{ did: OTHER, at: "2024-05-15" }, { did: DID, at: "2024-05-16" }] });
     const r = withdrawClaim(p, DID);
     expect(r.ok).toBe(true);
@@ -55,7 +55,7 @@ describe("withdrawing a claim", () => {
     expect(r.posting.claims.map((c) => c.did)).toEqual([OTHER]);
   });
 
-  it("keeps a manager's refusal, which is their record and not the worker's", () => {
+  it("keeps a manager's refusal, which is their record and not the worker's", async () => {
     /* declineClaim() marks; this removes. The difference is whose record it
        is — a refusal is a decision somebody has to answer for. */
     const p = declineClaim(posting({ claims: [{ did: DID, at: "2024-05-16" }] }), DID, "Not needed");
@@ -65,14 +65,14 @@ describe("withdrawing a claim", () => {
     expect(r.kind).toBe("none");
   });
 
-  it("refuses when there is nothing to withdraw", () => {
+  it("refuses when there is nothing to withdraw", async () => {
     const r = withdrawClaim(posting(), DID);
     expect(r.ok).toBe(false);
     if (r.ok) return;
     expect(r.kind).toBe("none");
   });
 
-  it("refuses once they are rostered", () => {
+  it("refuses once they are rostered", async () => {
     // dropping an assigned shift leaves a venue short — a conversation, not a
     // button, and the refusal says so rather than failing silently
     const p = posting({ assigned: [DID], claims: [{ did: DID, at: "2024-05-16" }] });
@@ -83,7 +83,7 @@ describe("withdrawing a claim", () => {
     expect(r.reason).toMatch(/talk to the venue/i);
   });
 
-  it("lets them claim again afterwards", () => {
+  it("lets them claim again afterwards", async () => {
     // the whole point: a claim you cannot take back is one you hesitate to make
     const claimed = claimShift(posting(), DID, "2024-05-16", null);
     if (!claimed.ok) throw new Error("setup");
@@ -95,12 +95,12 @@ describe("withdrawing a claim", () => {
 });
 
 describe("a withdrawal survives a reload", () => {
-  it("is recognised as a shift event at all", () => {
+  it("is recognised as a shift event at all", async () => {
     // if the filter drops it, the fold never sees it and the claim comes back
     expect(isShiftEvent(event({ type: "shift.withdrawn" }))).toBe(true);
   });
 
-  it("folds back over the claim above it", () => {
+  it("folds back over the claim above it", async () => {
     const log = [
       event({ type: "shift.claimed", seq: 0 }),
       event({ type: "shift.withdrawn", seq: 1 }),
@@ -109,7 +109,7 @@ describe("a withdrawal survives a reload", () => {
     expect(p.claims).toHaveLength(0);
   });
 
-  it("does not resurrect the claim when replayed twice", () => {
+  it("does not resurrect the claim when replayed twice", async () => {
     const log = [
       event({ type: "shift.claimed", seq: 0 }),
       event({ type: "shift.withdrawn", seq: 1 }),
@@ -119,7 +119,7 @@ describe("a withdrawal survives a reload", () => {
     expect(twice[0].claims).toHaveLength(0);
   });
 
-  it("keeps a claim made after the withdrawal", () => {
+  it("keeps a claim made after the withdrawal", async () => {
     // claim, withdraw, change your mind — the order is the whole answer
     const log = [
       event({ type: "shift.claimed", seq: 0, at: "2024-05-16T10:00:00.000Z" }),
@@ -131,7 +131,7 @@ describe("a withdrawal survives a reload", () => {
     expect(p.claims[0].at).toBe("2024-05-16T12:00:00.000Z");
   });
 
-  it("withdraws only the person who withdrew", () => {
+  it("withdraws only the person who withdrew", async () => {
     const log = [
       event({ type: "shift.claimed", seq: 0, subject: OTHER, actorDid: OTHER }),
       event({ type: "shift.claimed", seq: 1 }),
@@ -141,7 +141,7 @@ describe("a withdrawal survives a reload", () => {
     expect(p.claims.map((c) => c.did)).toEqual([OTHER]);
   });
 
-  it("leaves an assignment alone", () => {
+  it("leaves an assignment alone", async () => {
     /* Somebody assigned and then withdrawing is refused by withdrawClaim(),
        but the fold must not quietly undo an assignment if such an event ever
        reaches it — the roster is the thing a venue staffs from. */

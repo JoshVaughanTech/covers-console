@@ -22,7 +22,10 @@ import { COOKIE } from "../lib/auth/cookie";
    here that proves anything is a file on the server.
    ============================================================ */
 
-process.env.COVERS_DB = ":memory:";
+/* No database to point at any more: with no DATABASE_URL the store opens an
+   in-process Postgres, and vitest gives each test FILE its own worker, so
+   these routes get a database nobody else is writing to. Cases within one
+   file do share it — the ones that care set their own org or clientRef. */
 process.env.COVERS_ORG = "org-test";
 
 let request: typeof import("../app/api/auth/console/request/route");
@@ -184,14 +187,12 @@ describe("being signed in", () => {
     const op = anOperator();
     await signInOperator(op.did, op.name);
 
-    const e = store
-      .eventStore()
-      .all("org-test")
+    const e = (await (await (await store.eventStore()).all("org-test")))
       .filter((x) => x.type === "auth.signed_in" && x.data.via === "console")
       .at(-1)!;
     expect(e.actorDid).toBe(op.did);
     expect(e.summary).toMatch(/signed in to the console/);
-    expect(store.eventStore().verify("org-test").ok).toBe(true);
+    expect((await (await store.eventStore()).verify("org-test")).ok).toBe(true);
   });
 });
 
@@ -210,7 +211,7 @@ describe("what the chain says a code was issued by", () => {
     );
     expect(res.status).toBe(200);
 
-    const e = store.eventStore().all("org-test").filter((x) => x.type === "auth.code_issued").at(-1)!;
+    const e = (await (await store.eventStore()).all("org-test")).filter((x) => x.type === "auth.code_issued").at(-1)!;
     /* Until console sign-in existed this said CONSOLE_OPERATOR whoever was
        calling — a name that proved nothing, and the screen said so. */
     expect(e.actor).toBe(op.name);
@@ -356,7 +357,7 @@ describe("every sign-in has a cause before it", () => {
      added later would reproduce it exactly. */
 
   it("records who caused it, however the code was obtained", async () => {
-    const before = store.eventStore().all("org-test").length;
+    const before = (await (await store.eventStore()).all("org-test")).length;
 
     // a worker asking for their own
     const w = aWorker();
@@ -369,7 +370,7 @@ describe("every sign-in has a cause before it", () => {
     const op = anOperator();
     await signInOperator(op.did, op.name);
 
-    const fresh = store.eventStore().all("org-test").slice(before);
+    const fresh = (await (await store.eventStore()).all("org-test")).slice(before);
     const issued = fresh.filter((e) => e.type === "auth.code_issued");
     const signedIn = fresh.filter((e) => e.type === "auth.signed_in");
 
@@ -392,7 +393,7 @@ describe("every sign-in has a cause before it", () => {
     await workerRequest.POST(json("http://x/api/auth/request", { did: w.did }));
     const code = codeFromFile(w.name);
 
-    const serialised = JSON.stringify(store.eventStore().all("org-test"));
+    const serialised = JSON.stringify((await (await store.eventStore()).all("org-test")));
     /* The audit screen is readable by every operator, so a code in the chain
        would be a credential published to the surface it protects. */
     expect(serialised).not.toContain(code.replace("-", ""));
@@ -402,11 +403,11 @@ describe("every sign-in has a cause before it", () => {
   it("records one cause per grant, however often a phone retries", async () => {
     const w = aWorker();
     await workerRequest.POST(json("http://x/api/auth/request", { did: w.did }));
-    const after = store.eventStore().all("org-test").filter((e) => e.type === "auth.code_issued").length;
+    const after = (await (await store.eventStore()).all("org-test")).filter((e) => e.type === "auth.code_issued").length;
 
     // the same grant, re-announced: a flaky connection must not double the log
     await workerRequest.POST(json("http://x/api/auth/request", { did: w.did }));
-    const grants = store.eventStore().all("org-test").filter((e) => e.type === "auth.code_issued");
+    const grants = (await (await store.eventStore()).all("org-test")).filter((e) => e.type === "auth.code_issued");
     // a second request mints a NEW grant, so this is 1 more, not 0 and not 2
     expect(grants.length).toBe(after + 1);
     expect(new Set(grants.map((g) => g.data.grantId)).size).toBe(grants.length);

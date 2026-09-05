@@ -18,9 +18,6 @@
    that grants exist and when they expire, which is what a support
    conversation needs anyway.
    ============================================================ */
-import { DatabaseSync } from "node:sqlite";
-import { mkdirSync } from "node:fs";
-import { dirname } from "node:path";
 import {
   MAX_ATTEMPTS,
   digestEquals,
@@ -30,35 +27,36 @@ import {
   normaliseCode,
   type MintedToken,
 } from "@/lib/auth/token";
+import { db, type Db } from "./db";
 
 const DDL = `
 CREATE TABLE IF NOT EXISTS signin_grant (
   id          TEXT PRIMARY KEY,
-  did         TEXT    NOT NULL,
-  token_hash  TEXT    NOT NULL,
-  code_hash   TEXT    NOT NULL,
-  issued_at   INTEGER NOT NULL,
-  expires_at  INTEGER NOT NULL,
+  did         TEXT   NOT NULL,
+  token_hash  TEXT   NOT NULL,
+  code_hash   TEXT   NOT NULL,
+  issued_at   BIGINT NOT NULL,
+  expires_at  BIGINT NOT NULL,
   attempts    INTEGER NOT NULL DEFAULT 0,
   -- what the resulting session is for. Never inferred at the point of use.
-  kind        TEXT    NOT NULL DEFAULT 'worker',
+  kind        TEXT   NOT NULL DEFAULT 'worker',
   -- set the moment it is spent, so a second redemption of the same grant
   -- is refused by a fact rather than by the row being gone
-  redeemed_at INTEGER
+  redeemed_at BIGINT
 );
 
 CREATE INDEX IF NOT EXISTS signin_grant_did ON signin_grant (did);
 CREATE INDEX IF NOT EXISTS signin_grant_code ON signin_grant (code_hash);
 
 CREATE TABLE IF NOT EXISTS session (
-  id          TEXT PRIMARY KEY,
-  did         TEXT    NOT NULL,
-  secret_hash TEXT    NOT NULL UNIQUE,
-  issued_at   INTEGER NOT NULL,
-  expires_at  INTEGER NOT NULL,
-  last_seen   INTEGER NOT NULL,
-  revoked_at  INTEGER,
-  kind        TEXT    NOT NULL DEFAULT 'worker'
+  id          TEXT   PRIMARY KEY,
+  did         TEXT   NOT NULL,
+  secret_hash TEXT   NOT NULL UNIQUE,
+  issued_at   BIGINT NOT NULL,
+  expires_at  BIGINT NOT NULL,
+  last_seen   BIGINT NOT NULL,
+  revoked_at  BIGINT,
+  kind        TEXT   NOT NULL DEFAULT 'worker'
 );
 
 CREATE INDEX IF NOT EXISTS session_did ON session (did);
@@ -67,11 +65,20 @@ CREATE INDEX IF NOT EXISTS session_did ON session (did);
 -- binds once a guess has found a real grant; this is what stops someone
 -- walking the code space without ever consuming anyone.
 CREATE TABLE IF NOT EXISTS redeem_attempt (
-  bucket TEXT    NOT NULL,
-  at     INTEGER NOT NULL
+  bucket TEXT   NOT NULL,
+  at     BIGINT NOT NULL
 );
 
 CREATE INDEX IF NOT EXISTS redeem_attempt_bucket ON redeem_attempt (bucket, at);
+
+/* Columns added after a database already existed. Postgres has
+   ADD COLUMN IF NOT EXISTS, so this replaces the schema introspection the
+   SQLite version needed — and it defaults to "worker", which is the only
+   safe direction: an existing session predates operators entirely, and
+   defaulting the other way would silently promote every live phone session
+   to console access. */
+ALTER TABLE session ADD COLUMN IF NOT EXISTS kind TEXT NOT NULL DEFAULT 'worker';
+ALTER TABLE signin_grant ADD COLUMN IF NOT EXISTS kind TEXT NOT NULL DEFAULT 'worker';
 `;
 
 /**
@@ -127,22 +134,7 @@ export interface Session {
 
 const now = () => Math.floor(Date.now() / 1000);
 
-/**
- * Throttle window, and how many failures one bucket gets inside it.
- *
- * The bucket is per caller AND per person, not per caller alone. A venue is
- * one IP: bucketing on the address alone means four people fumbling their five
- * attempts locks out everyone behind that NAT, and eight characters read aloud
- * across a bar makes that an ordinary Friday rather than an attack. The people
- * locked out did nothing.
- *
- * The address half is also weaker than it looks — x-forwarded-for is
- * client-supplied unless a trusted proxy overwrites it, so a caller can mint a
- * fresh bucket per request. That is survivable because it is not the control
- * doing the work: redeeming requires the did, and each person has their own
- * five attempts. This is a flood ceiling, documented as one rather than
- * relied on as a gate.
- */
+/** Throttle window, and how many failures one bucket gets inside it. */
 const THROTTLE_WINDOW_SECONDS = 15 * 60;
 const MAX_FAILURES_PER_WINDOW = 20;
 
@@ -158,53 +150,34 @@ const MAX_FAILURES_PER_WINDOW = 20;
 const ISSUE_WINDOW_SECONDS = 15 * 60;
 const MAX_ISSUES_PER_WINDOW = 5;
 
-/**
- * Bring an existing database up to the current schema.
- *
- * CREATE TABLE IF NOT EXISTS says nothing to a table that already exists, so a
- * database written before a column was added never receives it. Added columns
- * default to "worker", which is the safe direction and the only safe one: an
- * existing session predates operators entirely, and defaulting it the other
- * way would silently promote every live phone session to console access.
- */
-function migrate(db: DatabaseSync): void {
-  const cols = (t: string) =>
-    (db.prepare(`PRAGMA table_info(${t})`).all() as { name: string }[]).map((c) => c.name);
+type GrantRow = {
+  id: string; did: string; token_hash: string; code_hash: string;
+  issued_at: string | number; expires_at: string | number;
+  attempts: number; redeemed_at: string | number | null; kind: SessionKind;
+};
 
-  if (!cols("session").includes("kind")) {
-    db.exec("ALTER TABLE session ADD COLUMN kind TEXT NOT NULL DEFAULT 'worker'");
-  }
-  if (!cols("signin_grant").includes("kind")) {
-    db.exec("ALTER TABLE signin_grant ADD COLUMN kind TEXT NOT NULL DEFAULT 'worker'");
-  }
-}
+type SessionRow = {
+  id: string; did: string; secret_hash: string;
+  issued_at: string | number; expires_at: string | number;
+  last_seen: string | number; revoked_at: string | number | null; kind: SessionKind;
+};
+
+/**
+ * BIGINT comes back from node-postgres as a string, because it does not fit a
+ * JS number in general. Every epoch here does fit, but comparing a string to a
+ * number would silently do the wrong thing at some boundary rather than fail,
+ * so every one is converted at the edge instead of trusted.
+ */
+const num = (v: string | number | null): number => (v === null ? 0 : Number(v));
 
 export class AuthStore {
-  private db: DatabaseSync;
+  private ready: Promise<void> | null = null;
 
-  constructor(path: string) {
-    if (path !== ":memory:") mkdirSync(dirname(path), { recursive: true });
-    this.db = new DatabaseSync(path);
-    if (path !== ":memory:") this.db.exec("PRAGMA journal_mode = WAL");
-    /* Two connections now open this file — the event store and the auth
-       store — so a write can meet another write. Without a busy timeout
-       SQLite returns SQLITE_BUSY at once rather than waiting, which would
-       surface as a sign-in or a claim failing under load for no reason a
-       user could act on.
+  constructor(private readonly database: Db) {}
 
-       Five seconds is not a round number picked for looking sensible. Every
-       write here is one INSERT and one UPDATE inside a transaction, so real
-       overlap is sub-millisecond and this is about four orders of magnitude
-       of headroom. The number is chosen for what happens when it is NOT
-       enough: waiting and succeeding beats failing at the six-hour mark,
-       because the cost of a spurious failure is a supervisor who cannot send
-       a break or a casual who cannot claim a shift. The trade is that a
-       genuinely stuck lock now presents as a slow request rather than a fast
-       error, and slow is harder to attribute — but a stuck lock is a bug to
-       find either way, and it should not take a worker down with it. */
-    this.db.exec("PRAGMA busy_timeout = 5000");
-    this.db.exec(DDL);
-    migrate(this.db);
+  private async migrate(): Promise<void> {
+    if (!this.ready) this.ready = this.database.exec(DDL);
+    return this.ready;
   }
 
   /**
@@ -215,29 +188,34 @@ export class AuthStore {
    * they are reading the older of two texts — and it doubles the guessing
    * surface for no benefit.
    */
-  issue(did: string, kind: SessionKind = "worker", at = now()): IssueResult {
-    this.sweep(at);
+  async issue(did: string, kind: SessionKind = "worker", at = now()): Promise<IssueResult> {
+    await this.migrate();
+    await this.sweep(at);
 
     /* Refuse BEFORE spending anything. The order is the whole defence: a
        refusal that had already killed the outstanding grant would be the
        denial of service it exists to prevent, just with a different status
        code. */
-    const { n } = this.db
-      .prepare("SELECT COUNT(*) AS n FROM signin_grant WHERE did = ? AND issued_at >= ?")
-      .get(did, at - ISSUE_WINDOW_SECONDS) as { n: number };
-    if (n >= MAX_ISSUES_PER_WINDOW) return { ok: false, reason: "rate_limited" };
+    const count = await this.database.query<{ n: string }>(
+      "SELECT COUNT(*) AS n FROM signin_grant WHERE did = $1 AND issued_at >= $2",
+      [did, at - ISSUE_WINDOW_SECONDS],
+    );
+    if (Number(count.rows[0].n) >= MAX_ISSUES_PER_WINDOW) {
+      return { ok: false, reason: "rate_limited" };
+    }
 
-    this.db.prepare("UPDATE signin_grant SET redeemed_at = ? WHERE did = ? AND redeemed_at IS NULL")
-      .run(at, did);
+    await this.database.query(
+      "UPDATE signin_grant SET redeemed_at = $1 WHERE did = $2 AND redeemed_at IS NULL",
+      [at, did],
+    );
 
     const minted: MintedToken = mint(at);
     const id = `sg-${hash(minted.tokenHash).slice(0, 16)}`;
-    this.db
-      .prepare(
-        `INSERT INTO signin_grant (id, did, token_hash, code_hash, issued_at, expires_at, kind)
-         VALUES (?,?,?,?,?,?,?)`,
-      )
-      .run(id, did, minted.tokenHash, minted.codeHash, at, minted.expiresAt, kind);
+    await this.database.query(
+      `INSERT INTO signin_grant (id, did, token_hash, code_hash, issued_at, expires_at, kind)
+       VALUES ($1,$2,$3,$4,$5,$6,$7)`,
+      [id, did, minted.tokenHash, minted.codeHash, at, minted.expiresAt, kind],
+    );
 
     return {
       ok: true,
@@ -246,11 +224,13 @@ export class AuthStore {
   }
 
   /** Redeem a link secret. */
-  redeemToken(token: string, at = now()): RedeemResult {
-    const row = this.db
-      .prepare("SELECT * FROM signin_grant WHERE token_hash = ?")
-      .get(hash(token)) as GrantRow | undefined;
-    return this.consume(row, at);
+  async redeemToken(token: string, at = now()): Promise<RedeemResult> {
+    await this.migrate();
+    const r = await this.database.query<GrantRow>(
+      "SELECT * FROM signin_grant WHERE token_hash = $1",
+      [hash(token)],
+    );
+    return this.consume(r.rows[0], at);
   }
 
   /**
@@ -267,15 +247,18 @@ export class AuthStore {
    *
    * The bucket identifies the caller for throttling — an address, normally.
    */
-  redeemCode(did: string, input: string, bucket = "anon", at = now()): RedeemResult {
-    if (this.throttled(bucket, at)) return { ok: false, reason: "too_many_attempts" };
+  async redeemCode(did: string, input: string, bucket = "anon", at = now()): Promise<RedeemResult> {
+    await this.migrate();
+    if (await this.throttled(bucket, at)) return { ok: false, reason: "too_many_attempts" };
 
     const code = normaliseCode(input);
     if (!code) return this.failed(bucket, at, "unknown");
 
-    const row = this.db
-      .prepare("SELECT * FROM signin_grant WHERE did = ? AND redeemed_at IS NULL ORDER BY issued_at DESC")
-      .get(did) as GrantRow | undefined;
+    const r = await this.database.query<GrantRow>(
+      "SELECT * FROM signin_grant WHERE did = $1 AND redeemed_at IS NULL ORDER BY issued_at DESC",
+      [did],
+    );
+    const row = r.rows[0];
 
     /* No grant and a wrong code are one answer to the person in front of us,
        and must be: telling them apart says which names have a code waiting. */
@@ -284,7 +267,7 @@ export class AuthStore {
     // counted before the comparison, so a guess costs a try whatever the
     // outcome — counting only failures leaves unlimited guessing to whoever
     // never succeeds, which is the entire activity
-    this.db.prepare("UPDATE signin_grant SET attempts = attempts + 1 WHERE id = ?").run(row.id);
+    await this.database.query("UPDATE signin_grant SET attempts = attempts + 1 WHERE id = $1", [row.id]);
     if (row.attempts + 1 > MAX_ATTEMPTS) return this.failed(bucket, at, "too_many_attempts");
     if (!digestEquals(row.code_hash, hash(code))) return this.failed(bucket, at, "unknown");
 
@@ -292,92 +275,112 @@ export class AuthStore {
   }
 
   /** Record a failed redemption and return the reason to the caller. */
-  private failed(bucket: string, at: number, reason: "unknown" | "too_many_attempts"): RedeemResult {
-    this.db.prepare("INSERT INTO redeem_attempt (bucket, at) VALUES (?,?)").run(bucket, at);
+  private async failed(
+    bucket: string,
+    at: number,
+    reason: "unknown" | "too_many_attempts",
+  ): Promise<RedeemResult> {
+    await this.database.query("INSERT INTO redeem_attempt (bucket, at) VALUES ($1,$2)", [bucket, at]);
     return { ok: false, reason };
   }
 
   /** Has this caller failed too often lately? */
-  private throttled(bucket: string, at: number): boolean {
-    this.db.prepare("DELETE FROM redeem_attempt WHERE at < ?").run(at - THROTTLE_WINDOW_SECONDS);
-    const { n } = this.db
-      .prepare("SELECT COUNT(*) AS n FROM redeem_attempt WHERE bucket = ? AND at >= ?")
-      .get(bucket, at - THROTTLE_WINDOW_SECONDS) as { n: number };
-    return n >= MAX_FAILURES_PER_WINDOW;
+  private async throttled(bucket: string, at: number): Promise<boolean> {
+    await this.database.query("DELETE FROM redeem_attempt WHERE at < $1", [at - THROTTLE_WINDOW_SECONDS]);
+    const r = await this.database.query<{ n: string }>(
+      "SELECT COUNT(*) AS n FROM redeem_attempt WHERE bucket = $1 AND at >= $2",
+      [bucket, at - THROTTLE_WINDOW_SECONDS],
+    );
+    return Number(r.rows[0].n) >= MAX_FAILURES_PER_WINDOW;
   }
 
-  private consume(row: GrantRow | undefined, at: number): RedeemResult {
+  private async consume(row: GrantRow | undefined, at: number): Promise<RedeemResult> {
     if (!row) return { ok: false, reason: "unknown" };
     if (row.redeemed_at !== null) return { ok: false, reason: "spent" };
-    if (row.expires_at <= at) return { ok: false, reason: "expired" };
+    if (num(row.expires_at) <= at) return { ok: false, reason: "expired" };
     if (row.attempts > MAX_ATTEMPTS) return { ok: false, reason: "too_many_attempts" };
 
     /* Spend it and mint the session in one transaction. Two requests racing
        the same link — the phone's browser prefetching it, say — must produce
-       one session, not two. */
-    this.db.exec("BEGIN IMMEDIATE");
-    try {
-      const spent = this.db
-        .prepare("UPDATE signin_grant SET redeemed_at = ? WHERE id = ? AND redeemed_at IS NULL")
-        .run(at, row.id);
-      if (spent.changes === 0) {
-        this.db.exec("ROLLBACK");
-        return { ok: false, reason: "spent" };
-      }
+       one session, not two.
+
+       The UPDATE's WHERE clause carries the race: only one of them finds
+       redeemed_at still NULL, and the other sees zero rows changed. That is
+       the check, not the read above it, which is why the read being stale is
+       harmless. */
+    return this.database.transaction(async (tx) => {
+      const spent = await tx.query(
+        "UPDATE signin_grant SET redeemed_at = $1 WHERE id = $2 AND redeemed_at IS NULL",
+        [at, row.id],
+      );
+      if (spent.rowCount === 0) return { ok: false, reason: "spent" as const };
 
       const s = mintSession(at);
       const id = `ses-${hash(s.secretHash).slice(0, 16)}`;
-      this.db
-        .prepare(
-          `INSERT INTO session (id, did, secret_hash, issued_at, expires_at, last_seen, kind)
-           VALUES (?,?,?,?,?,?,?)`,
-        )
-        .run(id, row.did, s.secretHash, at, s.expiresAt, at, row.kind);
-      this.db.exec("COMMIT");
+      await tx.query(
+        `INSERT INTO session (id, did, secret_hash, issued_at, expires_at, last_seen, kind)
+         VALUES ($1,$2,$3,$4,$5,$6,$7)`,
+        [id, row.did, s.secretHash, at, s.expiresAt, at, row.kind],
+      );
 
-      return { ok: true, did: row.did, kind: row.kind, session: { id, secret: s.secret, expiresAt: s.expiresAt } };
-    } catch (e) {
-      this.db.exec("ROLLBACK");
-      throw e;
-    }
+      return {
+        ok: true as const,
+        did: row.did,
+        kind: row.kind,
+        session: { id, secret: s.secret, expiresAt: s.expiresAt },
+      };
+    });
   }
 
   /** Who this session secret belongs to, or null if it is not a live one. */
-  resolve(secret: string, at = now()): Session | null {
-    const row = this.db
-      .prepare("SELECT * FROM session WHERE secret_hash = ?")
-      .get(hash(secret)) as SessionRow | undefined;
+  async resolve(secret: string, at = now()): Promise<Session | null> {
+    await this.migrate();
+    const r = await this.database.query<SessionRow>(
+      "SELECT * FROM session WHERE secret_hash = $1",
+      [hash(secret)],
+    );
+    const row = r.rows[0];
     if (!row) return null;
     if (row.revoked_at !== null) return null;
-    if (row.expires_at <= at) return null;
+    if (num(row.expires_at) <= at) return null;
 
-    this.db.prepare("UPDATE session SET last_seen = ? WHERE id = ?").run(at, row.id);
-    return { id: row.id, did: row.did, kind: row.kind, issuedAt: row.issued_at, expiresAt: row.expires_at };
+    await this.database.query("UPDATE session SET last_seen = $1 WHERE id = $2", [at, row.id]);
+    return {
+      id: row.id, did: row.did, kind: row.kind,
+      issuedAt: num(row.issued_at), expiresAt: num(row.expires_at),
+    };
   }
 
   /** Sign out. Revoking rather than deleting keeps the row auditable. */
-  revoke(secret: string, at = now()): boolean {
-    const r = this.db
-      .prepare("UPDATE session SET revoked_at = ? WHERE secret_hash = ? AND revoked_at IS NULL")
-      .run(at, hash(secret));
-    return r.changes > 0;
+  async revoke(secret: string, at = now()): Promise<boolean> {
+    await this.migrate();
+    const r = await this.database.query(
+      "UPDATE session SET revoked_at = $1 WHERE secret_hash = $2 AND revoked_at IS NULL",
+      [at, hash(secret)],
+    );
+    return r.rowCount > 0;
   }
 
   /** Every live session for a person — for "sign out my other devices". */
-  sessionsOf(did: string, at = now()): Session[] {
-    return (
-      this.db
-        .prepare(
-          "SELECT * FROM session WHERE did = ? AND revoked_at IS NULL AND expires_at > ? ORDER BY issued_at DESC",
-        )
-        .all(did, at) as SessionRow[]
-    ).map((r) => ({ id: r.id, did: r.did, kind: r.kind, issuedAt: r.issued_at, expiresAt: r.expires_at }));
+  async sessionsOf(did: string, at = now()): Promise<Session[]> {
+    await this.migrate();
+    const r = await this.database.query<SessionRow>(
+      "SELECT * FROM session WHERE did = $1 AND revoked_at IS NULL AND expires_at > $2 ORDER BY issued_at DESC",
+      [did, at],
+    );
+    return r.rows.map((row) => ({
+      id: row.id, did: row.did, kind: row.kind,
+      issuedAt: num(row.issued_at), expiresAt: num(row.expires_at),
+    }));
   }
 
-  revokeAllFor(did: string, at = now()): number {
-    return this.db
-      .prepare("UPDATE session SET revoked_at = ? WHERE did = ? AND revoked_at IS NULL")
-      .run(at, did).changes as number;
+  async revokeAllFor(did: string, at = now()): Promise<number> {
+    await this.migrate();
+    const r = await this.database.query(
+      "UPDATE session SET revoked_at = $1 WHERE did = $2 AND revoked_at IS NULL",
+      [at, did],
+    );
+    return r.rowCount;
   }
 
   /**
@@ -387,36 +390,24 @@ export class AuthStore {
    * rather than security — but a table that only grows is a table nobody
    * looks at, and the codes are the one thing here worth not hoarding.
    */
-  sweep(at = now()): number {
-    return this.db.prepare("DELETE FROM signin_grant WHERE expires_at < ?").run(at - 3600)
-      .changes as number;
+  async sweep(at = now()): Promise<number> {
+    await this.migrate();
+    const r = await this.database.query("DELETE FROM signin_grant WHERE expires_at < $1", [at - 3600]);
+    return r.rowCount;
   }
 
-  close(): void {
-    this.db.close();
+  async close(): Promise<void> {
+    await this.database.close();
   }
 }
 
-type GrantRow = {
-  id: string; did: string; token_hash: string; code_hash: string;
-  issued_at: number; expires_at: number; attempts: number; redeemed_at: number | null;
-  kind: SessionKind;
-};
-
-type SessionRow = {
-  id: string; did: string; secret_hash: string;
-  issued_at: number; expires_at: number; last_seen: number; revoked_at: number | null;
-  kind: SessionKind;
-};
-
-/* One instance per process, cached across dev-server hot reloads for the same
-   reason the event store is: a new database handle per reload would leave the
-   previous one open and lose whatever was in :memory:. */
+/* One instance per process, cached across dev-server hot reloads: a new
+   connection pool per reload would leak the previous one. */
 const KEY = Symbol.for("covers.authStore");
-type Holder = { [KEY]?: AuthStore };
+type Holder = { [KEY]?: Promise<AuthStore> };
 
-export function authStore(): AuthStore {
+export function authStore(): Promise<AuthStore> {
   const g = globalThis as Holder;
-  if (!g[KEY]) g[KEY] = new AuthStore(process.env.COVERS_DB ?? ".data/covers.db");
+  if (!g[KEY]) g[KEY] = db().then((d) => new AuthStore(d));
   return g[KEY];
 }

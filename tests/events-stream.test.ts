@@ -19,7 +19,10 @@ const asOp = (url: string, init?: RequestInit) => asCaller(op, url, init);
    not a rare one.
    ============================================================ */
 
-process.env.COVERS_DB = ":memory:";
+/* No database to point at any more: with no DATABASE_URL the store opens an
+   in-process Postgres, and vitest gives each test FILE its own worker, so
+   these routes get a database nobody else is writing to. Cases within one
+   file do share it — the ones that care set their own org or clientRef. */
 process.env.COVERS_ORG = "org-stream";
 
 let stream: typeof import("../app/api/events/stream/route");
@@ -35,9 +38,9 @@ const ev = (n: number) => ({
 });
 
 beforeAll(async () => {
-  op = signInOperator(OPERATORS[0].did);
+  op = await signInOperator(OPERATORS[0].did);
   stream = await import("../app/api/events/stream/route");
-  store = (await import("../lib/store/events")).eventStore();
+  store = await (await import("../lib/store/events")).eventStore();
 });
 
 /** Any unhandled rejection here is the bug this file exists to catch. */
@@ -66,8 +69,8 @@ async function readFrames(res: Response, count: number, ms = 1500): Promise<stri
 
 describe("replay on connect", () => {
   it("sends what the client missed before going live", async () => {
-    store.append(ORG, ev(1));
-    store.append(ORG, ev(2));
+    await store.append(ORG, ev(1));
+    await store.append(ORG, ev(2));
 
     const res = await stream.GET(asOp("http://x/api/events/stream?since=-1"));
     expect(res.headers.get("content-type")).toContain("text/event-stream");
@@ -103,7 +106,7 @@ describe("when the client goes away", () => {
     await new Promise((r) => setTimeout(r, 50));
 
     // the append that would previously have thrown from inside a microtask
-    expect(() => store.append(ORG, ev(99))).not.toThrow();
+    await expect(store.append(ORG, ev(99))).resolves.not.toThrow();
     await new Promise((r) => setTimeout(r, 50));
     // afterEach asserts nothing was left unhandled
   });
@@ -118,8 +121,8 @@ describe("when the client goes away", () => {
     await new Promise((r) => setTimeout(r, 50));
 
     // appends still work and the chain is untouched by all that churn
-    expect(() => store.append(ORG, ev(100))).not.toThrow();
-    expect(store.verify(ORG).ok).toBe(true);
+    await expect(store.append(ORG, ev(100))).resolves.not.toThrow();
+    expect((await store.verify(ORG)).ok).toBe(true);
   });
 
   it("handles a request that is already aborted before the stream starts", async () => {
@@ -128,6 +131,6 @@ describe("when the client goes away", () => {
     const res = await stream.GET(asOp("http://x/api/events/stream", { signal: ctl.signal }));
     expect(res.status).toBe(200);
     await new Promise((r) => setTimeout(r, 50));
-    expect(() => store.append(ORG, ev(101))).not.toThrow();
+    await expect(store.append(ORG, ev(101))).resolves.not.toThrow();
   });
 });

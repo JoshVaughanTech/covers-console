@@ -56,15 +56,15 @@ const blockReason = (creds: Credential[], posting = bar) =>
   });
 
 describe("a renewed credential is not defeated by the record behind it", () => {
-  it("lets him take the shift with the superseded record listed first", () => {
+  it("lets him take the shift with the superseded record listed first", async () => {
     expect(blockReason([superseded, current, ...others])).toBeNull();
   });
 
-  it("lets him take it with the superseded record listed last", () => {
+  it("lets him take it with the superseded record listed last", async () => {
     expect(blockReason([current, ...others, superseded])).toBeNull();
   });
 
-  it("gives the same answer for every posting, whichever way round they sit", () => {
+  it("gives the same answer for every posting, whichever way round they sit", async () => {
     for (const p of POSTINGS) {
       const first = blockReason([superseded, current, ...others], p);
       const last = blockReason([current, ...others, superseded], p);
@@ -72,7 +72,7 @@ describe("a renewed credential is not defeated by the record behind it", () => {
     }
   });
 
-  it("names the induction he actually lacks, not the RSA he holds", () => {
+  it("names the induction he actually lacks, not the RSA he holds", async () => {
     // the four postings that refuse him for a reason that is not his licence
     const lunch = POSTINGS.find((p) => p.id === "sp-2038-wait")!;
     const reason = blockReason([superseded, current, ...others], lunch);
@@ -92,13 +92,13 @@ describe("which record answers the requirement", () => {
       verifier,
     });
 
-  it("is a valid one whenever the person holds any", () => {
+  it("is a valid one whenever the person holds any", async () => {
     const d = ask([superseded, current, ...others]);
     expect(d.reasons.some((r) => r.code === "credential.valid")).toBe(true);
     expect(d.reasons.some((r) => r.outcome === "fail")).toBe(false);
   });
 
-  it("reports the longest-covering failure when none is valid", () => {
+  it("reports the longest-covering failure when none is valid", async () => {
     /* Revoked but dated 2025 beats lapsed-in-2024: the revocation is the live
        fact, and the one he can do something about. */
     const revoked = CREDENTIALS.find(
@@ -112,7 +112,7 @@ describe("which record answers the requirement", () => {
     expect(rsa?.code).toBe("credential.revoked");
   });
 
-  it("prefers a non-expiring record over any dated one", () => {
+  it("prefers a non-expiring record over any dated one", async () => {
     const forever: Credential = { ...seedRsa, id: "rsa-forever", status: "valid", expiresAt: null };
     const soon: Credential = { ...seedRsa, id: "rsa-soon", status: "valid", expiresAt: "2024-06-01" };
     // dated one first: without ranking it would warn "expires in N days"

@@ -9,8 +9,10 @@ import { describe, it, expect, beforeAll } from "vitest";
    in production, with an in-memory store behind it.
    ============================================================ */
 
-// must be set before the store is first constructed
-process.env.COVERS_DB = ":memory:";
+/* No database to point at any more: with no DATABASE_URL the store opens an
+   in-process Postgres, and vitest gives each test FILE its own worker, so
+   these routes get a database nobody else is writing to. Cases within one
+   file do share it — the ones that care set their own org or clientRef. */
 process.env.COVERS_ORG = "org-test";
 
 let events: typeof import("../app/api/events/route");
@@ -19,8 +21,8 @@ let decision: typeof import("../app/api/breaks/decision/route");
 beforeAll(async () => {
   events = await import("../app/api/events/route");
   decision = await import("../app/api/breaks/decision/route");
-  leanne = signIn("did:web:idara.app:w:leanne-vidal");
-  op = signInOperator(OPERATORS[0].did);
+  leanne = await signIn("did:web:idara.app:w:leanne-vidal");
+  op = await signInOperator(OPERATORS[0].did);
 });
 
 import { signIn, signInOperator, asCaller, type TestSession } from "./sign-in-helper";

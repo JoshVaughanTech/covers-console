@@ -66,24 +66,24 @@ const run = (role: string, credentials: Credential[] = [], where: Site = bar) =>
   });
 
 describe("functionsForRole", () => {
-  it("returns the mapped duties for a known role", () => {
+  it("returns the mapped duties for a known role", async () => {
     expect(functionsForRole("Head Chef")).toEqual(["handle_food", "supervise"]);
     expect(functionsForRole("Bartender")).toContain("serve_alcohol");
   });
 
-  it("fails safe: an unmapped role is assumed to do everything", () => {
+  it("fails safe: an unmapped role is assumed to do everything", async () => {
     expect(functionsForRole("Sommelier")).toEqual(ALL_WORK_FUNCTIONS);
     expect(functionsForRole("")).toEqual(ALL_WORK_FUNCTIONS);
   });
 
-  it("distinguishes an explicitly empty duty list from an unknown role", () => {
+  it("distinguishes an explicitly empty duty list from an unknown role", async () => {
     // a glassy clears tables — mapped, but performs none of the gated duties
     expect(ROLE_FUNCTIONS["Glassy"]).toEqual([]);
     expect(functionsForRole("Glassy")).toEqual([]);
     expect(functionsForRole("Glassy")).not.toEqual(ALL_WORK_FUNCTIONS);
   });
 
-  it("only ever names known work functions", () => {
+  it("only ever names known work functions", async () => {
     for (const [role, fns] of Object.entries(ROLE_FUNCTIONS)) {
       for (const f of fns) {
         expect(ALL_WORK_FUNCTIONS, `${role} → ${f}`).toContain(f);
@@ -93,21 +93,21 @@ describe("functionsForRole", () => {
 });
 
 describe("decide — role-scoped requirements", () => {
-  it("demands RSA of someone who serves alcohol", () => {
+  it("demands RSA of someone who serves alcohol", async () => {
     const d = run("Bartender");
     expect(d.allowed).toBe(false);
     expect(d.reasons[0].outcome).toBe("fail");
     expect(d.reasons[0].code).toBe("credential.missing");
   });
 
-  it("does not demand RSA of the kitchen", () => {
+  it("does not demand RSA of the kitchen", async () => {
     const d = run("Head Chef");
     expect(d.allowed).toBe(true);
     expect(d.reasons[0].outcome).toBe("n/a");
     expect(d.reasons[0].code).toBe("credential.not_applicable");
   });
 
-  it("records the skipped requirement rather than dropping it", () => {
+  it("records the skipped requirement rather than dropping it", async () => {
     const d = run("Head Chef");
     // still one entry per requirement — the trail shows what was considered
     expect(d.reasons).toHaveLength(bar.requires.length);
@@ -115,25 +115,25 @@ describe("decide — role-scoped requirements", () => {
     expect(d.reasons[0].detail).toContain("Head Chef");
   });
 
-  it("counts an n/a as neither a failure nor a warning", () => {
+  it("counts an n/a as neither a failure nor a warning", async () => {
     const d = run("Head Chef");
     expect(d.warnings).toBe(0);
     expect(d.reasons.filter((r) => r.outcome === "fail")).toHaveLength(0);
   });
 
-  it("still demands RSA of an unmapped role", () => {
+  it("still demands RSA of an unmapped role", async () => {
     const d = run("Cellar Hand");
     expect(d.allowed).toBe(false);
     expect(d.reasons[0].outcome).toBe("fail");
   });
 
-  it("skips every scoped requirement for a role with no gated duties", () => {
+  it("skips every scoped requirement for a role with no gated duties", async () => {
     const d = run("Glassy");
     expect(d.allowed).toBe(true);
     expect(d.reasons.every((r) => r.outcome === "n/a")).toBe(true);
   });
 
-  it("an unscoped requirement binds to everyone, kitchen included", () => {
+  it("an unscoped requirement binds to everyone, kitchen included", async () => {
     const inducted: Site = {
       ...bar,
       requires: [{ type: "site_induction" }],
@@ -143,7 +143,7 @@ describe("decide — role-scoped requirements", () => {
     expect(run("Bartender", [], inducted).allowed).toBe(false);
   });
 
-  it("binds when the person performs any one of several listed duties", () => {
+  it("binds when the person performs any one of several listed duties", async () => {
     const either: Site = {
       ...bar,
       requires: [{ type: "first_aid", appliesTo: ["gaming", "supervise"] }],
@@ -154,21 +154,21 @@ describe("decide — role-scoped requirements", () => {
     expect(run("Bartender", [], either).reasons[0].outcome).toBe("n/a");
   });
 
-  it("holding a credential you don't owe neither helps nor hurts", () => {
+  it("holding a credential you don't owe neither helps nor hurts", async () => {
     const withRsa = run("Head Chef", [cred("rsa", "2026-01-01")]);
     const without = run("Head Chef", []);
     expect(withRsa.allowed).toBe(without.allowed);
     expect(withRsa.reasons[0].outcome).toBe("n/a");
   });
 
-  it("does not warn about an expiring credential the person doesn't owe", () => {
+  it("does not warn about an expiring credential the person doesn't owe", async () => {
     // RSA expiring in 3 days, but this chef was never required to hold it
     const d = run("Head Chef", [cred("rsa", "2024-05-19")]);
     expect(d.warnings).toBe(0);
     expect(d.allowed).toBe(true);
   });
 
-  it("scoping decides applicability, not validity — a revoked RSA still blocks a bartender", () => {
+  it("scoping decides applicability, not validity — a revoked RSA still blocks a bartender", async () => {
     const revoked: Credential = { ...cred("rsa", "2026-01-01"), status: "revoked" };
     const d = run("Bartender", [revoked]);
     expect(d.allowed).toBe(false);

@@ -50,12 +50,12 @@ const gate = (p: ShiftPosting, person: Identity, at = TODAY, creds?: Credential[
   });
 
 describe("who may take a shift", () => {
-  it("allows someone holding what the shift's duties demand", () => {
+  it("allows someone holding what the shift's duties demand", async () => {
     // Darie holds a current RSA and is inducted at Brightwater
     expect(gate(posting(), who("Darie Roberts"))).toBeNull();
   });
 
-  it("refuses with the credential reason, not a generic no", () => {
+  it("refuses with the credential reason, not a generic no", async () => {
     // Michael Tan's RSA is revoked in the seed
     const reason = gate(posting(), who("Michael Tan"));
     expect(reason).not.toBeNull();
@@ -63,7 +63,7 @@ describe("who may take a shift", () => {
     expect(reason?.toLowerCase()).toMatch(/rsa|licence|license|induction/);
   });
 
-  it("gates on the shift's duties rather than the job title", () => {
+  it("gates on the shift's duties rather than the job title", async () => {
     /* Same person, same site, same day — only what the shift involves differs.
        Michael Tan's RSA is revoked, which matters behind the bar and does not
        matter clearing tables. A gate reading the job title could not tell
@@ -73,7 +73,7 @@ describe("who may take a shift", () => {
     expect(gate(posting({ role: "Wait Staff", duties: ["serve_alcohol"] }), mt)).toMatch(/RSA/);
   });
 
-  it("demands RSG of everyone in the gaming room, whatever the duties say", () => {
+  it("demands RSG of everyone in the gaming room, whatever the duties say", async () => {
     /* Not an exception to the rule above but the other half of it: where the
        location itself implies the duty, the location scopes the requirement.
        Darie is inducted for gaming and holds no RSG. */
@@ -83,7 +83,7 @@ describe("who may take a shift", () => {
 });
 
 describe("the commercial layer, kept apart from the legal one", () => {
-  it("refuses an excluded client without calling it a credential problem", () => {
+  it("refuses an excluded client without calling it a credential problem", async () => {
     // Michael Tan is excluded from Meridian Group in the staff profiles
     const p = posting({ role: "Wait Staff", duties: [], client: "Meridian Group" });
     expect(gate(p, who("Michael Tan"))).toBe("Not available for this client");
@@ -92,7 +92,7 @@ describe("the commercial layer, kept apart from the legal one", () => {
     expect(gate(posting({ role: "Wait Staff", duties: [] }), who("Michael Tan"))).toBeNull();
   });
 
-  it("answers the credential question first", () => {
+  it("answers the credential question first", async () => {
     /* Michael Tan is both excluded from this client and short an RSA. Behind
        a bar he is refused for the licence, not the preference — the two are
        different kinds of fact and only one of them is a compliance matter. */
@@ -100,7 +100,7 @@ describe("the commercial layer, kept apart from the legal one", () => {
     expect(gate(p, who("Michael Tan"))).toMatch(/RSA/);
   });
 
-  it("does not apply client preference to in-house work", () => {
+  it("does not apply client preference to in-house work", async () => {
     // an in-house posting has no client, so the component correctly never runs
     const p = posting({ client: undefined });
     for (const w of WORKERS) {
@@ -110,7 +110,7 @@ describe("the commercial layer, kept apart from the legal one", () => {
 });
 
 describe("failing closed", () => {
-  it("refuses when the person cannot be resolved", () => {
+  it("refuses when the person cannot be resolved", async () => {
     expect(
       claimBlockReason({
         posting: posting(),
@@ -123,7 +123,7 @@ describe("failing closed", () => {
     ).toBe("Not eligible");
   });
 
-  it("refuses when the site cannot be resolved", () => {
+  it("refuses when the site cannot be resolved", async () => {
     // an unresolvable id must never become an unchecked claim
     expect(
       claimBlockReason({
@@ -148,17 +148,17 @@ describe("a credential expiring on the day it is checked", () => {
     c.type === "rsa" ? { ...c, expiresAt: TODAY } : c,
   );
 
-  it("still allows the claim on a bare date", () => {
+  it("still allows the claim on a bare date", async () => {
     expect(gate(posting(), darie, TODAY, expiringToday)).toBeNull();
   });
 
-  it("still allows the claim when the caller passes a full timestamp", () => {
+  it("still allows the claim when the caller passes a full timestamp", async () => {
     // the phone writes new Date().toISOString(); a gate that compared raw
     // strings would sort that after the expiry date and refuse
     expect(gate(posting(), darie, `${TODAY}T22:10:00.000Z`, expiringToday)).toBeNull();
   });
 
-  it("refuses the day after, which is the point of an expiry", () => {
+  it("refuses the day after, which is the point of an expiry", async () => {
     expect(gate(posting(), darie, "2024-05-17", expiringToday)).not.toBeNull();
   });
 });
@@ -167,11 +167,11 @@ describe("credentials as the chain leaves them", () => {
   const chain = (evs: Parameters<typeof appendEvent>[1][]): AuditEvent[] =>
     evs.reduce<AuditEvent[]>((log, e) => appendEvent(log, e), []);
 
-  it("returns the seed untouched when nothing was revoked", () => {
+  it("returns the seed untouched when nothing was revoked", async () => {
     expect(credentialsNow([])).toBe(CREDENTIALS);
   });
 
-  it("applies a revocation the console recorded", () => {
+  it("applies a revocation the console recorded", async () => {
     const target = CREDENTIALS.find((c) => c.type === "rsa" && c.status === "valid")!;
     const log = chain([
       {
@@ -190,7 +190,7 @@ describe("credentials as the chain leaves them", () => {
     expect(CREDENTIALS.find((c) => c.id === target.id)!.status).toBe("valid");
   });
 
-  it("stops someone claiming once their licence is struck off", () => {
+  it("stops someone claiming once their licence is struck off", async () => {
     const darie = who("Darie Roberts");
     const rsa = credsFor(darie.did).find((c) => c.type === "rsa")!;
     const before = gate(posting(), darie);
@@ -215,13 +215,13 @@ describe("credentials as the chain leaves them", () => {
 });
 
 describe("the board the server builds", () => {
-  it("carries the console's date, not the wall clock", () => {
+  it("carries the console's date, not the wall clock", async () => {
     // the demo world is dated; a gate on the real date would expire everything
     // and read as a broken gate rather than a dated fixture
     expect(boardFrom([]).at).toBe(TODAY);
   });
 
-  it("starts from the seed postings", () => {
+  it("starts from the seed postings", async () => {
     const board = boardFrom([]);
     expect(board.postings.length).toBeGreaterThan(0);
     expect(board.postings.some((p) => p.status === "draft")).toBe(true);

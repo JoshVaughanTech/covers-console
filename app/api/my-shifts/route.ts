@@ -47,11 +47,11 @@ const siteIndex = new Map(SITES.map((s) => [s.id, s]));
 const clockIdOf = (did: string) => did.replace(/^did:web:idara\.app:/, "");
 
 export async function GET(req: Request) {
-  const caller = workerOf(req);
+  const caller = await workerOf(req);
   if (!caller) return NextResponse.json({ error: "not signed in" }, { status: 401 });
 
   const { did, person } = caller;
-  const board = boardFrom(eventStore().all(ORG));
+  const board = boardFrom((await (await eventStore()).all(ORG)));
   const profile = profileOf(did);
   const now = Math.floor(Date.now() / 1000);
 

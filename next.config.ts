@@ -21,6 +21,18 @@ const nextConfig: NextConfig = {
      throwaway copy of the tree, or check git diff on tsconfig.json afterwards
      and revert it. */
   distDir: process.env.NEXT_DIST_DIR ?? ".next",
+
+  /* Both database drivers load things a bundler cannot follow: pg picks its
+     native or pure-JS binding at runtime, and PGlite fetches a WebAssembly
+     module and a filesystem image next to its own source. Bundled, PGlite
+     resolves those to a URL and hands it to something expecting a path, and
+     every request that touches the database returns 500.
+
+     Worth naming because the tests do not catch it: vitest runs them in plain
+     Node, where the import works, so a suite can be entirely green while the
+     running server cannot open a connection. This was found by loading a page
+     and reading the log, which is the only place it showed up. */
+  serverExternalPackages: ["@electric-sql/pglite", "pg"],
 };
 
 export default nextConfig;

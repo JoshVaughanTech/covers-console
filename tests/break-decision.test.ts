@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { EventStore } from "../lib/store/events";
 import { sendOnBreak, unresolvedPushes, type BreakPusher, type BreakDecisionInput } from "../lib/store/decision";
+import { db, setDb } from "../lib/store/db";
 
 /* ============================================================
    The two-phase write.
@@ -31,8 +32,8 @@ const pusher = (impl: Partial<BreakPusher> = {}): BreakPusher => ({
   ...impl,
 });
 
-beforeEach(() => { store = new EventStore(":memory:"); });
-afterEach(() => store.close());
+beforeEach(async () => { setDb(null); store = new EventStore(await db()); });
+afterEach(async () => { await store.close(); setDb(null); });
 
 describe("the happy path", () => {
   it("records the decision, pushes, then records the outcome", async () => {
@@ -41,11 +42,11 @@ describe("the happy path", () => {
     expect(r.pushed).toBe("ok");
     expect(r.ctBreakId).toBe("ct-1");
 
-    const all = store.all(ORG);
+    const all = await store.all(ORG);
     expect(all.map((e) => e.type)).toEqual(["break.decision", "break.pushed"]);
     // the outcome points back at the decision it resolves
     expect(all[1].data.decisionSeq).toBe(all[0].seq);
-    expect(store.verify(ORG).ok).toBe(true);
+    expect((await store.verify(ORG)).ok).toBe(true);
   });
 
   it("keeps the supervisor's time, not the recording time", async () => {
@@ -62,12 +63,12 @@ describe("when Connecteam refuses", () => {
     }), input);
 
     expect(r.pushed).toBe("failed");
-    const all = store.all(ORG);
+    const all = await store.all(ORG);
     expect(all.map((e) => e.type)).toEqual(["break.decision", "break.push_failed"]);
     // the decision survives — this is the whole reason it is written first
     expect(all[0].type).toBe("break.decision");
     expect(all[1].data.retryable).toBe(true);
-    expect(store.verify(ORG).ok).toBe(true);
+    expect((await store.verify(ORG)).ok).toBe(true);
   });
 
   it("marks a permission failure as not worth retrying", async () => {
@@ -75,14 +76,14 @@ describe("when Connecteam refuses", () => {
       push: async () => { throw new Error('the integration is missing the "time_clock.write" scope'); },
     }), input);
     expect(r.pushed).toBe("failed");
-    expect(store.all(ORG)[1].data.retryable).toBe(false);
+    expect((await store.all(ORG))[1].data.retryable).toBe(false);
   });
 
   it("never rewrites the decision to resolve it", async () => {
     await sendOnBreak(store, ORG, pusher({ push: async () => { throw new Error("nope"); } }), input);
     // the original still says pending; the outcome is a separate event
-    expect(store.all(ORG)[0].data.pushed).toBe("pending");
-    expect(store.verify(ORG).ok).toBe(true);
+    expect((await store.all(ORG))[0].data.pushed).toBe("pending");
+    expect((await store.verify(ORG)).ok).toBe(true);
   });
 });
 
@@ -91,8 +92,8 @@ describe("when the integration cannot write at all", () => {
     const r = await sendOnBreak(store, ORG, pusher({ available: () => false }), input);
     expect(r.pushed).toBe("skipped");
     expect(r.outcome).toBeNull();
-    expect(store.all(ORG).map((e) => e.type)).toEqual(["break.decision"]);
-    expect(store.all(ORG)[0].data.pushed).toBe("skipped");
+    expect((await store.all(ORG)).map((e) => e.type)).toEqual(["break.decision"]);
+    expect((await store.all(ORG))[0].data.pushed).toBe("skipped");
   });
 });
 
@@ -109,7 +110,7 @@ describe("idempotency under retry", () => {
     expect(b.decision.seq).toBe(a.decision.seq);
     // the crucial part: a replayed request must not push a second break
     expect(pushes).toBe(1);
-    expect(store.all(ORG).filter((e) => e.type === "break.decision")).toHaveLength(1);
+    expect((await store.all(ORG)).filter((e) => e.type === "break.decision")).toHaveLength(1);
   });
 });
 
@@ -120,10 +121,10 @@ describe("unresolved pushes", () => {
       push: () => new Promise((_, reject) => reject(new Error("fetch failed"))),
     }), input);
     // that one resolved (as failed), so nothing is outstanding
-    expect(unresolvedPushes(store, ORG, 0)).toHaveLength(0);
+    expect(await unresolvedPushes(store, ORG, 0)).toHaveLength(0);
 
     // a bare decision with no outcome is the state that must be visible
-    store.append(ORG, {
+    await store.append(ORG, {
       type: "break.decision",
       at: input.at,
       actor: input.actor,
@@ -131,22 +132,22 @@ describe("unresolved pushes", () => {
       summary: "queued on the phone",
       data: { pushed: "pending" },
     });
-    const open = unresolvedPushes(store, ORG, 0);
+    const open = await unresolvedPushes(store, ORG, 0);
     expect(open).toHaveLength(1);
     expect(open[0].subject).toBe(input.subject);
   });
 
   it("ignores ones that are merely recent", async () => {
-    store.append(ORG, {
+    await store.append(ORG, {
       type: "break.decision", at: input.at, actor: input.actor,
       subject: input.subject, summary: "just now", data: { pushed: "pending" },
     });
     // five minutes is the default grace; nothing should be flagged yet
-    expect(unresolvedPushes(store, ORG)).toHaveLength(0);
+    expect(await unresolvedPushes(store, ORG)).toHaveLength(0);
   });
 
   it("ignores skipped pushes — a read-only integration is not an outage", async () => {
     await sendOnBreak(store, ORG, pusher({ available: () => false }), input);
-    expect(unresolvedPushes(store, ORG, 0)).toHaveLength(0);
+    expect(await unresolvedPushes(store, ORG, 0)).toHaveLength(0);
   });
 });
