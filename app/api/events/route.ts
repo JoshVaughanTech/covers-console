@@ -67,7 +67,7 @@ export async function POST(req: Request) {
     actor: caller.operator.name,
     actorDid: caller.operator.did,
   };
-  const r = (await eventStore()).append(ORG, ev, { clientRef });
+  const r = (await (await eventStore()).append(ORG, ev, { clientRef }));
 
   /* A posting nobody hears about fills as slowly as no posting at all.
 
@@ -75,7 +75,9 @@ export async function POST(req: Request) {
      one made by a screen nobody has written yet. Only on a genuinely new
      append: a replayed clientRef must not re-offer, or a retrying client
      would put the same shift on ten phones twice. */
-  const offer = r.created ? offerPosting((await eventStore()), (await notificationStore()), ORG, r.event) : null;
+  const offer = r.created
+    ? await offerPosting(await eventStore(), await notificationStore(), ORG, r.event)
+    : null;
 
   return NextResponse.json({ ...r, ...(offer ? { offered: offer } : {}) }, { status: r.created ? 201 : 200 });
 }

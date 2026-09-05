@@ -40,7 +40,7 @@ export async function GET(req: Request) {
   const did = caller.did;
   const person = caller.person;
 
-  const board = boardFrom((await eventStore()).all(ORG));
+  const board = boardFrom((await (await eventStore()).all(ORG)));
 
   const shifts = board.postings
     // drafts are the manager's working copy and are not offers yet

@@ -62,7 +62,7 @@ export async function pushOffer(
   }
 
   const store = (await pushStore());
-  const subs = dids.flatMap((did) => store.forWorker(orgId, did));
+  const subs = (await Promise.all(dids.map((did) => store.forWorker(orgId, did)))).flat();
   if (subs.length === 0) return { delivered: 0, pruned: 0, failed: 0, attempted: true };
 
   /* What the service worker renders. Deliberately thin: enough to decide

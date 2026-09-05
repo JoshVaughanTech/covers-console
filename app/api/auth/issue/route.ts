@@ -74,7 +74,7 @@ export async function POST(req: Request) {
     );
   }
 
-  const issued = (await authStore()).issue(did);
+  const issued = (await (await authStore()).issue(did));
   if (!issued.ok) {
     /* The operator is the one caller who must be told plainly that nothing was
        minted. The phone endpoint hides this on purpose; here, silence would
@@ -106,7 +106,7 @@ export async function POST(req: Request) {
      inverts to nothing. Never the code, never a hash of it: the audit screen
      is readable by anyone who can reach it, so a secret in the chain would be
      a credential published to the surface it protects. */
-  const { event } = (await eventStore()).append(ORG, {
+  const { event } = (await (await eventStore()).append(ORG, {
     type: "auth.code_issued",
     at: new Date().toISOString(),
     actor: caller.operator.name,
@@ -119,7 +119,7 @@ export async function POST(req: Request) {
       deliveredTo: delivery.target,
       outOfBand: delivery.outOfBand,
     },
-  });
+  }));
 
   return NextResponse.json({
     issued: true,

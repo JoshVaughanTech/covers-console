@@ -51,7 +51,7 @@ export async function GET(req: Request) {
   if (!caller) return NextResponse.json({ error: "not signed in" }, { status: 401 });
 
   const { did, person } = caller;
-  const board = boardFrom((await eventStore()).all(ORG));
+  const board = boardFrom((await (await eventStore()).all(ORG)));
   const profile = profileOf(did);
   const now = Math.floor(Date.now() / 1000);
 

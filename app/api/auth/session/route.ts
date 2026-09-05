@@ -41,7 +41,7 @@ export async function GET(req: Request) {
 
 export async function DELETE(req: Request) {
   const secret = secretOf(req);
-  if (secret) (await authStore()).revoke(secret);
+  if (secret) (await (await authStore()).revoke(secret));
 
   const res = NextResponse.json({ signedIn: false });
   // clear the cookie whether or not a session was found: a stale cookie that

@@ -62,13 +62,13 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "endpoint must be https" }, { status: 400 });
   }
 
-  (await pushStore()).save(
+  (await (await pushStore()).save(
     ORG,
     { did: caller.did, endpoint, p256dh, auth },
     new Date().toISOString(),
-  );
+  ));
 
-  return NextResponse.json({ subscribed: true, devices: (await pushStore()).countFor(ORG, caller.did) });
+  return NextResponse.json({ subscribed: true, devices: (await (await pushStore()).countFor(ORG, caller.did)) });
 }
 
 export async function DELETE(req: Request) {
@@ -81,8 +81,8 @@ export async function DELETE(req: Request) {
 
   /* Scoped to this worker's own rows: the endpoint alone would let anyone
      signed in unsubscribe a device they had learned the endpoint of. */
-  const mine = (await pushStore()).forWorker(ORG, caller.did).some((s) => s.endpoint === endpoint);
+  const mine = (await (await pushStore()).forWorker(ORG, caller.did)).some((s) => s.endpoint === endpoint);
   if (!mine) return NextResponse.json({ removed: false });
 
-  return NextResponse.json({ removed: (await pushStore()).remove(ORG, endpoint) });
+  return NextResponse.json({ removed: (await (await pushStore()).remove(ORG, endpoint)) });
 }

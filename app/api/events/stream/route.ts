@@ -54,7 +54,12 @@ export async function GET(req: Request) {
   let heartbeat: ReturnType<typeof setInterval> | undefined;
 
   const stream = new ReadableStream({
-    start(controller) {
+    /* Async because the replay reads from the database, and a
+       ReadableStream waits on the promise start() returns before it
+       pulls. So a client that reconnects with a cursor still receives
+       every missed event before the first live one — the ordering the
+       replay exists to guarantee. */
+    async start(controller) {
       /* The single place anything is written. Once closed we stop rather than
          throw: a disconnected client is the normal end of a stream, not an
          error, and this is called from a microtask where a throw would be
@@ -87,7 +92,7 @@ export async function GET(req: Request) {
 
       // replay what this client missed before going live, so a reconnect never
       // leaves a hole between its cursor and the first live event
-      for (const e of store.since(ORG, from)) {
+      for (const e of await store.since(ORG, from)) {
         if (!send(e)) return;
       }
 

@@ -58,7 +58,7 @@ export async function POST(req: Request) {
   const ref =
     typeof body.clientRef === "string" && body.clientRef ? `withdraw:${did}:${body.clientRef}` : null;
   if (ref) {
-    const already = store.byClientRef(ORG, ref);
+    const already = await store.byClientRef(ORG, ref);
     if (already) {
       return NextResponse.json({
         withdrawn: true,
@@ -71,7 +71,7 @@ export async function POST(req: Request) {
     }
   }
 
-  const board = boardFrom(store.all(ORG));
+  const board = boardFrom(await store.all(ORG));
   const posting = board.postings.find((p) => p.id === postingId);
   if (!posting) return NextResponse.json({ error: "unknown posting" }, { status: 404 });
 
@@ -81,7 +81,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: result.reason, kind: result.kind }, { status: 409 });
   }
 
-  const { event, created } = store.append(
+  const { event, created } = await store.append(
     ORG,
     {
       type: "shift.withdrawn",
