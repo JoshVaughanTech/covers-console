@@ -17,7 +17,7 @@ import "./globals.css";
 /* Plus Jakarta Sans — display + UI + body (nearest match to the
    geometric-humanist sans in the Covers artwork). */
 const jakarta = localFont({
-  src: "./fonts/PlusJakartaSans-Variable.woff2",
+  src: "./fonts/PlusJakartaSans-Variable-latin.woff2",
   // the axis the file actually carries; Next serves 400–800 from this one file
   weight: "200 800",
   style: "normal",
@@ -27,7 +27,7 @@ const jakarta = localFont({
 
 /* JetBrains Mono — IDs, timers, codes. */
 const jbMono = localFont({
-  src: "./fonts/JetBrainsMono-Variable.woff2",
+  src: "./fonts/JetBrainsMono-Variable-latin.woff2",
   weight: "100 800",
   style: "normal",
   variable: "--font-jb-mono",

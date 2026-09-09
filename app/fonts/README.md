@@ -6,8 +6,8 @@ cuts.
 
 | file | family | axis | used at |
 |---|---|---|---|
-| `PlusJakartaSans-Variable.woff2` | Plus Jakarta Sans | `wght 200–800` | 400, 500, 600, 700, 800 |
-| `JetBrainsMono-Variable.woff2` | JetBrains Mono | `wght 100–800` | 400, 500 |
+| `PlusJakartaSans-Variable-latin.woff2` | Plus Jakarta Sans | `wght 200–800` | 400, 500, 600, 700, 800 |
+| `JetBrainsMono-Variable-latin.woff2` | JetBrains Mono | `wght 100–800` | 400, 500 |
 
 Fetched from `fonts.gstatic.com` on 9 September 2026:
 
