@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { NotComputedBanner } from "@/components/screen/not-computed";
 import {
   Card,
@@ -23,54 +23,47 @@ import {
 import type { Tone } from "@/lib/status";
 import { CardHead, LinkBtn } from "@/components/screen/page-head";
 
-interface BoardCard {
-  id: string;
-  title: string;
-  sub: string;
-  prio: "High" | "Medium" | "Low" | null;
-  due: string | null;
-  names: string[];
-  extra?: number;
-}
+/* The card shape, the columns and the seed all live in lib/tasks now, because
+   the API route folds the same types out of the audit chain. Two definitions
+   of what a task is would be two things that can disagree about a board. */
+import { BASE_EXTRA, COLS, cardInColumn, seedBoard, type ColName, type TaskBoard } from "@/lib/tasks";
 
-type ColName = "To Do" | "In Progress" | "Review" | "Completed";
-
-const COLS: ColName[] = ["To Do", "In Progress", "Review", "Completed"];
 const TABS = ["Dashboard", "Tasks", "Timeline", "Documents", "Team", "Issues", "Reports", "Settings"];
-
-let _seq = 100;
-const nextId = () => `t${++_seq}`;
 
 export default function ProjectsPage() {
   const toast = useToast();
   const [tab, setTab] = useState("Dashboard");
 
-  /* ---- Task board state (4 columns of cards) ---- */
-  const [board, setBoard] = useState<Record<ColName, BoardCard[]>>({
-    "To Do": [
-      { id: "t1", title: "Confirm final guest numbers", sub: "Client — Nguyen & Cole", prio: "High", due: "May 20", names: ["Priya Sharma"] },
-      { id: "t2", title: "Place beverage order", sub: "Cellar — bar stock", prio: "Medium", due: "May 21", names: ["Ben Cole"] },
-      { id: "t3", title: "Print menus & place cards", sub: "Front of house", prio: "Low", due: "May 22", names: ["Ana Reed"] },
-    ],
-    "In Progress": [
-      { id: "t4", title: "Confirm dietary requirements", sub: "38 guests flagged", prio: "High", due: "May 18", names: ["Cara Vu", "Dan Fox"], extra: 2 },
-      { id: "t5", title: "Marquee bar setup", sub: "Garden lawn", prio: "Medium", due: "May 18", names: ["Eve Ho"] },
-    ],
-    Review: [
-      { id: "t6", title: "Allergen sign-off — plated main", sub: "Kitchen", prio: "Medium", due: "May 17", names: ["Gus Ray", "Ben Cole"], extra: 1 },
-    ],
-    Completed: [
-      { id: "t7", title: "Site inspection — Werribee Park", sub: "Completed on May 12", prio: null, due: null, names: [] },
-      { id: "t8", title: "Menu tasting with client", sub: "Completed on May 13", prio: null, due: null, names: [] },
-      { id: "t9", title: "Staff briefing & rosters issued", sub: "Completed on May 14", prio: null, due: null, names: [] },
-    ],
-  });
+  /* ---- The board, as the chain says it stands ----
+
+     Starts from the seed so the first paint is the same board the server will
+     send, rather than an empty grid that fills in. /api/tasks then replaces it
+     with the fold, and every mutation returns the fold too — so the screen and
+     /audit cannot drift apart, which is the whole reason this is an event and
+     not a row somebody updates. */
+  const [board, setBoard] = useState<TaskBoard>(seedBoard);
+
+  useEffect(() => {
+    let live = true;
+    fetch("/api/tasks")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (live && d?.board) setBoard(d.board);
+      })
+      .catch(() => {
+        /* leaving the seed on screen is the honest failure: the board is
+           readable and stale rather than blank, and the next move will fail
+           loudly with a toast rather than silently disagreeing. */
+      });
+    return () => {
+      live = false;
+    };
+  }, []);
 
   /* Base counts reflect the larger backlog beyond the few cards shown.
      We track the "extra" (non-card) tally per column so totals stay
      consistent when a card is added or moved. */
-  const baseExtra: Record<ColName, number> = { "To Do": 9, "In Progress": 6, Review: 4, Completed: 23 };
-  const count = (c: ColName) => baseExtra[c] + board[c].length;
+  const count = (c: ColName) => BASE_EXTRA[c] + board[c].length;
   const totalDone = count("Completed");
   const totalAll = COLS.reduce((s, c) => s + count(c), 0);
 
@@ -140,36 +133,76 @@ export default function ProjectsPage() {
       toast("Task title is required", { tone: "warning", icon: "triangle-alert" });
       return;
     }
-    const card: BoardCard = {
-      id: nextId(),
-      title,
-      sub: fSub.trim() || "Unassigned location",
-      prio: addCol === "Completed" ? null : (fPrio as "High" | "Medium" | "Low"),
-      due: addCol === "Completed" ? "Completed today" : fDue.trim() || "No due date",
-      names: fAssignee ? [fAssignee] : [],
-    };
     const target = addCol;
-    setBoard((b) => ({ ...b, [target]: [card, ...b[target]] }));
-    toast(`Added “${title}” to ${target}`, { tone: "success", icon: "check-circle-2" });
+    /* No optimistic insert here, unlike a move: the id is minted server-side so
+       a card cannot be drawn before the chain has one. Accepting a client id
+       would let a new task collide with a seeded one, and the fold would then
+       skip the creation as already-present — losing it with no error. */
+    void persist(
+      {
+        action: "create",
+        to: target,
+        card: {
+          title,
+          sub: fSub.trim() || "Unassigned location",
+          prio: target === "Completed" ? null : fPrio,
+          due: target === "Completed" ? "Completed today" : fDue.trim() || "No due date",
+          names: fAssignee ? [fAssignee] : [],
+        },
+      },
+      `Added “${title}” to ${target}`,
+    );
     closeAdd();
   };
 
+  /**
+   * Send a change and take the server's board as the answer.
+   *
+   * The response is the fold, not an acknowledgement, so what ends up on screen
+   * is what the chain says rather than what this component predicted. On
+   * failure the previous board is restored and the toast says so — a move that
+   * silently did not persist is the one outcome worth avoiding, because the
+   * screen would then disagree with /audit and nothing would indicate which is
+   * right.
+   */
+  async function persist(body: Record<string, unknown>, okMessage: string, rollback?: TaskBoard) {
+    try {
+      const res = await fetch("/api/tasks", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const data = (await res.json().catch(() => null)) as { board?: TaskBoard; error?: string } | null;
+      if (!res.ok) throw new Error(data?.error ?? `could not save (${res.status})`);
+      if (data?.board) setBoard(data.board);
+      toast(okMessage, { tone: "success", icon: "check-circle-2" });
+    } catch (err) {
+      if (rollback) setBoard(rollback);
+      toast(err instanceof Error ? `Not saved — ${err.message}` : "Not saved", {
+        tone: "danger",
+        icon: "triangle-alert",
+      });
+    }
+  }
+
   const moveCard = (from: ColName, id: string, to: ColName) => {
     if (from === to) return;
-    setBoard((b) => {
-      const card = b[from].find((c) => c.id === id);
-      if (!card) return b;
-      const moved: BoardCard =
-        to === "Completed"
-          ? { ...card, prio: null, due: "Completed today", names: card.names }
-          : card;
-      return {
-        ...b,
-        [from]: b[from].filter((c) => c.id !== id),
-        [to]: [moved, ...b[to]],
-      };
-    });
-    toast(`Moved to ${to}`, { tone: "info", icon: "arrow-right" });
+    const before = board;
+    const card = board[from].find((c) => c.id === id);
+    if (!card) return;
+
+    /* Applied locally first, because a drag that waits for a round trip feels
+       broken. persist() then replaces this with the server's fold, so the
+       optimistic board is a prediction that is always corrected rather than a
+       second source of truth — and cardInColumn is shared with the replay so
+       the prediction and the correction agree about Completed. */
+    setBoard((b) => ({
+      ...b,
+      [from]: b[from].filter((c) => c.id !== id),
+      [to]: [cardInColumn(card, to), ...b[to]],
+    }));
+
+    void persist({ taskId: id, from, to }, `Moved to ${to}`, before);
   };
 
   /* ---- Dragging a card between columns ----
