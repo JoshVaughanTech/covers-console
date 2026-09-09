@@ -40,15 +40,38 @@ self.addEventListener("push", (event) => {
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
 
-  /* Focus a tab that is already open rather than opening a second one.
-     Somebody who taps a notification while the app is open in the background
-     expects the app, not another copy of it. */
+  /* Open the shift this notification is about.
+
+     The id has been in the payload since push was built and was thrown away
+     here, because until /m/shifts/[id] existed the board was the only address
+     there was. So "Bartender · Fri, 28 Aug" woke a phone and then handed over
+     a list to search — which is worst exactly when it matters most, on a busy
+     board where the shift somebody was told about is hardest to find.
+
+     Falling back to the board when there is no id: a notification that opens
+     nothing is worse than one that opens something general. */
+  const id = event.notification.data && event.notification.data.postingId;
+  const url = id ? "/m/shifts/" + encodeURIComponent(id) : "/m/shifts";
+
   event.waitUntil(
     self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((all) => {
       for (const client of all) {
-        if (client.url.includes("/m/shifts") && "focus" in client) return client.focus();
+        if (client.url.includes("/m/shifts") && "focus" in client) {
+          /* Focus AND navigate. Focusing alone would surface a tab still
+             showing the board — dropping the one thing this notification
+             knew. navigate() can reject (a client this worker does not
+             control), so a failure still leaves them on the app rather than
+             on nothing. */
+          if ("navigate" in client) {
+            return client.navigate(url).then(
+              (c) => (c || client).focus(),
+              () => client.focus(),
+            );
+          }
+          return client.focus();
+        }
       }
-      return self.clients.openWindow("/m/shifts");
+      return self.clients.openWindow(url);
     }),
   );
 });
