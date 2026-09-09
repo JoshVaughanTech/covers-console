@@ -172,6 +172,17 @@ export default function ProjectsPage() {
     toast(`Moved to ${to}`, { tone: "info", icon: "arrow-right" });
   };
 
+  /* ---- Dragging a card between columns ----
+
+     An addition to the ⋮ menu rather than a replacement for it. Drag is a
+     mouse-only gesture, and the menu is the path that works from a keyboard,
+     so removing it to "simplify" would quietly drop a whole class of user.
+     Both routes call moveCard(), so they cannot disagree about what a move
+     does — the Completed column rewrites the card, and doing that in one
+     place is why. */
+  const [drag, setDrag] = useState<{ from: ColName; id: string } | null>(null);
+  const [overCol, setOverCol] = useState<ColName | null>(null);
+
   /* ---- Verified sign-off modal ---- */
   const [signoffOpen, setSignoffOpen] = useState(false);
   const signoffs: [string, string, string, string][] = [
@@ -188,17 +199,74 @@ export default function ProjectsPage() {
     <div style={{ display: "grid", gridTemplateColumns: `repeat(${cardCols},1fr)`, gap: tabIsBoard ? 14 : 10 }}>
       {COLS.map((col) => {
         const [bg, fg] = STATUS[colTone[col]];
+        // only a drop target if a card is in flight and it did not start here
+        const isTarget = Boolean(drag) && drag!.from !== col && overCol === col;
         return (
-          <div key={col} style={{ minWidth: 0 }}>
+          <div
+            key={col}
+            onDragOver={(e) => {
+              if (!drag) return;
+              // without preventDefault the browser refuses the drop entirely
+              e.preventDefault();
+              e.dataTransfer.dropEffect = "move";
+              if (overCol !== col) setOverCol(col);
+            }}
+            onDragLeave={(e) => {
+              // dragleave also fires when crossing onto a child, so ignore those
+              if (e.currentTarget.contains(e.relatedTarget as Node | null)) return;
+              setOverCol((o) => (o === col ? null : o));
+            }}
+            onDrop={(e) => {
+              e.preventDefault();
+              if (drag) moveCard(drag.from, drag.id, col);
+              setDrag(null);
+              setOverCol(null);
+            }}
+            style={{ minWidth: 0 }}
+          >
             <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "6px 8px", borderRadius: 7, background: bg, marginBottom: 8 }}>
               <span style={{ fontSize: 11.5, fontWeight: 700, color: fg, flex: 1 }}>{col}</span>
               <span className="fs-tnum" style={{ fontSize: 11, fontWeight: 700, color: fg }}>{count(col)}</span>
             </div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            <div
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                gap: 8,
+                borderRadius: 9,
+                // minHeight so an empty column is still a target you can hit
+                minHeight: 44,
+                outline: isTarget ? `2px dashed ${fg}` : "2px dashed transparent",
+                outlineOffset: 3,
+                transition: "outline-color .12s ease",
+              }}
+            >
               {board[col].map((c) => {
                 const others = COLS.filter((x) => x !== col);
                 return (
-                  <div key={c.id} style={{ border: "1px solid var(--border)", borderRadius: 9, padding: 9, background: col === "Completed" ? "var(--surface-2)" : "#fff" }}>
+                  <div
+                    key={c.id}
+                    draggable
+                    onDragStart={(e) => {
+                      setDrag({ from: col, id: c.id });
+                      e.dataTransfer.effectAllowed = "move";
+                      // Firefox will not start a drag without payload on the transfer
+                      e.dataTransfer.setData("text/plain", c.id);
+                    }}
+                    onDragEnd={() => {
+                      // fires on a cancelled drag too, so this is where cleanup belongs
+                      setDrag(null);
+                      setOverCol(null);
+                    }}
+                    style={{
+                      border: "1px solid var(--border)",
+                      borderRadius: 9,
+                      padding: 9,
+                      background: col === "Completed" ? "var(--surface-2)" : "#fff",
+                      cursor: "grab",
+                      opacity: drag?.id === c.id ? 0.4 : 1,
+                    }}
+                  >
                     <div style={{ display: "flex", alignItems: "flex-start", gap: 6 }}>
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ fontSize: 11.5, fontWeight: 700, color: "var(--fg-1)", lineHeight: 1.25 }}>{c.title}</div>
