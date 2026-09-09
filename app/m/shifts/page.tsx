@@ -5,6 +5,7 @@ import Link from "next/link";
 import { SignIn, type Signed } from "../sign-in";
 import { MobileNav } from "../nav";
 import { PushToggle } from "../push";
+import { Banner, Pill, aud, chip, type Shift } from "./parts";
 
 /* ============================================================
    Open shifts, in the hand of the person who would work them.
@@ -29,89 +30,17 @@ import { PushToggle } from "../push";
    learns why before tapping rather than after.
    ============================================================ */
 
-type Standing = "open" | "declined" | "lapsed" | "assigned";
-
-/**
- * What the shift pays, already checked against the award by the server.
- *
- * Every figure here arrives computed. The phone does no rate arithmetic of its
- * own on purpose: "above award" on this card has to be the same answer that
- * stopped the venue posting below it, and two implementations of the same sum
- * is how they come to disagree. Null means no rate is published yet — which
- * the card says, rather than showing a number nobody set.
- */
-interface Pay {
-  offeredHourlyCents: number;
-  floorHourlyCents: number;
-  marginHourlyCents: number;
-  estGrossCents: number;
-  paidHours: number;
-  unpaidHours: number;
-  atOrAboveFloor: boolean;
-  bands: { band: string; label: string; hours: number; hourlyCents: number }[];
-  mixedRates: boolean;
-  awardId: string;
-  publicHolidaysChecked: boolean;
-  summary: string;
-  notModelled: string[];
-}
-
-/** 4150 → "$41.50". Formatting only; the arithmetic happened on the server. */
-const aud = (cents: number) => {
-  const sign = cents < 0 ? "-" : "";
-  const a = Math.abs(cents);
-  return `${sign}$${Math.floor(a / 100)}.${String(a % 100).padStart(2, "0")}`;
-};
-
-interface Shift {
-  id: string;
-  role: string;
-  functionName: string;
-  client: string | null;
-  siteId: string;
-  siteName: string;
-  day: string;
-  window: string;
-  seats: number;
-  seatsLeft: number;
-  duties: string[];
-  requires: { skill: string; level: string }[];
-  /** null until the venue publishes a rate. */
-  pay: Pay | null;
-  status: string;
-  blockReason: string | null;
-  standing: { standing: Standing; at: string; reason: string | null } | null;
-  /** already on the roster for this shift, claim or no claim. */
-  rostered: boolean;
-  claimable: boolean;
-}
-
 interface Payload {
   worker: { did: string; name: string; role: string };
   at: string;
   shifts: Shift[];
 }
 
-/** A claim this device has sent, and what became of it. */
-interface Sent {
-  state: "sending" | "ok" | "failed";
-  reason?: string;
-}
-
-const DUTY_LABEL: Record<string, string> = {
-  serve_alcohol: "Serve alcohol",
-  handle_food: "Handle food",
-  gaming: "Gaming",
-  supervise: "Supervise",
-};
-
 export default function MobileShiftsPage() {
   const [me, setMe] = useState<Signed | null>(null);
   const [ready, setReady] = useState(false);
   const [payload, setPayload] = useState<Payload | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [open, setOpen] = useState<string | null>(null);
-  const [sent, setSent] = useState<Record<string, Sent>>({});
 
   /* Who is holding this phone is the server’s answer, not the device’s.
      A name in localStorage was an assertion; a session cookie is a claim
@@ -176,35 +105,8 @@ export default function MobileShiftsPage() {
     };
   }, [payload, unseen]);
 
-  async function claim(s: Shift) {
-    if (!me) return;
-    setSent((x) => ({ ...x, [s.id]: { state: "sending" } }));
-    // one ref per tap: a retry of THIS attempt is idempotent, while asking
-    // again after a decline is deliberately a new request
-    const clientRef = `${s.id}:${Date.now()}`;
-    try {
-      const res = await fetch("/api/shifts/claim", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ postingId: s.id, clientRef }),
-      });
-      const body = await res.json();
-      if (!res.ok) throw new Error(body.error ?? `HTTP ${res.status}`);
-      setSent((x) => ({ ...x, [s.id]: { state: "ok" } }));
-      setOpen(null);
-      await load();
-    } catch (e) {
-      setSent((x) => ({
-        ...x,
-        [s.id]: { state: "failed", reason: e instanceof Error ? e.message : "failed" },
-      }));
-    }
-  }
-
   if (!ready) return null;
   if (!me) return <SignIn onSignedIn={setMe} />;
-
-  const active = open ? (payload?.shifts ?? []).find((s) => s.id === open) ?? null : null;
 
   return (
     <div style={{ padding: "14px 14px 28px" }}>
@@ -282,25 +184,17 @@ export default function MobileShiftsPage() {
       {groups.available.length > 0 && (
         <Section title={`Available to you (${groups.available.length})`}>
           {groups.available.map((s) => (
-            <Row key={s.id} s={s} sent={sent[s.id]} isNew={unseen.has(s.id)} onTap={() => setOpen(s.id)} />
+            <Row key={s.id} s={s} isNew={unseen.has(s.id)} />
           ))}
         </Section>
       )}
 
       {groups.blocked.length > 0 && (
         <Section title={`Not available to you (${groups.blocked.length})`}>
-          {groups.blocked.map((s) => <Row key={s.id} s={s} onTap={() => setOpen(s.id)} />)}
+          {groups.blocked.map((s) => <Row key={s.id} s={s} />)}
         </Section>
       )}
 
-      {active && (
-        <Sheet
-          s={active}
-          sent={sent[active.id]}
-          onClose={() => setOpen(null)}
-          onClaim={() => claim(active)}
-        />
-      )}
     </div>
   );
 }
@@ -323,26 +217,15 @@ function Section({ title, children }: { title: string; children: React.ReactNode
   );
 }
 
-function Banner({ tone, children }: { tone: "danger" | "warn" | "success" | "info"; children: React.ReactNode }) {
-  const bg = `var(--${tone === "warn" ? "warning" : tone}-bg)`;
-  const fg = `var(--${tone === "warn" ? "warning" : tone}-fg)`;
-  return (
-    <div
-      style={{
-        background: bg, color: fg, borderRadius: 10, padding: "10px 12px",
-        fontSize: 13, lineHeight: 1.5, marginBottom: 12,
-      }}
-    >
-      {children}
-    </div>
-  );
-}
-
-function Row({ s, sent, isNew, onTap }: { s: Shift; sent?: Sent; isNew?: boolean; onTap: () => void }) {
+function Row({ s, isNew }: { s: Shift; isNew?: boolean }) {
   const blocked = Boolean(s.blockReason);
   return (
-    <button
-      onClick={onTap}
+    /* A link, not a button. The shift has an address now, so tapping it should
+       behave like going somewhere: long-press to copy, open in a new tab, and
+       a back button that returns to the board rather than closing a sheet the
+       browser never knew about. */
+    <Link
+      href={`/m/shifts/${s.id}`}
       style={{
         display: "block", width: "100%", textAlign: "left", minHeight: 56,
         padding: "11px 13px", borderRadius: 12, cursor: "pointer",
@@ -433,95 +316,7 @@ function Row({ s, sent, isNew, onTap }: { s: Shift; sent?: Sent; isNew?: boolean
       {s.rostered && <Pill tone="success">You&rsquo;re on this shift</Pill>}
       {!s.rostered && s.standing?.standing === "open" && <Pill tone="info">Claimed — waiting on the manager</Pill>}
       {s.standing?.standing === "declined" && <Pill tone="warning">{s.standing.reason ?? "Not needed"}</Pill>}
-      {sent?.state === "failed" && <Pill tone="danger">{sent.reason}</Pill>}
-    </button>
-  );
-}
-
-/**
- * The award maths, shown rather than summarised.
- *
- * The point of this panel is that a casual can check it. "Above award" as a
- * badge is a marketing claim; the same badge next to the floor it beat, the
- * hours it was worked out over, and the clause it comes from is something a
- * person can argue with — which is the only version worth putting in front of
- * someone whose pay it describes.
- *
- * It also says what it does not cover. A gross figure that quietly excludes
- * overtime and allowances, presented as "your pay", is the kind of number that
- * is believed until payday.
- */
-function PayPanel({ pay }: { pay: Pay }) {
-  return (
-    <section
-      style={{
-        background: "var(--fs-navy, #0a1a28)", color: "#fff", borderRadius: 14,
-        padding: "14px 15px", margin: "0 0 14px",
-      }}
-    >
-      {/* globals.css colours h3 and p with --fg-1 / --fg-2, which are dark by
-          design and invisible on this panel. Inheritance does not reach them,
-          so every element here states its own colour. */}
-      <h3
-        style={{
-          margin: 0, fontSize: 10.5, fontWeight: 700, letterSpacing: ".08em",
-          textTransform: "uppercase", color: "#fff", opacity: 0.65,
-        }}
-      >
-        Your pay for this shift
-      </h3>
-
-      <p style={{ margin: "6px 0 0", display: "flex", alignItems: "baseline", gap: 8, flexWrap: "wrap", color: "#fff" }}>
-        <span className="fs-tnum" style={{ fontSize: 30, fontWeight: 800, letterSpacing: "-.02em" }}>
-          {aud(pay.estGrossCents)}
-        </span>
-        <span style={{ fontSize: 12.5, opacity: 0.7 }}>
-          est. gross · {pay.paidHours}h at {aud(pay.offeredHourlyCents)}/h
-        </span>
-      </p>
-
-      {/* Per band, because this is the part a single rate hides: an eight-hour
-          Friday that runs past midnight is not eight Friday hours. */}
-      <ul style={{ margin: "12px 0 0", padding: 0, listStyle: "none", fontSize: 12.5, color: "#fff" }}>
-        {pay.bands.map((b) => (
-          <li key={b.band} style={{ display: "flex", justifyContent: "space-between", gap: 12, padding: "3px 0" }}>
-            <span style={{ opacity: 0.75 }}>
-              {b.label} · {b.hours}h
-            </span>
-            <span className="fs-tnum" style={{ fontWeight: 600, whiteSpace: "nowrap" }}>
-              award {aud(b.hourlyCents)}/h
-            </span>
-          </li>
-        ))}
-        {/* The rows above cover the shift end to end, so they have to be
-            reconciled with the paid hours rather than quietly not adding up. */}
-        {pay.unpaidHours > 0 && (
-          <li style={{ display: "flex", justifyContent: "space-between", gap: 12, padding: "3px 0", opacity: 0.75 }}>
-            <span>Unpaid meal break</span>
-            <span className="fs-tnum" style={{ whiteSpace: "nowrap" }}>−{pay.unpaidHours}h</span>
-          </li>
-        )}
-      </ul>
-
-      <p
-        style={{
-          margin: "12px 0 0", padding: "9px 10px", borderRadius: 9, fontSize: 12.5, lineHeight: 1.5,
-          background: pay.atOrAboveFloor ? "rgba(18,217,198,.14)" : "rgba(255,120,120,.16)",
-          color: pay.atOrAboveFloor ? "var(--fs-teal-bright, #12d9c6)" : "#ffb4b4",
-          fontWeight: 600,
-        }}
-      >
-        {pay.atOrAboveFloor
-          ? `✓ ${aud(pay.offeredHourlyCents)}/h clears the ${pay.awardId} floor for every hour of this shift — the dearest hour is ${aud(pay.floorHourlyCents)}/h.`
-          : `This rate is below the ${pay.awardId} floor of ${aud(pay.floorHourlyCents)}/h.`}
-      </p>
-
-      <p style={{ margin: "10px 0 0", fontSize: 11, lineHeight: 1.5, color: "#fff", opacity: 0.6 }}>
-        {pay.awardId} cl 18 &amp; 29. Estimate for ordinary hours — excludes {pay.notModelled.slice(0, 3).join(", ")} and
-        super.
-        {!pay.publicHolidaysChecked && " Public holidays are not checked for this site."}
-      </p>
-    </section>
+    </Link>
   );
 }
 
@@ -530,115 +325,3 @@ const mineLink: React.CSSProperties = {
   border: "1px solid var(--border-2)", background: "#fff", textDecoration: "none",
   fontSize: 13.5, fontWeight: 600, color: "var(--fg-2)",
 };
-
-const chip = (tone: string): React.CSSProperties => ({
-  fontSize: 11.5, fontWeight: 700, borderRadius: 999, padding: "3px 8px",
-  color: `var(--${tone}-fg)`, background: `var(--${tone}-bg)`,
-});
-
-function Pill({ tone, children }: { tone: string; children: React.ReactNode }) {
-  return (
-    <span
-      style={{
-        display: "inline-block", marginTop: 7, fontSize: 11.5, fontWeight: 600,
-        color: `var(--${tone}-fg)`, background: `var(--${tone}-bg)`,
-        borderRadius: 999, padding: "4px 9px",
-      }}
-    >
-      {children}
-    </span>
-  );
-}
-
-function Sheet({
-  s, sent, onClose, onClaim,
-}: {
-  s: Shift;
-  sent?: Sent;
-  onClose: () => void;
-  onClaim: () => void;
-}) {
-  return (
-    <div
-      onClick={onClose}
-      style={{
-        position: "fixed", inset: 0, background: "rgba(0,0,0,.34)",
-        display: "flex", alignItems: "flex-end", zIndex: 40,
-      }}
-    >
-      <div
-        onClick={(e) => e.stopPropagation()}
-        style={{
-          width: "100%", background: "var(--bg)", borderRadius: "16px 16px 0 0",
-          padding: "18px 16px calc(18px + env(safe-area-inset-bottom))",
-          maxHeight: "86dvh", overflowY: "auto",
-        }}
-      >
-        <h2 style={{ margin: "0 0 2px", fontSize: 19, letterSpacing: "-.02em" }}>{s.role}</h2>
-        <p style={{ margin: "0 0 14px", fontSize: 13, color: "var(--fg-4)" }}>
-          {s.functionName}
-          {s.client && ` · ${s.client}`}
-        </p>
-
-        <dl style={{ margin: "0 0 14px", display: "grid", gridTemplateColumns: "auto 1fr", gap: "7px 14px", fontSize: 13.5 }}>
-          <dt style={{ color: "var(--fg-4)" }}>When</dt>
-          <dd style={{ margin: 0 }}>{s.day} · {s.window}</dd>
-          <dt style={{ color: "var(--fg-4)" }}>Where</dt>
-          <dd style={{ margin: 0 }}>{s.siteName}</dd>
-          <dt style={{ color: "var(--fg-4)" }}>Seats</dt>
-          <dd style={{ margin: 0 }}>{s.seatsLeft} of {s.seats} still open</dd>
-          {s.duties.length > 0 && (
-            <>
-              <dt style={{ color: "var(--fg-4)" }}>Involves</dt>
-              <dd style={{ margin: 0 }}>{s.duties.map((d) => DUTY_LABEL[d] ?? d).join(", ")}</dd>
-            </>
-          )}
-        </dl>
-
-        {s.pay && <PayPanel pay={s.pay} />}
-
-        {s.blockReason && (
-          <Banner tone="warn">
-            <strong>You can&rsquo;t take this one yet.</strong>
-            <span style={{ display: "block", marginTop: 4 }}>{s.blockReason}</span>
-          </Banner>
-        )}
-        {s.rostered && <Banner tone="success">You&rsquo;re rostered on this shift.</Banner>}
-        {!s.rostered && s.standing?.standing === "open" && (
-          <Banner tone="info">Your claim is in. The manager decides who gets the seat.</Banner>
-        )}
-        {s.standing?.standing === "declined" && (
-          <Banner tone="warn">{s.standing.reason ?? "You weren't needed for this one."}</Banner>
-        )}
-        {sent?.state === "failed" && <Banner tone="danger">{sent.reason}</Banner>}
-
-        <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
-          <button
-            onClick={onClose}
-            style={{
-              flex: 1, minHeight: 50, borderRadius: 12, fontSize: 15, fontWeight: 600,
-              border: "1px solid var(--border-2)", background: "#fff", color: "var(--fg-2)", cursor: "pointer",
-            }}
-          >
-            Close
-          </button>
-          {s.claimable && (
-            <button
-              onClick={onClaim}
-              disabled={sent?.state === "sending"}
-              style={{
-                flex: 2, minHeight: 50, borderRadius: 12, fontSize: 15, fontWeight: 700,
-                border: "1px solid var(--accent, var(--fg-1))",
-                background: "var(--accent, var(--fg-1))", color: "#fff",
-                cursor: sent?.state === "sending" ? "default" : "pointer",
-                opacity: sent?.state === "sending" ? 0.7 : 1,
-              }}
-            >
-              {sent?.state === "sending" ? "Sending…" : "Put my hand up"}
-            </button>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
