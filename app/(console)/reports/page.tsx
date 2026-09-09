@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { NotComputedBanner } from "@/components/screen/not-computed";
 import {
   Card,
   Ring,
@@ -244,6 +245,7 @@ export default function ReportsPage() {
 
   return (
     <div>
+      <NotComputedBanner source={<>The one report that IS computed is Break loading, which folds the real time clock — it is linked above and lives at /reports/breaks. Fairness, labour cost and attendance analytics have nothing behind them yet.</>} />
       <PageHead
         title="Reports"
         sub="Analytics across fairness, labour cost, attendance and compliance."

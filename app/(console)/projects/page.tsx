@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { NotComputedBanner } from "@/components/screen/not-computed";
 import {
   Card,
   Ring,
@@ -252,6 +253,7 @@ export default function ProjectsPage() {
 
   return (
     <div>
+      <NotComputedBanner source="Covers records no run sheets. A shift knows its role, site and duties; nothing holds the tasks, timings or courses a service is run to." />
       <div style={{ display: "flex", alignItems: "flex-start", gap: 16, marginBottom: 18 }}>
         <div style={{ flex: 1 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
