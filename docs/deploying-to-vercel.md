@@ -175,6 +175,42 @@ URL rather than by reading the setting back.
 So the guarantee does not rest there alone. Use the preview URL; leave the
 alias inert.
 
+## The console does not work on this deployment, on purpose
+
+`POST /api/auth/console/request` returns **503** with a message about
+`AUTH_CODES_DIR`. That is the design working, not a misconfiguration, and it is
+worth knowing before somebody spends an afternoon on it.
+
+The route does not consult `sinkFromEnv()` at all. Its own comment says why:
+
+> Only ever a file. `sinkFromEnv()` is not consulted, because it can return the
+> inline sink and this is the one code that must never travel that way.
+
+An operator session mints other people's credentials, so an operator code
+returned in a response body is worth more to an attacker than a worker's. On
+Vercel the only writable filesystem is ephemeral and per-instance, so a
+`FileSink` here would write the code where nobody — including the person who
+asked for it — can read it. File-only plus no usable filesystem equals no
+console.
+
+**What works instead:** the worker app at `/m`. Those codes come back inline,
+which is what `AUTH_CODES_INLINE` on Preview is for, and it is the phone
+experience the deployment exists to show.
+
+**What would change it**, in increasing order of how much it deserves:
+
+1. A channel that proves delivery — email to a verified address, SMS to a
+   number on the roster. This retires the question rather than answering it,
+   and is the only option that makes the console safe on a public URL.
+2. A second, separate opt-in — deliberately **not** `AUTH_CODES_INLINE`, because
+   sharing that flag would mean enabling inline codes for a demo silently also
+   handing out operator codes. Two doors, opened independently.
+
+Option 2 was written and deliberately not merged. The reasoning that argues for
+it — "nobody can reach this server without a Vercel account" — is the same
+shape as "the alias is gated", and this file already declines to rest a
+guarantee there.
+
 ## What is worse on serverless than it is locally
 
 **The event stream goes quiet across instances.** `EventStore.subscribe()` is
