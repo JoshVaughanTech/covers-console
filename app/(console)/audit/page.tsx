@@ -43,6 +43,10 @@ function eventMeta(e: AuditEvent): EventMeta {
       return { icon: "undo-2", tone: "neutral", kind: "Claim withdrawn" };
     case "shift.posted":
       return { icon: "megaphone", tone: "neutral", kind: "Shift posted" };
+    case "task.moved":
+      return { icon: "corner-up-right", tone: "neutral", kind: "Task moved" };
+    case "task.created":
+      return { icon: "plus", tone: "neutral", kind: "Task added" };
     /* The cause, next to the effect. Without a label of its own it renders
        as a generic "Event", which is exactly the distinction the pair exists
        to draw. */

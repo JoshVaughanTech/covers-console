@@ -58,6 +58,8 @@ const DECLARED: Record<AuditEventType, true> = {
   "shift.claimed": true,
   "shift.withdrawn": true,
   "shift.posted": true,
+  "task.moved": true,
+  "task.created": true,
   "engagement.proposed": true,
   "engagement.accepted": true,
   "engagement.provisioned": true,

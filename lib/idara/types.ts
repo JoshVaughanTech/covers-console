@@ -277,6 +277,22 @@ export type AuditEventType =
    */
   | "shift.posted"
   /**
+   * A run sheet task moved between columns. Carries `taskId`, `from` and `to`.
+   *
+   * `from` is recorded even though the fold does not need it — replay locates
+   * the card itself, so a stale `from` cannot corrupt the board. It is there
+   * because the audit screen is read by a person asking what changed, and
+   * "moved to Review" answers half the question.
+   */
+  | "task.moved"
+  /**
+   * A task added to a run sheet. Carries the card itself in `data`, for the
+   * same reason shift.posted carries the posting: the board is rebuilt by
+   * folding this log over the seed, and a task whose creation went unrecorded
+   * would vanish on the next reload.
+   */
+  | "task.created"
+  /**
    * An employment offer assembled from a worker's pack and a venue's employer
    * profile: this worker, this venue, this shift, this rate. Carries the
    * engagement itself in `data` for the same reason shift.posted carries the
