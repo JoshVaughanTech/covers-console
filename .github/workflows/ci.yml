@@ -1,0 +1,77 @@
+# ============================================================
+# The gate this repository did not have.
+#
+# Until now nothing ran automatically on any branch — no tests, no
+# tsc, no lint, no build. A merge to main was gated by whoever
+# chose to run something locally, and that held only as long as
+# somebody chose to. In one week that arrangement let through a
+# fail-open vault key, eight unawaited auth calls that opened two
+# endpoints to anonymous callers, and a node_modules a full minor
+# version behind the lockfile.
+#
+# None of those would have been caught by choosing to look. Each
+# needed a specific check to be run by someone who already knew
+# what they were looking for.
+#
+# There is a second reason, and it is the one that argues for CI
+# even where a human would eventually notice. The repo now carries
+# three checks written in response to real failures —
+# audit-events-wired, promises-awaited, installed-matches-lockfile.
+# A check nobody is obliged to run has to earn its place every time
+# it speaks, and one false positive retires it permanently. Making
+# them mandatory is what stops them being optional folklore.
+# ============================================================
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# A second push to a branch makes the first run's answer irrelevant, and a
+# queued run of superseded code is a runner nobody needed.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    # The other half of vitest.config.ts's generous hook timeouts: a genuine
+    # deadlock fails the run rather than holding a runner indefinitely.
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          # From .nvmrc, so the version is stated once rather than here and
+          # in whatever a developer happens to have installed.
+          node-version-file: .nvmrc
+          cache: npm
+
+      # `ci`, never `install`. It installs exactly what the lockfile says and
+      # cannot rewrite it, which is the invariant the whole tree turns on —
+      # `npm install` produces a tree that merely SATISFIES package.json, and
+      # that difference is how node_modules came to sit a minor version behind
+      # main while every check passed.
+      - name: Install
+        run: npm ci
+
+      # First because it is fast, and because it sees things the build cannot.
+      # next build type-checks the app graph; tests/ is not part of that graph,
+      # so tsc is the only check that ever reads them. See the noUnusedLocals
+      # comment in tsconfig.json and docs/green-tests-broken-build.md.
+      - name: Typecheck
+        run: npx tsc --noEmit
+
+      - name: Test
+        run: npm test
+
+      # Last because it is slowest, and because a type error or a failing test
+      # is a more useful thing to be told first. Also runs ESLint, which is why
+      # there is no separate lint step.
+      - name: Build
+        run: npm run build
