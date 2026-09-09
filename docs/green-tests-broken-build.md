@@ -16,14 +16,15 @@ that was expensive.
 Three different failures. The first two are opposites; the third is neither,
 and is the one that took longest to see.
 
-**Eight disagreements.** A check says sound, another says broken, and only one
+**Nine disagreements.** A check says sound, another says broken, and only one
 of them is right. In five of these a passing test suite — usually with a clean
 `tsc` — sat over a tree that `next build` refuses. The sixth runs the other way:
 `tsc` fails on code nobody wrote, and the build is fine. The seventh runs a
 third way, and is the one that undoes the tidy version of the rule: the build
-passes over a file `tsc` rejects, because the build never reads it. The eighth
-is not two checks disagreeing at all — it is one check, run twice, over two
-trees somebody thought were the same.
+passes over a file `tsc` rejects, because the build never reads it. The last
+two are not two checks disagreeing at all. The eighth is one check run over two
+trees somebody thought were the same; the ninth is one check, one tree, run
+twice, disagreeing with itself.
 
 **One false agreement.** Every check passes and they are all wrong together,
 because the thing being consulted is not evidence.
@@ -38,7 +39,7 @@ them would flatten the difference.
 
 Everything below was hit for real in this repo, not imagined.
 
-The reason there are eight disagreements and not one is that these checks have
+The reason there are nine disagreements and not one is that these checks have
 **different and partly disjoint coverage** — and the coverage differs by
 directory, not only by tool.
 
@@ -273,12 +274,59 @@ are different promises and only one of them is about the repo.
 
 ---
 
+## 9. The same check, run twice, with two answers
+
+| run | result |
+|---|---|
+| first | **6 failures** — `Hook timed out in 10000ms` |
+| second, nothing changed | 63 files, 944 tests, green |
+
+Reported by the session working on `one-tap-employment`; not reproduced here,
+and it is worth saying so rather than dressing it up. What is checkable from
+this side: `@electric-sql/pglite` is a dependency, and no `hookTimeout` is set
+anywhere, so vitest's default of ten seconds applies — which is the number in
+the message.
+
+The failing files were `subscriptions`, weekly delivery and the migration
+tests: files that branch never touches. So the red run was not about the change
+under test, and an in-memory Postgres starting up under load is the obvious
+suspect.
+
+**Every entry above this one is two things disagreeing. This is one thing
+disagreeing with itself, having been shown nothing new.** Same code, same
+command, two answers, minutes apart.
+
+What makes it dangerous is the response it invites, which is also the correct
+response: run it again. That is right when the first run was a flake and wrong
+when the first run was real, and **the two cases are indistinguishable from the
+results alone.** A green run after a red one is not evidence that anything was
+fixed. Nothing was touched.
+
+The habit is worse than the incident. Re-running until green quietly discards
+genuine intermittent failures, and intermittent failures are the ones about
+ordering, timing and shared state — the hardest class to find any other way,
+and the one this repo has already been bitten by more than once. A team that
+learns "just re-run it" has built a filter that removes exactly the bugs it
+most needs to see.
+
+So the question is not *is this flaky*. It is **did anything change between the
+two runs**, which is answerable and usually answered by "no". If nothing
+changed, both results are facts about the harness under load and neither is a
+fact about the code — and quoting the green one as though it were the second
+kind is the move to avoid.
+
+**How it arises:** a red run, a re-run, and relief. The fix is a sentence, not
+a tool: say which run you are quoting, and say whether anything changed between
+them. Entry 8 asks you to say which tree. This one asks you to say which run.
+
+---
+
 ## A different failure: things that look like evidence
 
-The eight above are all **checks disagreeing** — one says sound, another says
+The nine above are all **checks disagreeing** — one says sound, another says
 broken, and the disagreement is the signal. Seven of them disagree about one
-tree; the eighth disagrees because it was shown two, which is the same lesson
-entered from the other side. These are the opposite and deserve separating
+tree; the eighth disagrees because it was shown two; the ninth disagrees with
+itself, over one tree, having been shown nothing new at all. These are the opposite and deserve separating
 rather than numbering: **every check agrees, confidently, on the wrong answer.**
 
 Agreement is what we normally treat as evidence. That is what makes this class
@@ -435,7 +483,7 @@ has to happen before the sentence, not after somebody has acted on it.
 
 ## A third failure: a check with nothing to say
 
-The eight disagreements are checks that contradict each other. The evidence
+The nine disagreements are checks that contradict each other. The evidence
 cases are checks that agree and are wrong together. This one is neither. **Every
 check passed, every check was correct, and none of them was ever looking.**
 
