@@ -1,0 +1,95 @@
+# ============================================================
+# The checks, run by something other than a person remembering.
+#
+# Every check below already existed and every one of them was
+# green while something was wrong, because nothing obliged anyone
+# to run it. In one week that gap let through a credential vault
+# deriving AES keys from three bytes of a mistyped env var, eight
+# auth guards that never fired, and a checkout building the exact
+# Next release a security upgrade had just replaced. All three
+# were caught by somebody choosing to look.
+#
+# So this file adds no new checking. It removes the choosing.
+#
+# ORDER IS DELIBERATE: cheapest and most specific first, so a
+# failure names its own cause. tsc points at a line; the build
+# points at "something in the app". Both are useful and only one
+# of them is a diagnosis.
+#
+# ON FLAKINESS, because a red run here will eventually be one and
+# a check people learn to re-run is a check they have stopped
+# reading: the store suites each boot an in-memory Postgres in
+# ~1.5s against vitest's 5s default, so under CPU contention they
+# time out in files unrelated to the change. Two things tell you
+# that is what happened, and neither is the duration:
+#
+#   1. the failures say `timed out`, not an assertion with a diff
+#   2. the failing file passes on its own, immediately, every time
+#
+# If both hold, it is the machine. Re-run it. If either does not,
+# it is the code, and re-running is how the bug reaches main.
+#
+# The real fix is one database per file with TRUNCATE between
+# cases — 3ms where a fresh boot is ~1500ms — not a raised
+# timeout, which turns a fast loud failure into a slow one and
+# buys the same silence for a genuine hang.
+# ============================================================
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# A second push to the same branch makes the first run's answer stale before it
+# arrives. Cancel it rather than let a green tick from an older commit sit on
+# the PR looking like it means something.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          # Matches the development environment. A CI runtime that differs from
+          # the one people actually use produces failures nobody can reproduce,
+          # and an unreproducible red run is how a check gets ignored.
+          node-version: '24'
+          cache: npm
+
+      # `ci`, never `install`. `npm install` produces a tree that SATISFIES
+      # package.json; `npm ci` produces one that EQUALS the lockfile. The
+      # difference is not academic — it is how a checkout came to hold Next
+      # 15.1.6 while package.json said 15.5.25, with every check passing.
+      - name: Install
+        run: npm ci
+
+      - name: Typecheck
+        run: npx tsc --noEmit
+
+      # Reaches app code that tsc does not: unused vars, and the type-aware
+      # promise rules that catch `if (!workerOf(req))` — a guard that never
+      # fires, which tsc compiles in silence.
+      #
+      # `next lint` is deprecated and goes away in Next 16. When it does, these
+      # rules stop being invoked and nothing fails — they simply stop running.
+      # Migrate with: npx @next/codemod@canary next-lint-to-eslint-cli .
+      - name: Lint
+        run: npm run lint
+
+      - name: Test
+        run: npm test
+
+      # Last because it is slowest, and because it is the only step that
+      # validates what a route module is allowed to export. Not a superset of
+      # the others: it does not typecheck anything under tests/.
+      - name: Build
+        run: npm run build
