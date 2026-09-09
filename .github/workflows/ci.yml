@@ -54,6 +54,36 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
 
+    # A real Postgres, for the one test file that cannot use PGlite.
+    #
+    # PGlite is real Postgres and is not the real code path: db() builds a
+    # PgliteDb without DATABASE_URL and a PgDb with it, and those are two
+    # implementations of transaction(). Everything else here runs the first.
+    # Without this service the class that actually deploys is exercised by
+    # nothing, and tests/pg-driver.test.ts skipIf's itself into a green tick
+    # that means "not run".
+    #
+    # It also needs more than one connection to be worth anything: the
+    # property under test is that pg_advisory_xact_lock serialises appends
+    # arriving on different connections, and PGlite has one.
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_USER: covers
+          POSTGRES_PASSWORD: covers
+          POSTGRES_DB: covers_test
+        ports:
+          - 5432:5432
+        # Steps start as soon as the container does, which is well before
+        # Postgres accepts connections. Without the health check the first
+        # query races the server's own startup and fails on a good day.
+        options: >-
+          --health-cmd "pg_isready -U covers"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
     steps:
       - uses: actions/checkout@v4
 
@@ -87,6 +117,25 @@ jobs:
 
       - name: Test
         run: npm test
+
+      # ONLY this file, and only here, gets DATABASE_URL.
+      #
+      # Setting it for the whole job would not extend coverage, it would
+      # break the suite: every file would share one database instead of
+      # getting its own PGlite, and the files that mint sessions collide —
+      # measured, 18 files and 97 tests fail that way, reporting things like
+      # "expected priya-sharma to be darie-roberts" because one file's
+      # session was read by another.
+      #
+      # sslmode=disable because freshDb() turns SSL on for anything that does
+      # not opt out, which is correct for Neon and wrong for a sidecar. The
+      # failure is "The server does not support SSL connections" on every
+      # case, which reads like a broken driver rather than a URL missing a
+      # parameter.
+      - name: Test the driver that ships
+        run: npx vitest run tests/pg-driver.test.ts
+        env:
+          DATABASE_URL: postgresql://covers:covers@localhost:5432/covers_test?sslmode=disable
 
       # Last because it is slowest, and because it is the only step that
       # validates what a route module is allowed to export. Not a superset of
