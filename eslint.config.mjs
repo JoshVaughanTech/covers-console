@@ -10,6 +10,16 @@ const compat = new FlatCompat({
 });
 
 const eslintConfig = [
+  {
+    /* `next lint` scoped itself to app/, components/, lib/ and friends. The
+       ESLint CLI does not — `eslint .` walks the whole tree — so a boundary
+       that used to be implicit has to be stated.
+
+       Without it the run lints node_modules and .next and reports thousands of
+       problems in generated code, which is not a stricter check. It is the
+       shape that gets a check switched off rather than fixed. */
+    ignores: ["node_modules/**", ".next/**", ".next-build/**", "out/**", "build/**", "next-env.d.ts"],
+  },
   ...compat.extends("next/core-web-vitals", "next/typescript"),
   {
     rules: {
