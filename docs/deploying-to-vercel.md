@@ -128,18 +128,52 @@ worker, none of which the roster currently carries.
 
 ## Environment variables
 
-| Variable | Value | Why |
-|---|---|---|
-| `DATABASE_URL` | set by connecting Neon | everything durable |
-| `PGPOOL_MAX` | leave unset (3) | the ceiling is the server's, shared |
-| `AUTH_CODES_INLINE` | `1` | only valid behind deployment protection |
-| `AUTH_CODES_DIR` | leave unset | ephemeral, per-instance, unreadable |
+**Everything goes on Preview. Production is deliberately empty, and that is
+not an oversight to tidy up.**
+
+| Variable | Value | Environment | Why |
+|---|---|---|---|
+| `DATABASE_URL` | the pooled Neon string | **Preview only** | everything durable |
+| `PGPOOL_MAX` | leave unset (3) | — | the ceiling is the server's, shared |
+| `AUTH_CODES_INLINE` | `1` | **Preview only** | only ever valid behind a gate |
+| `AUTH_CODES_DIR` | leave unset | — | ephemeral, per-instance, unreadable |
 | `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` / `VAPID_SUBJECT` | from `node scripts/generate-vapid-keys.mjs` | web push; without them the offer is still recorded and simply not pushed |
 | `COVERS_ORG` | leave unset | defaults to the demo org |
 
 Connecteam variables stay unset unless live break-compliance data is wanted;
 blank means demo data, which is what a deployment behind a password should
 show anyway.
+
+### Why Production has nothing on it
+
+The obvious future change is to move these to Production, because that is
+where the app runs. That reasoning is correct and the premise it rests on is
+the thing this section exists to write down.
+
+Both the production alias and the preview URLs are gated by Vercel
+Authentication. Production being empty is the **second** thing that would have
+to fail, and it fails closed: if protection is ever flipped back, the alias
+serves an app with no database and a `NoSink` that 503s. Inert.
+
+Put these variables on Production and that same flip yields a live app handing
+sign-in codes to anyone who asks, with a dashboard toggle as the only thing
+that was ever in the way.
+
+**The gated alias is what makes Preview-only safe to keep — not what makes it
+unnecessary.** Those two read identically from outside and lead to opposite
+decisions.
+
+The reason to distrust a single toggle is first-hand rather than theoretical.
+While this deployment was being set up, `vercel project protection enable
+--sso` returned success, genuinely changed `ssoProtection.deploymentType`, and
+left `/m` serving 200 to anyone: the scope it set was
+`prod_deployment_urls_and_all_previews`, and only `all` covers the production
+alias. Not a bug and not ambiguous naming — the command did exactly what it
+said, to the wrong scope, and reported success. It was caught by re-testing the
+URL rather than by reading the setting back.
+
+So the guarantee does not rest there alone. Use the preview URL; leave the
+alias inert.
 
 ## What is worse on serverless than it is locally
 
