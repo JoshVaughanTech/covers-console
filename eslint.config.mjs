@@ -10,6 +10,15 @@ const compat = new FlatCompat({
 });
 
 const eslintConfig = [
+  /* What `next lint` used to skip for us.
+
+     It walked src, app, pages, components and lib and nothing else, so
+     generated output was never linted and nobody had to say so. `eslint .`
+     walks everything, which is the point — it reaches tests/, which next lint
+     never did — but it also reaches Next's own generated files, and
+     next-env.d.ts fails a rule it has no business being judged by. Ignoring
+     the generated ones is restoring an implicit exclusion, not adding one. */
+  { ignores: [".next/**", "next-env.d.ts", "node_modules/**"] },
   ...compat.extends("next/core-web-vitals", "next/typescript"),
   {
     rules: {
