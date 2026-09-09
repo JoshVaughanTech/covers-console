@@ -25,17 +25,54 @@ const TABS = [
   { href: "/m/profile", label: "Profile" },
 ] as const;
 
-/* Shown only to a venue sign-in. Posting commits the venue to paying
-   somebody, so it is an operator act — and operators and workers are separate
-   populations here, not one population with a flag (lib/auth/operators.ts).
+/* What a venue sign-in gets instead — not in addition.
+
+   The six above are worker screens: every one reads b.worker from the session
+   and, finding none, renders the staff sign-in picker. So an operator shown
+   those tabs gets six dead ends, and the failure is worse than a wasted tap.
+   The picker invites them to sign in as a WORKER, which replaces the operator
+   session they are holding — after which Post disappears, and nothing
+   anywhere explains why.
+
+   Operators and workers are separate populations on purpose
+   (lib/auth/operators.ts: "an operator is not a worker with a flag"), and
+   Sophie Nguyen exists in both rosters. A nav that mixes the two invites
+   somebody to swap identity by accident.
+
+   Two entries rather than one, because a nav with a single item is a nav that
+   has stopped being one: the console is where the rest of an operator's work
+   is, and this says so rather than leaving the phone a cul-de-sac.
 
    Asked of the server rather than inferred from anything the device holds. A
    tab drawn from a guess would be a tab that 401s on arrival, and the screen
    behind it refuses independently regardless: this decides what to DRAW, and
    nothing more. */
-const OPERATOR_TABS = [{ href: "/m/post", label: "Post" }] as const;
+const OPERATOR_TABS = [
+  { href: "/m/post", label: "Post" },
+  { href: "/overview", label: "Console" },
+] as const;
 
 export type MobileTab = (typeof TABS)[number]["href"] | (typeof OPERATOR_TABS)[number]["href"];
+
+export interface Tab {
+  href: string;
+  label: string;
+}
+
+/**
+ * Which tabs a session of this kind gets.
+ *
+ * Pulled out of the component so it can be held to the property that matters
+ * without rendering anything: the two sets do not overlap. A worker offered
+ * Post gets a 401; an operator offered a worker tab gets the staff sign-in
+ * picker, which would replace the session they are holding.
+ *
+ * Signed out falls to the worker tabs, because that is who the phone app is
+ * for — the venue screens are the exception, not the default.
+ */
+export function tabsFor(kind: "worker" | "operator" | null): readonly Tab[] {
+  return kind === "operator" ? OPERATOR_TABS : TABS;
+}
 
 /* Sized to content, not to an equal share. `flex: 1` gives every tab the same
    width whatever its label, so the longest name is always the first to run out
@@ -77,7 +114,9 @@ export function MobileNav({ current }: { current: MobileTab }) {
     return () => { live = false; };
   }, []);
 
-  const tabs = isOperator ? [...TABS, ...OPERATOR_TABS] : TABS;
+  /* Replaced, not appended. Signed out falls to the worker tabs because that
+     is who the phone app is for; the venue screens are the exception. */
+  const tabs = tabsFor(isOperator ? "operator" : "worker");
 
   return (
     <nav style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 14 }}>
