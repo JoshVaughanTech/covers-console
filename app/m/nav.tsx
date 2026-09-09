@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useEffect, useState } from "react";
 
 /* ============================================================
    The phone's tabs, defined once.
@@ -24,7 +25,17 @@ const TABS = [
   { href: "/m/profile", label: "Profile" },
 ] as const;
 
-export type MobileTab = (typeof TABS)[number]["href"];
+/* Shown only to a venue sign-in. Posting commits the venue to paying
+   somebody, so it is an operator act — and operators and workers are separate
+   populations here, not one population with a flag (lib/auth/operators.ts).
+
+   Asked of the server rather than inferred from anything the device holds. A
+   tab drawn from a guess would be a tab that 401s on arrival, and the screen
+   behind it refuses independently regardless: this decides what to DRAW, and
+   nothing more. */
+const OPERATOR_TABS = [{ href: "/m/post", label: "Post" }] as const;
+
+export type MobileTab = (typeof TABS)[number]["href"] | (typeof OPERATOR_TABS)[number]["href"];
 
 /* Sized to content, not to an equal share. `flex: 1` gives every tab the same
    width whatever its label, so the longest name is always the first to run out
@@ -46,9 +57,31 @@ const style = (on: boolean): React.CSSProperties => ({
 });
 
 export function MobileNav({ current }: { current: MobileTab }) {
+  /* Undefined until the answer arrives, so the Post tab appears rather than
+     flickering away — a tab that shows and then vanishes reads as a bug, and
+     the wrong direction to be wrong in is offering something and taking it
+     back. */
+  const [isOperator, setIsOperator] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    let live = true;
+    void (async () => {
+      try {
+        const r = await fetch("/api/auth/session");
+        const b = (await r.json()) as { kind?: string };
+        if (live) setIsOperator(b.kind === "operator");
+      } catch {
+        if (live) setIsOperator(false);
+      }
+    })();
+    return () => { live = false; };
+  }, []);
+
+  const tabs = isOperator ? [...TABS, ...OPERATOR_TABS] : TABS;
+
   return (
     <nav style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 14 }}>
-      {TABS.map((t) =>
+      {tabs.map((t) =>
         t.href === current ? (
           // the current tab is not a link: tapping where you already are is a
           // dead end that costs a page load to discover
