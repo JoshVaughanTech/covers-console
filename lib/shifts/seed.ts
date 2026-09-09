@@ -6,6 +6,7 @@
    ============================================================ */
 
 import { WORKERS } from "@/lib/idara";
+import { DEMO_WEEK } from "@/lib/awards";
 import type { ShiftPay, ShiftPosting } from "./types";
 
 const W = Object.fromEntries(WORKERS.map((w) => [w.name, w.did])) as Record<string, string>;
@@ -92,7 +93,65 @@ function pay(
 
 const CASUAL = { employment: "casual" } as const;
 
+/* ---------- a shift that has already been worked ----------
+
+   Every other posting here is anchored to the NEXT occurrence of its weekday,
+   which is right for a board of work going. It also means no engagement made
+   in this demo can ever be confirmed: confirmation reads the time clock, and
+   the clock's completed sessions are all in the last complete week, so a
+   future-dated shift matches nothing. The feature would be correct and
+   invisible, which is the worst combination to ship.
+
+   So one posting is anchored BACKWARDS, onto a real completed session — Darie
+   Roberts' Tuesday 16:00 close at the hotel, which he worked with no meal
+   break at all. Assign him, let him sign, and the whole path is reachable:
+   the clock says eight hours against a roster that planned seven and a half,
+   and cl 16.6 says the venue owes loading for the break he never got. Both
+   numbers land on the chain when somebody confirms.
+
+   DEMO_WEEK is imported rather than recomputed. lastCompleteWeek() called
+   twice a few milliseconds apart would agree today and disagree at midnight
+   on a Sunday, and a fixture that comes apart once a week is worse than no
+   fixture. One definition, imported. */
+const CLOSE = DEMO_WEEK.start + 1 * 86400 + 16 * 3600;
+const CLOSE_HOURS = 8;
+
+/** The real date of that shift, formatted rather than hand-typed. */
+const closeDay = new Intl.DateTimeFormat("en-AU", {
+  timeZone: TZ,
+  weekday: "short",
+  day: "numeric",
+  month: "short",
+}).format(CLOSE * 1000);
+
 export const POSTINGS: ShiftPosting[] = [
+  {
+    id: "sp-lastweek-close",
+    role: "Bartender",
+    seats: 1,
+    functionName: "Brightwater Close",
+    siteId: "s-brightwater",
+    day: closeDay,
+    window: "16:00–00:00",
+    shiftId: "Tue",
+    duties: ["serve_alcohol"],
+    requires: [{ skill: "till_pos", level: "solid" }],
+    /* $41.50 against a Tuesday evening floor of $36.80 — comfortably over, so
+       the rate is not what this fixture is testing. What it is testing is that
+       hours come from the clock: the roster plans a 30-minute unpaid break and
+       the clock says he never took one. */
+    pay: {
+      level: 2,
+      ...CASUAL,
+      offeredHourlyCents: 4150,
+      startsAt: CLOSE,
+      endsAt: CLOSE + CLOSE_HOURS * 3600,
+      unpaidBreakSec: 30 * 60,
+    },
+    claims: [],
+    assigned: [],
+    status: "open",
+  },
   {
     id: "sp-2038-wait",
     role: "Wait Staff",

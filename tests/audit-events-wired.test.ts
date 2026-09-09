@@ -58,6 +58,14 @@ const DECLARED: Record<AuditEventType, true> = {
   "shift.claimed": true,
   "shift.withdrawn": true,
   "shift.posted": true,
+  "engagement.proposed": true,
+  "engagement.accepted": true,
+  "engagement.provisioned": true,
+  "engagement.confirmed": true,
+  "engagement.cancelled": true,
+  "pack.item_verified": true,
+  "pack.item_revoked": true,
+  "conversion.flagged": true,
 };
 
 /**
@@ -66,7 +74,24 @@ const DECLARED: Record<AuditEventType, true> = {
  * The reason is the point. "Pending" with no blocker named is the same silence
  * this file exists to break, one indirection further along.
  */
-const PENDING: Partial<Record<AuditEventType, string>> = {};
+const PENDING: Partial<Record<AuditEventType, string>> = {
+  "engagement.cancelled":
+    "no cancellation flow on either side — a venue standing somebody down and a " +
+    "worker pulling out are different facts with different consequences, and " +
+    "neither is designed. cancelledEvent() exists and nothing calls it.",
+  "pack.item_verified":
+    "§10 names KYC provider selection (Stripe Identity / Onfido / GreenID) as an " +
+    "unresolved P0. The packs are seeded, so there is no verification callback " +
+    "for this to be written from.",
+  "pack.item_revoked":
+    "same blocker as pack.item_verified — revocation arrives from the issuer that " +
+    "did the verifying, and no issuer is connected.",
+  "conversion.flagged":
+    "the signal is live — conversionSignals() runs on every read of " +
+    "/api/employer/engagements and the venue sees it. Putting it ON THE CHAIN " +
+    "needs something scheduled that writes each signal exactly once, and once is " +
+    "the hard half: a daily recompute would append the same fact thirty times.",
+};
 
 /* ---------- reading the source ---------- */
 

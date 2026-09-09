@@ -20,17 +20,25 @@ const TABS = [
   { href: "/m/shifts", label: "Find" },
   { href: "/m/mine", label: "Mine" },
   { href: "/m/earnings", label: "Earnings" },
+  { href: "/m/pack", label: "Pack" },
   { href: "/m/profile", label: "Profile" },
 ] as const;
 
 export type MobileTab = (typeof TABS)[number]["href"];
 
-/* Sized to content, not to an equal fifth. `flex: 1` gives every tab the same
+/* Sized to content, not to an equal share. `flex: 1` gives every tab the same
    width whatever its label, so the longest name is always the first to run out
    of room — and at 320px "Earnings" filled its box to the pixel. The tab whose
-   name is hardest to guess from four letters is the worst one to truncate. */
+   name is hardest to guess from four letters is the worst one to truncate.
+
+   And it wraps, which the five-tab version did not need to. Earnings and Pack
+   arrived on separate branches, so neither author was looking at six: six
+   content-sized tabs do not fit one row on a 320px phone, and `nowrap` without
+   `flexWrap` resolves that by overflowing the viewport rather than by
+   shrinking. Two readable rows beat one row that runs off the screen. */
 const style = (on: boolean): React.CSSProperties => ({
-  flex: "1 1 auto", textAlign: "center", padding: "8px 4px", borderRadius: 10, fontSize: 13, fontWeight: 600,
+  flex: "1 1 auto", minWidth: 88, textAlign: "center",
+  padding: "8px 4px", borderRadius: 10, fontSize: 13, fontWeight: 600,
   textDecoration: "none", whiteSpace: "nowrap",
   border: `1px solid ${on ? "var(--accent)" : "var(--border)"}`,
   background: on ? "var(--accent-bg, var(--bg-2))" : "#fff",
@@ -39,7 +47,7 @@ const style = (on: boolean): React.CSSProperties => ({
 
 export function MobileNav({ current }: { current: MobileTab }) {
   return (
-    <nav style={{ display: "flex", gap: 8, marginBottom: 14 }}>
+    <nav style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 14 }}>
       {TABS.map((t) =>
         t.href === current ? (
           // the current tab is not a link: tapping where you already are is a
