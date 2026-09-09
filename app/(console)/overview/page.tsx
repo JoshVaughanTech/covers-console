@@ -190,8 +190,8 @@ export default function OverviewPage() {
               per-candidate fairness COMPONENT used to rank people for a shift;
               there is no venue-level figure behind this and no trend behind
               the panel below. */}
-          <div style={{ fontSize: 13, color: "var(--fg-3)", fontWeight: 600, marginBottom: 8, display: "flex", alignItems: "center", gap: 7 }}>
-            Roster Fairness Score
+          <div style={{ fontSize: 13, color: "var(--fg-3)", fontWeight: 600 }}>Roster Fairness Score</div>
+          <div style={{ margin: "4px 0 8px" }}>
             <NotComputed title="No roster-wide fairness score is computed anywhere" />
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
@@ -227,12 +227,10 @@ export default function OverviewPage() {
         {metrics.map((m, i) => (
           <ClickableCard key={i} pad={18} ariaLabel={m.link} onClick={() => router.push(m.href)} style={{ display: "flex", flexDirection: "column", gap: 2 }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-              <span style={{ fontSize: 13, color: "var(--fg-3)", fontWeight: 600, display: "inline-flex", alignItems: "center", gap: 7 }}>
-                {m.label}
-                {m.illustrative && <NotComputed />}
-              </span>
+              <span style={{ fontSize: 13, color: "var(--fg-3)", fontWeight: 600 }}>{m.label}</span>
               <Icon name={m.icon} size={17} color={m.accent || "var(--fg-4)"} />
             </div>
+            {m.illustrative && <span style={{ marginTop: 3 }}><NotComputed /></span>}
             <span className="fs-tnum" style={{ fontSize: 32, fontWeight: 800, letterSpacing: "-.02em" }}>{m.value}</span>
             <span style={{ fontSize: 12.5, color: m.statusTone }}>{m.status}</span>
             <div style={{ marginTop: 6 }}><LinkBtn href={m.href}>{m.link}</LinkBtn></div>
