@@ -89,7 +89,7 @@ export async function POST(req: Request) {
      the only place anybody can act on them; the assignment itself stands
      regardless, since being rostered and being employed through Covers are
      two different facts and only one of them is this route's to refuse. */
-  const engagement = r.created ? engageOnAssign(eventStore(), ORG, r.event) : null;
+  const engagement = r.created ? await engageOnAssign(await eventStore(), ORG, r.event) : null;
 
   return NextResponse.json(
     { ...r, ...(offer ? { offered: offer } : {}), ...(engagement ? { engagement } : {}) },

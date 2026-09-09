@@ -34,10 +34,10 @@ const TZ = process.env.TZ_VENUE ?? "Australia/Melbourne";
 const workerIndex = new Map(WORKERS.map((w) => [w.did, w]));
 
 export async function GET(req: Request) {
-  if (!operatorOf(req)) return NextResponse.json({ error: "not signed in" }, { status: 401 });
+  if (!(await operatorOf(req))) return NextResponse.json({ error: "not signed in" }, { status: 401 });
 
   const employer = EMPLOYERS[0];
-  const all = replayEngagements(eventStore().all(ORG));
+  const all = replayEngagements((await (await eventStore()).all(ORG)));
   const mine = all.filter((e) => e.employerDid === employer.did || e.hostDid === employer.did);
 
   /* Real time, not the console's demo clock.

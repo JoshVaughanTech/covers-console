@@ -52,7 +52,7 @@ function tokenOk(given: string | null): boolean {
 }
 
 /** Write one confirmation. Returns the event and whether this call created it. */
-function confirm(
+async function confirm(
   store: EventStore,
   worked: WorkedShift,
   input: { at: string; actor: string; actorDid?: string; via: "venue" | "auto" },
@@ -82,11 +82,11 @@ interface ConfirmBody {
 }
 
 export async function POST(req: Request) {
-  const store = eventStore();
+  const store = await eventStore();
   const now = Math.floor(Date.now() / 1000);
   const at = new Date().toISOString();
 
-  const engagements: Engagement[] = replayEngagements(store.all(ORG));
+  const engagements: Engagement[] = replayEngagements((await store.all(ORG)));
   const { sessions, live } = await completedSessions(now);
   const sheet = timesheet({ engagements, sessions, now, timezone: TZ });
 
@@ -94,15 +94,21 @@ export async function POST(req: Request) {
 
   if (tokenOk(req.headers.get("x-run-token"))) {
     const due = dueForAutoConfirm(sheet);
-    const written = due.map((w) => {
-      const r = confirm(store, w, { at, actor: "system", via: "auto" });
-      return {
+
+    /* One at a time, not Promise.all. Every append takes the chain lock, so
+       parallel writes would queue inside the store anyway — and issuing them
+       together would only mean a failure halfway through leaving the rest in
+       flight with nothing reporting which had landed. */
+    const written: { engagementId: string; hours: number; created: boolean; seq: number }[] = [];
+    for (const w of due) {
+      const r = await confirm(store, w, { at, actor: "system", via: "auto" });
+      written.push({
         engagementId: w.engagement.id,
         hours: w.hours,
         created: r.created,
         seq: r.event.seq,
-      };
-    });
+      });
+    }
     return NextResponse.json({
       via: "auto",
       clockLive: live,
@@ -114,7 +120,7 @@ export async function POST(req: Request) {
 
   /* ---------- a venue confirming one shift ---------- */
 
-  const caller = operatorOf(req);
+  const caller = await operatorOf(req);
   if (!caller) {
     // 404 for a bad token, 401 for no session: an unauthenticated caller with
     // a wrong token learns nothing about whether this endpoint exists
@@ -163,14 +169,14 @@ export async function POST(req: Request) {
     });
   }
 
-  const { event, created } = confirm(store, worked, {
+  const { event, created } = await confirm(store, worked, {
     at,
     actor: caller.operator.name,
     actorDid: caller.operator.did,
     via: "venue",
   });
 
-  const after = replayEngagements(store.all(ORG)).find((e) => e.id === engagementId);
+  const after = replayEngagements((await store.all(ORG))).find((e) => e.id === engagementId);
 
   return NextResponse.json(
     {

@@ -33,17 +33,41 @@ export interface ClockRead {
 /**
  * Is a real time clock configured?
  *
- * Both halves are required — an id with no credentials cannot be read, and
- * credentials with no clock id have nothing to read. Half-configured is
- * treated as not configured, because the alternative is an integration that
- * looks connected and returns nothing.
+ * Three states, not two, and the third is why this throws.
+ *
+ * NOTHING SET is the demo: seeded sessions, `live: false` on every result, and
+ * a warning printed by anything that acts on them.
+ *
+ * FULLY SET is Connecteam.
+ *
+ * PARTLY SET is somebody halfway through wiring it up, and returning false
+ * there would answer "somebody asked and got it wrong" as though it were
+ * "nobody asked" — the same mistake the pack vault made with its key, and the
+ * one sinkFromEnv() already decided about sign-in codes. It matters more here
+ * than it looks: confirmation reads this, so a half-configured clock would
+ * settle SEEDED hours as somebody's worked hours and invoice a venue for them.
  */
 export function clockConfigured(): boolean {
   const clock = process.env.CONNECTEAM_TIME_CLOCK_ID;
-  return Boolean(
-    clock &&
-      (process.env.CONNECTEAM_API_KEY ||
-        (process.env.CONNECTEAM_CLIENT_ID && process.env.CONNECTEAM_CLIENT_SECRET)),
+  const key = process.env.CONNECTEAM_API_KEY;
+  const id = process.env.CONNECTEAM_CLIENT_ID;
+  const secret = process.env.CONNECTEAM_CLIENT_SECRET;
+
+  const credentials = Boolean(key || (id && secret));
+  if (clock && credentials) return true;
+
+  const anything = Boolean(clock || key || id || secret);
+  if (!anything) return false;
+
+  const missing = [
+    !clock && "CONNECTEAM_TIME_CLOCK_ID",
+    !credentials && "CONNECTEAM_API_KEY (or CLIENT_ID and CLIENT_SECRET)",
+  ].filter(Boolean);
+
+  throw new Error(
+    `The time clock is half-configured: ${missing.join(" and ")} missing. ` +
+      `Set them, or unset the rest — falling back to seeded sessions here would ` +
+      `confirm demo hours as somebody's worked hours.`,
   );
 }
 

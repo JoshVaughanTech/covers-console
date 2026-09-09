@@ -34,12 +34,12 @@ function profile() {
 }
 
 export async function GET(req: Request) {
-  if (!operatorOf(req)) return NextResponse.json({ error: "not signed in" }, { status: 401 });
+  if (!(await operatorOf(req))) return NextResponse.json({ error: "not signed in" }, { status: 401 });
 
   const p = profile();
   const at = TODAY;
   const gaps = profileGaps(p, at);
-  const engagements = replayEngagements(eventStore().all(ORG)).filter((e) => e.employerDid === p.did);
+  const engagements = replayEngagements((await (await eventStore()).all(ORG))).filter((e) => e.employerDid === p.did);
 
   return NextResponse.json({
     at,
@@ -100,7 +100,7 @@ interface EmployerBody {
  * record to say otherwise would be the console lying about a disclosure.
  */
 export async function POST(req: Request) {
-  const caller = operatorOf(req);
+  const caller = await operatorOf(req);
   if (!caller) return NextResponse.json({ error: "not signed in" }, { status: 401 });
 
   const body = (await req.json().catch(() => null)) as EmployerBody | null;

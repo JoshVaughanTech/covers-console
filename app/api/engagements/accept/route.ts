@@ -73,7 +73,7 @@ interface AcceptBody {
 }
 
 export async function POST(req: Request) {
-  const caller = workerOf(req);
+  const caller = await workerOf(req);
   if (!caller) return NextResponse.json({ error: "not signed in" }, { status: 401 });
 
   const body = (await req.json().catch(() => null)) as AcceptBody | null;
@@ -82,7 +82,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "engagementId is required" }, { status: 400 });
   }
 
-  const store = eventStore();
+  const store = await eventStore();
 
   /* A retry is answered before anything is decided — the same shape the claim
      endpoint uses. Without this the second attempt finds the engagement
@@ -92,9 +92,9 @@ export async function POST(req: Request) {
       ? `engagement:accept:${caller.did}:${body.clientRef}`
       : null;
   if (ref) {
-    const already = store.byClientRef(ORG, ref);
+    const already = await store.byClientRef(ORG, ref);
     if (already) {
-      const e = replayEngagements(store.all(ORG)).find((x) => x.id === engagementId);
+      const e = replayEngagements((await store.all(ORG))).find((x) => x.id === engagementId);
       return NextResponse.json({
         accepted: true,
         created: false,
@@ -103,7 +103,7 @@ export async function POST(req: Request) {
     }
   }
 
-  const engagement = replayEngagements(store.all(ORG)).find((e) => e.id === engagementId);
+  const engagement = replayEngagements((await store.all(ORG))).find((e) => e.id === engagementId);
   if (!engagement) return NextResponse.json({ error: "unknown engagement" }, { status: 404 });
 
   /* Not 403. Whether an engagement exists is itself information about
@@ -132,7 +132,7 @@ export async function POST(req: Request) {
   }
 
   const at = new Date().toISOString();
-  store.append(
+  await store.append(
     ORG,
     acceptedEvent(engagement, "worker", {
       at,
@@ -147,7 +147,7 @@ export async function POST(req: Request) {
      hash, which only exists once the store has chained it — so the engagement
      that carries a real signature is the one the fold returns, not the one
      this handler was holding. */
-  const signed = replayEngagements(store.all(ORG)).find((e) => e.id === engagementId);
+  const signed = replayEngagements((await store.all(ORG))).find((e) => e.id === engagementId);
   if (!signed) return NextResponse.json({ error: "engagement vanished" }, { status: 500 });
 
   if (!isFullySigned(signed)) {
@@ -172,7 +172,7 @@ export async function POST(req: Request) {
     );
   }
 
-  const posting = boardFrom(store.all(ORG)).postings.find((p) => p.id === signed.postingId);
+  const posting = boardFrom((await store.all(ORG))).postings.find((p) => p.id === signed.postingId);
 
   try {
     const result = await provisionEngagement({
@@ -187,7 +187,7 @@ export async function POST(req: Request) {
       at,
     });
 
-    store.append(
+    await store.append(
       ORG,
       provisionedEvent(signed, {
         at,
@@ -199,7 +199,7 @@ export async function POST(req: Request) {
       { clientRef: `engagement:provisioned:${signed.id}` },
     );
 
-    const provisioned = replayEngagements(store.all(ORG)).find((e) => e.id === engagementId);
+    const provisioned = replayEngagements((await store.all(ORG))).find((e) => e.id === engagementId);
 
     return NextResponse.json(
       {

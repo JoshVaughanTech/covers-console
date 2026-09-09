@@ -17,6 +17,7 @@
    ============================================================ */
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { EventStore } from "../lib/store/events";
+import { db, setDb } from "../lib/store/db";
 import {
   BOOKING_FEE_RATE,
   acceptedEvent,
@@ -38,8 +39,9 @@ const END = START + 8 * H;
 const NOW = END + 3 * H;
 
 let store: EventStore;
-beforeEach(() => {
-  store = new EventStore(":memory:");
+beforeEach(async () => {
+  setDb(null);
+  store = new EventStore(await db());
 });
 afterEach(() => store.close());
 
@@ -93,13 +95,13 @@ const session = (over: Partial<ShiftSession> = {}): ShiftSession => ({
 });
 
 /** Everything up to the point where hours can be confirmed. */
-function provisioned(): Engagement {
+async function provisioned(org = ORG): Promise<Engagement> {
   const e = engagement();
-  store.append(ORG, proposedEvent(e, "Emma Taylor"));
-  store.append(ORG, acceptedEvent(e, "employer", { at: "2026-08-30", actor: "Emma Taylor" }));
-  store.append(ORG, acceptedEvent(e, "worker", { at: "2026-08-30", actor: "Darie Roberts", actorDid: WORKER }));
-  store.append(
-    ORG,
+  await store.append(org, proposedEvent(e, "Emma Taylor"));
+  await store.append(org, acceptedEvent(e, "employer", { at: "2026-08-30", actor: "Emma Taylor" }));
+  await store.append(org, acceptedEvent(e, "worker", { at: "2026-08-30", actor: "Darie Roberts", actorDid: WORKER }));
+  await store.append(
+    org,
     provisionedEvent(e, {
       at: "2026-08-30",
       actor: "Brightwater Hospitality",
@@ -107,14 +109,14 @@ function provisioned(): Engagement {
       released: ["identity", "bank_account", "super_choice", "emergency_contact", "tfn_declaration"],
     }),
   );
-  return replayEngagements(store.all(ORG))[0];
+  return replayEngagements(await store.all(org))[0];
 }
 
 /** What the route does: match, then write, keyed on the engagement. */
-function confirmVia(e: Engagement, via: "venue" | "auto", s = session()) {
+async function confirmVia(e: Engagement, via: "venue" | "auto", s = session(), org = ORG) {
   const w = describeWorked(e, s, NOW);
   return store.append(
-    ORG,
+    org,
     confirmedEvent(e, {
       at: new Date(NOW * 1000).toISOString(),
       actor: via === "auto" ? "system" : "Emma Taylor",
@@ -129,20 +131,20 @@ function confirmVia(e: Engagement, via: "venue" | "auto", s = session()) {
 }
 
 describe("confirming", () => {
-  it("moves the engagement to confirmed and keeps the chain intact", () => {
-    const e = provisioned();
+  it("moves the engagement to confirmed and keeps the chain intact", async () => {
+    const e = await provisioned();
     expect(e.status).toBe("provisioned");
 
-    confirmVia(e, "venue");
-    const after = replayEngagements(store.all(ORG))[0];
+    await confirmVia(e, "venue");
+    const after = replayEngagements((await store.all(ORG)))[0];
 
     expect(after.status).toBe("confirmed");
-    expect(verifyChain(store.all(ORG))).toEqual({ ok: true, brokenAt: null });
+    expect(verifyChain((await store.all(ORG)))).toEqual({ ok: true, brokenAt: null });
   });
 
-  it("records the clock's hours, the plan, and the gap between them", () => {
-    const e = provisioned();
-    const { event } = confirmVia(e, "venue");
+  it("records the clock's hours, the plan, and the gap between them", async () => {
+    const e = await provisioned();
+    const { event } = await confirmVia(e, "venue");
 
     expect(event.data.hours).toBe(8);
     expect(event.data.plannedHours).toBe(7.5);
@@ -151,17 +153,17 @@ describe("confirming", () => {
     expect(event.data.breaks).toBe(0);
   });
 
-  it("records the money at the moment it was charged", () => {
-    const e = provisioned();
-    const { event } = confirmVia(e, "venue");
+  it("records the money at the moment it was charged", async () => {
+    const e = await provisioned();
+    const { event } = await confirmVia(e, "venue");
 
     expect(event.data.wagesCents).toBe(4150 * 8);
     expect(event.data.bookingFeeCents).toBe(Math.round(4150 * 8 * BOOKING_FEE_RATE));
   });
 
-  it("carries the cl 16.6 loading for the break he never got", () => {
-    const e = provisioned();
-    const { event } = confirmVia(e, "venue");
+  it("carries the cl 16.6 loading for the break he never got", async () => {
+    const e = await provisioned();
+    const { event } = await confirmVia(e, "venue");
     expect(Number(event.data.loadingMinutes)).toBeGreaterThan(0);
   });
 
@@ -169,14 +171,15 @@ describe("confirming", () => {
      looking at a timesheet; "the venue did not disagree in 48 hours" is a
      deadline. A dispute that turns on whether anybody actually checked has to
      be able to tell them apart. */
-  it("says which of the two settled it, in the data and in the summary", () => {
-    const venue = confirmVia(provisioned(), "venue");
+  /* Two orgs rather than two stores. The chain is keyed by org, so a second
+     one is a fresh chain — where closing and rebuilding the store would now
+     close the shared database underneath every other test in the file. */
+  it("says which of the two settled it, in the data and in the summary", async () => {
+    const venue = await confirmVia(await provisioned(), "venue");
     expect(venue.event.data.via).toBe("venue");
     expect(venue.event.summary).toMatch(/^Hours confirmed/);
 
-    store.close();
-    store = new EventStore(":memory:");
-    const auto = confirmVia(provisioned(), "auto");
+    const auto = await confirmVia(await provisioned("org-auto"), "auto", session(), "org-auto");
     expect(auto.event.data.via).toBe("auto");
     expect(auto.event.summary).toMatch(/auto-confirmed after 48h/);
     expect(auto.event.actor).toBe("system");
@@ -186,25 +189,25 @@ describe("confirming", () => {
 describe("confirming twice", () => {
   /* The property this whole feature rests on. Everything upstream can be
      retried harmlessly; this one bills somebody. */
-  it("writes one event and charges one fee", () => {
-    const e = provisioned();
-    const first = confirmVia(e, "venue");
-    const second = confirmVia(e, "venue");
+  it("writes one event and charges one fee", async () => {
+    const e = await provisioned();
+    const first = await confirmVia(e, "venue");
+    const second = await confirmVia(e, "venue");
 
     expect(first.created).toBe(true);
     expect(second.created).toBe(false);
     expect(second.event.seq).toBe(first.event.seq);
-    expect(store.all(ORG).filter((x) => x.type === "engagement.confirmed")).toHaveLength(1);
+    expect((await store.all(ORG)).filter((x) => x.type === "engagement.confirmed")).toHaveLength(1);
   });
 
-  it("keeps the venue's confirmation when the sweep arrives after it", () => {
-    const e = provisioned();
-    confirmVia(e, "venue");
-    const sweep = confirmVia(e, "auto");
+  it("keeps the venue's confirmation when the sweep arrives after it", async () => {
+    const e = await provisioned();
+    await confirmVia(e, "venue");
+    const sweep = await confirmVia(e, "auto");
 
     // the sweep is a no-op, and the record still says a person agreed
     expect(sweep.created).toBe(false);
-    const confirmations = store.all(ORG).filter((x) => x.type === "engagement.confirmed");
+    const confirmations = (await store.all(ORG)).filter((x) => x.type === "engagement.confirmed");
     expect(confirmations).toHaveLength(1);
     expect(confirmations[0].data.via).toBe("venue");
   });
@@ -213,13 +216,13 @@ describe("confirming twice", () => {
 describe("what the sheet offers the route", () => {
   /* The route confirms what awaitingConfirmation() hands it, so this is the
      list that decides whether a Confirm button can bill twice. */
-  it("stops offering an engagement once it is confirmed", () => {
-    const e = provisioned();
+  it("stops offering an engagement once it is confirmed", async () => {
+    const e = await provisioned();
     const before = timesheet({ engagements: [e], sessions: [session()], now: NOW });
     expect(awaitingConfirmation(before).map((w) => w.engagementId)).toEqual([e.id]);
 
-    confirmVia(e, "venue");
-    const after = replayEngagements(store.all(ORG));
+    await confirmVia(e, "venue");
+    const after = replayEngagements((await store.all(ORG)));
     const sheet = timesheet({ engagements: after, sessions: [session()], now: NOW });
 
     expect(sheet.worked[0].engagement.status).toBe("confirmed");

@@ -39,20 +39,48 @@ const IV_LENGTH = 12;
 /**
  * The master key every per-worker key is derived from.
  *
- * A random key when none is configured, and the consequence is stated rather
- * than hidden: payloads written this process cannot be read by the next one.
- * For a demo that is correct — the vault is in memory too, so both halves die
- * together and there is no window where ciphertext outlives its key and looks
- * like corruption.
+ * UNSET is a supported state and a safe one: a random key, payloads that die
+ * with the process, and a loud failure on the next restart. The vault is in
+ * memory too, so both halves go together and there is no window where
+ * ciphertext outlives its key and looks like corruption.
  *
- * A deployment sets COVERS_PACK_KEY. If it does not, nobody's TFN is at risk;
- * they simply cannot be provisioned after a restart, which is the loud
- * failure rather than the quiet one.
+ * MISCONFIGURED is not, and it used to be. `Buffer.from(x, "base64")` never
+ * throws — it decodes what it can and drops the rest — and `subarray` returns
+ * whatever it was given, so a typo, a truncated paste or a hex string became
+ * a short buffer with no complaint:
+ *
+ *     "not-base64!!"  ->  7 bytes
+ *     "AAAA"          ->  3 bytes
+ *
+ * HKDF accepts any IKM length, so nothing downstream noticed either. Every TFN
+ * and BSB in the vault would have been encrypted under a key derived from a
+ * few bytes of guessable entropy, and the app would have started, provisioned
+ * and reported success throughout.
+ *
+ * So it refuses. This is the same call sinkFromEnv() already made about
+ * sign-in codes, and the reasoning transfers exactly: an unset variable says
+ * nobody asked, a bad value says somebody asked and got it wrong, and falling
+ * back to the safe default answers the second as though it were the first.
+ * The header of this file says a TFN table is the worst thing this product
+ * could breach; a key nobody validated is how it would happen.
  */
 function masterKey(): Buffer {
   const configured = process.env.COVERS_PACK_KEY;
-  if (configured) return Buffer.from(configured, "base64").subarray(0, KEY_LENGTH);
-  return EPHEMERAL_KEY;
+  if (!configured) return EPHEMERAL_KEY;
+
+  const key = Buffer.from(configured, "base64");
+  if (key.length !== KEY_LENGTH) {
+    /* Exact length, not a minimum. Too long is as much a sign of the wrong
+       value as too short — a hex-encoded 32-byte key decodes to 48 bytes of
+       base64 nonsense, and silently taking the first 32 would key the vault
+       off a misreading of somebody's intent. */
+    throw new Error(
+      `COVERS_PACK_KEY must decode to exactly ${KEY_LENGTH} bytes; got ${key.length}. ` +
+        `Generate one with: node -e "console.log(require('crypto').randomBytes(${KEY_LENGTH}).toString('base64'))". ` +
+        `Refusing to derive a pack key from a value nobody meant.`,
+    );
+  }
+  return key;
 }
 
 const EPHEMERAL_KEY = randomBytes(KEY_LENGTH);

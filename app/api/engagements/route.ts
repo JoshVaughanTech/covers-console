@@ -26,14 +26,14 @@ export const dynamic = "force-dynamic";
 const ORG = process.env.COVERS_ORG ?? "org-brightwater";
 
 export async function GET(req: Request) {
-  const caller = workerOf(req);
+  const caller = await workerOf(req);
   if (!caller) return NextResponse.json({ error: "not signed in" }, { status: 401 });
 
   const pack = packOf(caller.did);
   const at = TODAY;
   const completeness = pack ? completenessOf(pack, at) : null;
 
-  const engagements = engagementsFor(eventStore().all(ORG), caller.did).map((e) => {
+  const engagements = engagementsFor((await (await eventStore()).all(ORG)), caller.did).map((e) => {
     const view = describeEngagement(e);
     const employer = employerOf(e.employerDid);
     return {

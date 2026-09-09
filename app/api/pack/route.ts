@@ -35,7 +35,7 @@ export const dynamic = "force-dynamic";
 const ORG = process.env.COVERS_ORG ?? "org-brightwater";
 
 export async function GET(req: Request) {
-  const caller = workerOf(req);
+  const caller = await workerOf(req);
   if (!caller) return NextResponse.json({ error: "not signed in" }, { status: 401 });
 
   const pack = packOf(caller.did);
@@ -70,7 +70,7 @@ export async function GET(req: Request) {
      §10 of the design: workers can see where their details went. Assembled
      from the chain rather than from a table, so it cannot be quietly shorter
      than what happened. */
-  const engagements = engagementsFor(eventStore().all(ORG), caller.did);
+  const engagements = engagementsFor((await (await eventStore()).all(ORG)), caller.did);
   const releases = engagements
     .flatMap((e) =>
       e.releases.map((r) => ({
@@ -140,7 +140,7 @@ interface ThresholdBody {
  * changes when it does.
  */
 export async function POST(req: Request) {
-  const caller = workerOf(req);
+  const caller = await workerOf(req);
   if (!caller) return NextResponse.json({ error: "not signed in" }, { status: 401 });
 
   const pack = packOf(caller.did);

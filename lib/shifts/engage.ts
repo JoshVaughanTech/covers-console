@@ -108,15 +108,15 @@ function isAssignment(e: AuditEvent): boolean {
  * the reasons when the engagement cannot be assembled — those go back to the
  * console, which is the only place they can be acted on.
  */
-export function engageOnAssign(
+export async function engageOnAssign(
   store: EventStore,
   orgId: string,
   ev: AuditEvent,
-): EngageResult | null {
+): Promise<EngageResult | null> {
   if (!isAssignment(ev)) return null;
   const workerDid = ev.subject as string;
 
-  const log = store.all(orgId);
+  const log = await store.all(orgId);
   const board = boardFrom(log);
   const postingId = (ev.data as { postingId?: unknown }).postingId;
   const posting = board.postings.find((p) => p.id === postingId);
@@ -216,11 +216,11 @@ export function engageOnAssign(
     return { postingId: posting.id, workerDid, engagementId: engagement.id, proposed: true, refusals: [] };
   }
 
-  store.append(orgId, proposedEvent(engagement, ev.actor, ev.actorDid), {
+  await store.append(orgId, proposedEvent(engagement, ev.actor, ev.actorDid), {
     clientRef: `engagement:proposed:${engagement.id}`,
   });
 
-  store.append(
+  await store.append(
     orgId,
     acceptedEvent(engagement, "employer", {
       at: engagement.proposedAt,
