@@ -137,7 +137,7 @@ export function SignIn({ onSignedIn }: { onSignedIn: (s: Signed) => void }) {
           {WORKERS.map((w) => (
             <button
               key={w.did}
-              onClick={() => ask(w.did, w.name)}
+              onClick={() => void ask(w.did, w.name)}
               style={{
                 display: "flex", alignItems: "center", gap: 12, width: "100%", textAlign: "left",
                 minHeight: 56, padding: "10px 14px", borderRadius: 12,
@@ -232,7 +232,7 @@ export function SignIn({ onSignedIn }: { onSignedIn: (s: Signed) => void }) {
           Not me
         </button>
         <button
-          onClick={submit}
+          onClick={() => void submit()}
           disabled={busy || !code.trim()}
           style={{
             flex: 2, minHeight: 50, borderRadius: 12, fontSize: 15, fontWeight: 700,
@@ -247,7 +247,7 @@ export function SignIn({ onSignedIn }: { onSignedIn: (s: Signed) => void }) {
       </div>
 
       <button
-        onClick={() => ask(who.did, who.name)}
+        onClick={() => void ask(who.did, who.name)}
         disabled={busy}
         style={{
           marginTop: 12, width: "100%", background: "none", border: "none",

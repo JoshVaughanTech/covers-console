@@ -109,7 +109,7 @@ export default function ConsoleSignInPage() {
             {OPERATORS.map((o) => (
               <button
                 key={o.did}
-                onClick={() => ask(o.did, o.name)}
+                onClick={() => void ask(o.did, o.name)}
                 disabled={busy}
                 style={{
                   display: "flex",
@@ -196,7 +196,7 @@ export default function ConsoleSignInPage() {
                 Not me
               </button>
               <button
-                onClick={submit}
+                onClick={() => void submit()}
                 disabled={busy || !code.trim()}
                 style={{
                   flex: 2,

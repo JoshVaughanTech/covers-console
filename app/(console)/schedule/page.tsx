@@ -423,7 +423,7 @@ export default function SchedulePage() {
             <Button variant="sec" size="sm" icon="git-compare" onClick={() => setCompareOpen(true)}>
               Compare Scenarios
             </Button>
-            <Button size="sm" icon="send" onClick={handlePublish}>
+            <Button size="sm" icon="send" onClick={() => void handlePublish()}>
               Publish Roster
             </Button>
           </div>

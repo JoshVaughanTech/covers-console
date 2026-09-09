@@ -142,7 +142,7 @@ export function IdaraProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     let live = true;
-    (async () => {
+    void (async () => {
       try {
         const res = await fetch("/api/events");
         if (!res.ok) throw new Error(String(res.status));

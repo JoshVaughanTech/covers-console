@@ -57,7 +57,6 @@ function loadWorker() {
   };
 
   const src = readFileSync(resolve(process.cwd(), "public/sw.js"), "utf8");
-  // eslint-disable-next-line no-new-func
   new Function("self", src)(self);
   return handlers;
 }

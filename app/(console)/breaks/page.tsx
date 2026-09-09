@@ -137,8 +137,8 @@ export default function BreaksPage() {
   }, []);
 
   useEffect(() => {
-    load();
-    const poll = setInterval(load, 30_000);
+    void load();
+    const poll = setInterval(() => void load(), 30_000);
     const tick = setInterval(() => setNow(Math.floor(Date.now() / 1000)), 1000);
     return () => { clearInterval(poll); clearInterval(tick); };
   }, [load]);

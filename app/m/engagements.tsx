@@ -197,7 +197,7 @@ export function Engagements({ onChanged }: { onChanged?: () => void }) {
           e={active}
           sent={sent[active.id]}
           onClose={() => setOpen(null)}
-          onAccept={() => accept(active)}
+          onAccept={() => void accept(active)}
         />
       )}
     </section>

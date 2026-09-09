@@ -228,7 +228,7 @@ export default function MobileBreaksPage() {
         </Section>
       )}
 
-      {active && <Sheet p={active} now={now} me={me} onClose={() => setOpen(null)} onSend={send} />}
+      {active && <Sheet p={active} now={now} me={me} onClose={() => setOpen(null)} onSend={(p, k) => void send(p, k)} />}
     </div>
   );
 }

@@ -176,7 +176,7 @@ export default function SignInCodesPage() {
                 <div style={{ fontSize: 14, fontWeight: 600 }}>{w.name}</div>
                 <div style={{ fontSize: 12, color: "var(--fg-4)" }}>{w.role}</div>
               </div>
-              <Button variant="sec" onClick={() => issue(w.did, w.name)} disabled={busy !== null}>
+              <Button variant="sec" onClick={() => void issue(w.did, w.name)} disabled={busy !== null}>
                 {busy === w.did ? "Issuing…" : "Issue code"}
               </Button>
             </div>

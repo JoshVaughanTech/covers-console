@@ -155,7 +155,7 @@ export function PushToggle() {
   return (
     <>
       <button
-        onClick={state === "on" ? turnOff : turnOn}
+        onClick={() => void (state === "on" ? turnOff() : turnOn())}
         disabled={state === "working"}
         style={{ ...box, cursor: state === "working" ? "default" : "pointer", fontWeight: 600 }}
       >
