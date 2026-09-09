@@ -30,6 +30,15 @@ import { freshDb, withChainLock, type Db } from "../lib/store/db";
 const URL = process.env.DATABASE_URL;
 const ORG = `org-pgtest-${Math.random().toString(36).slice(2, 10)}`;
 
+/* The concurrency case needs a chain with nothing in it, because it asserts
+   the positions are exactly 0..N-1. Every other case here shares ORG on
+   purpose — the BIGINT case reads back what the transaction case wrote — so
+   the one that needs to start empty gets its own org rather than the others
+   giving up their sequence. Without this it counts the transaction case's
+   single event as a thirteenth append and fails on a property the driver
+   holds perfectly well. */
+const ORG_CONCURRENT = `${ORG}-concurrent`;
+
 let database: Db;
 
 const ev = (summary: string) => ({
@@ -46,8 +55,10 @@ describe.skipIf(!URL)("the pg driver, against a real server", () => {
 
   afterAll(async () => {
     // leave the database as it was found: this org's rows and nobody else's
-    await database.query("DELETE FROM audit_event WHERE org_id = $1", [ORG]).catch(() => {});
-    await database.query("DELETE FROM chain_head WHERE org_id = $1", [ORG]).catch(() => {});
+    for (const org of [ORG, ORG_CONCURRENT]) {
+      await database.query("DELETE FROM audit_event WHERE org_id = $1", [org]).catch(() => {});
+      await database.query("DELETE FROM chain_head WHERE org_id = $1", [org]).catch(() => {});
+    }
     await database.close().catch(() => {});
   });
 
@@ -92,16 +103,16 @@ describe.skipIf(!URL)("the pg driver, against a real server", () => {
          position — a forked chain that still looks like a chain. */
       const store = new EventStore(database);
       const N = 12;
-      await Promise.all(Array.from({ length: N }, (_, i) => store.append(ORG, ev(`c${i}`))));
+      await Promise.all(Array.from({ length: N }, (_, i) => store.append(ORG_CONCURRENT, ev(`c${i}`))));
 
-      const all = await store.all(ORG);
+      const all = await store.all(ORG_CONCURRENT);
       expect(all).toHaveLength(N);
 
       // gapless and in order: exactly 0..N-1, no position claimed twice
       expect(all.map((e) => e.seq)).toEqual(Array.from({ length: N }, (_, i) => i));
       expect(new Set(all.map((e) => e.hash)).size).toBe(N);
 
-      expect(await store.verify(ORG)).toEqual({ ok: true, brokenAt: null });
+      expect(await store.verify(ORG_CONCURRENT)).toEqual({ ok: true, brokenAt: null });
     });
 
     it("is held for the transaction, not the connection", async () => {
