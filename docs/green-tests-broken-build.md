@@ -278,19 +278,54 @@ are different promises and only one of them is about the repo.
 
 | run | result |
 |---|---|
-| first | **6 failures** — `Hook timed out in 10000ms` |
-| second, nothing changed | 63 files, 944 tests, green |
+| first | failures, all `timed out`, none carrying an assertion |
+| second, nothing changed | green |
 
-Reported by the session working on `one-tap-employment`; not reproduced here,
-and it is worth saying so rather than dressing it up. What is checkable from
-this side: `@electric-sql/pglite` is a dependency, and no `hookTimeout` is set
-anywhere, so vitest's default of ten seconds applies — which is the number in
-the message.
+Three sessions hit this independently over two days, each with a piece, and the
+final account is better than any of the three first offered. The mechanism is
+now measured rather than suspected — but **the grades of evidence differ and
+are worth keeping apart**, because the weakest piece is the one that nearly
+became a rule.
 
-The failing files were `subscriptions`, weekly delivery and the migration
-tests: files that branch never touches. So the red run was not about the change
-under test, and an in-memory Postgres starting up under load is the obvious
-suspect.
+**Established, by reading the config.** `vitest.config.ts` sets no
+`testTimeout`, no `hookTimeout` and no pool options, so the defaults apply —
+5000ms per test, 10000ms per hook. Both numbers turn up in real failures here,
+which is consistent with nothing being configured rather than with two
+different problems.
+
+**Established, by measurement.** A PGlite instance takes ~1.4–1.8s to boot, and
+everything after that is single-digit milliseconds:
+
+    boot #1        1782 ms
+    boot #2        1362 ms
+    CREATE TABLE      3 ms
+    20 inserts       10 ms
+    TRUNCATE          3 ms
+
+So a test that opens a fresh database spends roughly a third of its 5s budget
+before it does anything at all. That is the mechanism, and it makes the fix
+quantified rather than plausible: one database per file with `TRUNCATE` between
+cases is 3ms where a fresh boot is ~1500ms.
+
+**Established, by reproduction under the real condition.** Two full suites run
+concurrently — which is what actually happens when two people test at once —
+produced failures reading `Test timed out in 5000ms` and not one assertion
+failure. The suite that won the contention passed.
+
+**Established, by control.** Unmodified `main` was fully green on the same
+machine. So the code is not implicated, and the suites are not independently
+broken.
+
+### The failing file list is not a signature
+
+Worth stating because it looks like a contradiction and is not. A uniform low
+timeout deterministically catches the *slowest* tests; contention catches
+whichever tests happen to be scheduled during a spike. The two sets barely
+overlap, and contention gave different sets on different runs.
+
+So anyone confirming this by matching file names against a previous run will
+conclude it does not reproduce. It does. **The identity of the losers is noise**
+— which makes the natural way to check it the one thing guaranteed to mislead.
 
 **Every entry above this one is two things disagreeing. This is one thing
 disagreeing with itself, having been shown nothing new.** Same code, same
@@ -314,6 +349,47 @@ two runs**, which is answerable and usually answered by "no". If nothing
 changed, both results are facts about the harness under load and neither is a
 fact about the code — and quoting the green one as though it were the second
 kind is the move to avoid.
+
+### What discriminates, and what does not
+
+Two signals, both binary, both visible in output somebody is already reading:
+
+1. **The failures say `timed out`** rather than carrying an assertion and a
+   diff. A regression tells you what it expected.
+2. **The failing file passes in isolation**, immediately, every time.
+
+**Duration does not discriminate, and the attempt to make it is recorded below
+as its own failure.** `vitest` prints two numbers — `Duration` is wall clock,
+the `tests` figure inside the parentheses is CPU time summed across parallel
+workers and is several times larger on any multi-core machine. Measured here on
+a fully green run, 961 of 961 passing: `Duration 83.95s (… tests 490.18s …)`.
+Any threshold in the low hundreds flags that healthy run as contended.
+
+Wall clock fails too, and worse: one machine's clean run was 87s while another
+machine's *contended* run was 85.75s. Two clean runs on the same install forty
+minutes apart were 69s and 87s. **The between-machine spread and the
+run-to-run variance are both larger than the effect.**
+
+Duration is good for exactly one thing: **same machine, same install,
+before-and-after**, which is what verifying the truncation fix would need. A
+baseline, never a threshold.
+
+### Raising the timeout is not the fix
+
+This one is not an empirical claim and does not depend on any of the above.
+Raising the limit converts a fast, loud, reproducible failure into a slow one,
+and buys the same silence for a genuine hang. The fix is to stop paying the boot
+cost per test.
+
+**One hazard if anyone implements it.** A shared database per file needs the
+truncation to cover *every* table, and `audit_event` with `chain_head` is the
+pair that bites hardest and most quietly. Clear the events and miss the head and
+the next append chains onto a hash whose row is gone — so `verifyChain` reports
+the chain broken, and the symptom is **tamper detected** in a test that has
+nothing to do with tampering. That is a false positive on the one alarm this
+system exists to raise. `TRUNCATE ... CASCADE` over the table list read from
+`information_schema`, not an enumerated list: an enumerated list is correct the
+day it is written and silently wrong the first time somebody adds a store.
 
 **How it arises:** a red run, a re-run, and relief. The fix is a sentence, not
 a tool: say which run you are quoting, and say whether anything changed between
@@ -441,10 +517,71 @@ the hour spent fixing code that was never wrong — or worse, "fixing" it and
 breaking it to make the probe agree. It was caught by asking what the numbers
 *should* be before deciding what they meant.
 
-All six are the same failure: **an artefact carrying the authority of
+**A list that quietly claimed one per file.** Reviewing a branch for calls to a
+newly-async `workerOf()`, the grep was:
+
+    git show BRANCH:FILE | grep -oE "(await )?(workerOf|operatorOf)\(req\)" | head -1
+
+`head -1`. So for each file it asked *is there an unawaited call here* and the
+answer was read as *here is the unawaited call here*. Two of the files had two.
+The review reported five sites; there were eight.
+
+Nothing about that output looks truncated — one row per file is exactly what a
+per-file list should look like. And the missed ones sit in the worst place: a
+**second** call site in a file already on the list, which is the one a careful
+reader is least likely to go back for, because the file appears and therefore
+feels handled.
+
+Filed here rather than as a slip because of where it happened. Not in the code
+under review — in the instrument built to review it, run by somebody who had
+spent the week writing this exact failure down. The tool truncated, the
+truncation looked like an answer, and the wrong count was published twice before
+anyone counted rows.
+
+**A number that arrived with a name instead of a method.** One session measured
+a clean suite at 69s. Another had reported a flaky suite stretching "from 70s to
+250s". Between the two a rule appeared — *green is 50–70s, past 200s is
+contention* — and a third session's fresh measurement read as confirming it.
+
+Every number in that chain was real. The comparison was not. One figure was wall
+clock; the other was vitest's cumulative `tests` time, which sums across
+parallel workers and runs several times larger. A fully green run here reports
+`Duration 83.95s (… tests 490.18s …)`, so the threshold flags a healthy suite.
+Wall clock fails too: one machine's clean run was 87s against another machine's
+*contended* 85.75s. And the rule was attributed to a session that had never sent
+a duration figure at all.
+
+**This is the only case here with no author.** The test that pinned wrong
+behaviour was written by somebody. The fence that was only a sentence was typed
+by somebody. Nobody wrote this rule — it accumulated across three messages, each
+contributing something true, and arrived looking better sourced than any of its
+parts, because a figure with a citation looks like a figure somebody has already
+checked.
+
+It was caught only because the misattributed session was still in the
+conversation and **did not recognise its own claim**. Written down, it would have
+been unfalsifiable: a threshold with a name on it and nobody left to deny the
+name.
+
+The countermeasure is a format rather than a discipline: **record how, not
+who.** "Wall clock, single suite, otherwise-idle machine" can be checked by
+anyone reading it in a year; "that session's figure" can only be checked by that
+session. And the format catches it while writing, without needing anybody —
+nobody can write *wall clock, single suite* beside a number lifted from a
+cumulative line, because the sentence will not finish.
+
+Applied to the numbers above, so this entry does not commit its own error:
+
+    69s / 87s   wall clock, full suite, isolated 15.5.25 install,
+                otherwise-idle machine, two runs 40 minutes apart
+    490.18s     vitest's cumulative tests figure from the second of those,
+                961 of 961 passing
+
+All eight are the same failure: **an artefact carrying the authority of
 evidence without the substance of it.** A passing assertion, a familiar
-identifier, a rendered page, an absent name, a present one and a red result are
-all things we read as confirmation, and none of them was confirming anything.
+identifier, a rendered page, an absent name, a present one, a red result, a
+one-row-per-file list and a cited number are all things we read as
+confirmation, and none of them was confirming anything.
 
 The screen adds a wrinkle worth keeping separate, because it is the one that
 generalises furthest. The test and the mock were *wrong about this tree*. The
@@ -464,8 +601,12 @@ past the answer when the answer is what you hoped for. What is this test
 asserting, rather than does it pass. Which module does this identifier come
 from, rather than does the name match. Which server is answering, rather than
 does the page load. Whether the barrel re-exports it, rather than whether the
-barrel mentions it. What the commit changed, rather than whose name is on it. Every instance here was found by someone who had a reason
-to look at the thing rather than at its result.
+barrel mentions it. What the commit changed, rather than whose name is on it.
+How many rows the command returned, rather than whether it returned one. What a
+number measured, rather than who measured it.
+
+Every instance here was found by someone who had a reason to look at the thing
+rather than at its result.
 
 From the session that found the second of these, and it covers all three:
 
