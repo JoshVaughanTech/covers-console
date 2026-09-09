@@ -272,7 +272,37 @@ export async function freshDb(): Promise<Db> {
   }
 
   const { PGlite } = await import("@electric-sql/pglite");
-  return new PgliteDb((await PGlite.create()) as unknown as PgliteInstance);
+  const dir = pgliteDir();
+  return new PgliteDb((await (dir ? PGlite.create(dir) : PGlite.create())) as unknown as PgliteInstance);
+}
+
+/**
+ * Where PGlite keeps its data locally, or undefined to hold it in memory.
+ *
+ * In memory was the only option until now, and it made `npm run dev` lose
+ * every event on restart: a task moved on the run sheet, the server
+ * restarted, and the board was back to the seed. The chain was doing its job
+ * — there was simply nothing left of it to fold.
+ *
+ * VITEST short-circuits everything else and is not negotiable. Tests get
+ * isolation by calling setDb(null) and building a fresh database per case; a
+ * directory here would hand them all the SAME one, and a case seeing rows a
+ * previous case left is a worse failure than the one this fixes. It is
+ * checked first so no combination of env vars can turn it off.
+ *
+ * Otherwise: COVERS_PG_DIR if set — with ":memory:" as the way to opt out
+ * without editing code — and a default of .data/pg under `next dev`, so
+ * persistence is what a developer gets rather than what they have to
+ * discover. .data/ is already gitignored, so nothing lands in the repo.
+ *
+ * Production never reaches here: DATABASE_URL is required and returns a PgDb
+ * above.
+ */
+function pgliteDir(): string | undefined {
+  if (process.env.VITEST) return undefined;
+  const configured = process.env.COVERS_PG_DIR;
+  if (configured) return configured === ":memory:" ? undefined : configured;
+  return process.env.NODE_ENV === "development" ? ".data/pg" : undefined;
 }
 
 /** Tests replace the database between cases. */
