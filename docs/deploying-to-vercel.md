@@ -45,13 +45,48 @@ Turn it on under **Settings → Deployment Protection** before the first
 deploy, not after: between deploying and enabling it, the app is public with
 inline codes on.
 
+### "Protection is on" is not the question. The scope is.
+
+Vercel has more than one setting here, and the difference is the whole thing:
+
+- **Standard Protection** gates preview deployments and the long
+  `project-hash-team.vercel.app` deployment URLs — and **exempts the production
+  alias**. The short address is open to anybody.
+- **All Deployments** gates the production alias too. This is the one this
+  deployment needs.
+
+That is not hypothetical. It is what was live here: protection was correctly
+enabled, reported as done, and the site was public anyway.
+
+    covers-console-lqax80dv9-….vercel.app   Vercel SSO page   gated
+    covers-console.vercel.app               the app           open
+
+**So check the alias, not the setting.** The dashboard says "on" in both cases;
+only the URL tells you which:
+
+```bash
+curl -s -L https://<your-alias>.vercel.app/ | grep -c "Log in to Vercel"
+```
+
+`1` means gated. `0` means the app is being served to whoever asks.
+
 > **The coupling is invisible from inside the app.** Nothing in this codebase
-> can detect whether Vercel's protection is on, so turning it off silently
-> converts the deployment into one where anybody can sign in as anybody. That
-> is the failure mode this codebase argues hardest against elsewhere — a
-> confidentiality failure that announces itself to nobody. If protection ever
-> comes off, `AUTH_CODES_INLINE` has to come off in the same change, which
-> means sign-in stops working until a real delivery channel exists.
+> can detect whether Vercel's protection is on, so turning it off — or leaving
+> it on the wrong scope — silently converts the deployment into one where
+> anybody can sign in as anybody. That is the failure mode this codebase argues
+> hardest against elsewhere: a confidentiality failure that announces itself to
+> nobody. If protection ever comes off, `AUTH_CODES_INLINE` has to come off in
+> the same change, which means sign-in stops working until a real delivery
+> channel exists.
+
+> **And do not read "nothing is exposed" as "it is gated".** With no
+> `DATABASE_URL` and `AUTH_CODES_INLINE` unset, an open alias leaks nothing:
+> `sinkFromEnv()` returns `NoSink` so sign-in 503s, and the data routes have no
+> database to answer from. That is safe **because it is unconfigured**, which is
+> a different property from being gated and expires the moment somebody makes
+> the app work. Connecting the database is a normal, desirable act that nobody
+> would think to pair with a security check — and nothing about the URL changes
+> at that moment to say the assumption has lapsed.
 
 A real channel — email or SMS — is what removes the coupling. It needs a
 provider account, a verified sender, and an address or mobile number per
