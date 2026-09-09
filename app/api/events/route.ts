@@ -57,6 +57,26 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "type, at and summary are required" }, { status: 400 });
   }
 
+  /* A posting has to go through the route that runs the award gate.
+
+     This endpoint takes any well-formed event, which is right for most of
+     them — they record what somebody decided. A posting is different: it is
+     the venue committing to a rate, and buildPosting() is where "Covers will
+     not publish below the award" is enforced. While that check lived only in
+     the console's browser, an operator session could put a $30.00/h shift on
+     a $40.62/h Saturday board through here, and one did during the review
+     that produced this guard.
+
+     Refusing here rather than re-running the gate here, because two places
+     that both know how to make a posting is how they come to disagree about
+     what an acceptable one is. */
+  if (body.type === "shift.posted") {
+    return NextResponse.json(
+      { error: "Post a shift through POST /api/shifts/post, which runs the award floor check." },
+      { status: 400 },
+    );
+  }
+
   const { clientRef, ...rest } = body;
   /* The actor is the session, not the body. Screens used to send
      CONSOLE_OPERATOR because there was nothing better to send; now there is,

@@ -313,33 +313,74 @@ export default function OpenShiftsPage() {
       duties: d.duties.includes(fn) ? d.duties.filter((x) => x !== fn) : [...d.duties, fn],
     }));
 
-  const submitPosting = () => {
+  /* Posts through the server rather than writing the event directly.
+
+     The award floor check used to run only here, in this browser, and
+     /api/events took the resulting event without re-asking. So the refusal
+     that makes "Covers will not publish below the award" true was reachable
+     only by people using this form — an operator session could put a $30.00/h
+     shift on a $40.62/h Saturday board by calling the API, and one did during
+     the review that produced /api/shifts/post.
+
+     buildPosting() still runs here first. Not as the gate: as the fast answer,
+     so a manager sees the rate refused while they are still looking at the
+     field. The server runs the same function and its answer is the one that
+     decides. */
+  const submitPosting = async () => {
     const id = `sp-new-${postings.length + 1}`;
     const result = buildPosting(draft, id, draft.day.trim().slice(0, 3) || "Shift");
     if (!result.ok) {
       setDraftErrors(result.errors);
       return;
     }
-    setPostOpen(false);
 
-    // the posting carries itself into the event, because the board is rebuilt
-    // by folding this log over the seed — an unrecorded posting would not
-    // survive a reload, and the trail would then disagree with the screen
-    recordEvent({
-      type: "shift.posted",
-      at: today,
-      actor: CONSOLE_OPERATOR.name,
-      actorDid: CONSOLE_OPERATOR.did,
-      summary: `${result.posting.role} · ${result.posting.functionName} posted (${result.posting.seats} seat${result.posting.seats === 1 ? "" : "s"})`,
-      data: { postingId: result.posting.id, posting: result.posting },
-    });
+    const done = (posting: { role: string; functionName: string; status: string }) => {
+      setPostOpen(false);
+      toast(
+        posting.status === "open"
+          ? `Posted — ${posting.role} · ${posting.functionName}`
+          : `Saved as draft — ${posting.role}`,
+        { tone: "success", icon: "plus" },
+      );
+    };
 
-    toast(
-      result.posting.status === "open"
-        ? `Posted — ${result.posting.role} · ${result.posting.functionName}`
-        : `Saved as draft — ${result.posting.role}`,
-      { tone: "success", icon: "plus" },
-    );
+    try {
+      const res = await fetch("/api/shifts/post", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ ...draft, clientRef: crypto.randomUUID() }),
+      });
+
+      if (res.status === 422) {
+        /* The server refused the content. Shown in the same place as the local
+           errors, because to a manager there is one question — will this
+           post — and two lists answering it differently is how a form starts
+           arguing with itself. */
+        const body = (await res.json()) as { error?: string; errors?: string[] };
+        setDraftErrors(body.errors ?? [body.error ?? "The server refused this shift."]);
+        return;
+      }
+      if (!res.ok) throw new Error(String(res.status));
+
+      // no local append: the event stream folds the server's event in, so the
+      // board shows the posting the chain actually holds
+      const body = (await res.json()) as { posting: typeof result.posting };
+      done(body.posting);
+    } catch {
+      /* No backend. The console still works as a demo with no server behind
+         it — see IdaraProvider — so the posting is appended locally, exactly
+         as it was before this route existed. */
+      setPostOpen(false);
+      recordEvent({
+        type: "shift.posted",
+        at: today,
+        actor: CONSOLE_OPERATOR.name,
+        actorDid: CONSOLE_OPERATOR.did,
+        summary: `${result.posting.role} · ${result.posting.functionName} posted (${result.posting.seats} seat${result.posting.seats === 1 ? "" : "s"})`,
+        data: { postingId: result.posting.id, posting: result.posting },
+      });
+      done(result.posting);
+    }
   };
 
   /* Claims answered against today, never against the day they were made.
@@ -826,7 +867,7 @@ export default function OpenShiftsPage() {
         footer={
           <>
             <Button variant="sec" size="sm" onClick={() => setPostOpen(false)}>Cancel</Button>
-            <Button size="sm" icon="plus" onClick={submitPosting}>
+            <Button size="sm" icon="plus" onClick={() => void submitPosting()}>
               {draft.publish ? "Post it" : "Save draft"}
             </Button>
           </>
