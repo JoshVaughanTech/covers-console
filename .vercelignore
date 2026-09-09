@@ -1,0 +1,22 @@
+# Local environment files must never be uploaded with a deployment.
+#
+# Vercel injects the project's own environment variables at runtime, and a
+# .env travelling with the source is loaded by Next on top of them — so a
+# value set for one developer's laptop silently overrides the deployment's.
+#
+# This is not hypothetical. A local `AUTH_CODES_DIR=.data/sign-in`, written for
+# file-sink testing, shipped to a preview deployment and took priority over
+# AUTH_CODES_INLINE. sinkFromEnv() checks the directory first, so it built a
+# FileSink on a read-only filesystem, reported "not configured", and every
+# sign-in returned 503 — with the deployment's own AUTH_CODES_INLINE=1 sitting
+# correct and unread. It cost four wrong theories to find, because the
+# variable being wrong was invisible from the Vercel side: `vercel env ls`
+# showed exactly the two variables that were intended.
+#
+# .gitignore does list .env, and the CLI did not exclude it on that basis.
+.env
+.env.*
+!.env.example
+
+# Local database and delivered sign-in codes
+.data
