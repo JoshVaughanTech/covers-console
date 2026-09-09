@@ -25,6 +25,40 @@ instance may open, and defaults to 3 for the same reason.
 No migration step: each store runs its own `CREATE TABLE IF NOT EXISTS` and
 `ADD COLUMN IF NOT EXISTS` on first use, both idempotent.
 
+### Running the driver tests against a real server
+
+`db()` builds a `PgliteDb` when `DATABASE_URL` is absent and a `PgDb` when it is
+present, and those are two implementations of `transaction()`. The whole suite
+uses the first. Only `tests/pg-driver.test.ts` exercises the one that deploys,
+and it is `describe.skipIf(!URL)` — so on a machine with no database it skips,
+and **a skipped test reports identically to a passing one**. It reached main in
+a state that failed on its first run against a real server: two cases shared
+one org, so the second counted the first case's event and read thirteen
+appends where it expected twelve. Not a driver fault, and invisible for as
+long as nothing ran it.
+
+Two things are needed and neither is obvious:
+
+**A real server.** Not PGlite — the point is a connection pool with more than
+one connection, which is what makes `pg_advisory_xact_lock` observable rather
+than merely reasoned about. Nothing in this repo provides one. Any local
+Postgres will do; an embedded one installed outside the repo works and leaves
+`node_modules` alone, which matters when more than one checkout shares it.
+
+**`?sslmode=disable` on the URL.** `freshDb()` turns SSL on for anything that
+does not say otherwise, because Neon requires it. A local server without SSL
+answers `The server does not support SSL connections` and every case fails on
+connection, which reads like a broken driver and is a missing query parameter.
+
+```bash
+DATABASE_URL="postgresql://user:pass@localhost:5432/covers_test?sslmode=disable" npx vitest run tests/pg-driver.test.ts
+```
+
+Pointing it at the deployment's own Neon database also works: it scopes every
+row to a random `org-pgtest-…` org and deletes both tables' rows for those orgs
+afterwards, so it leaves other chains untouched. It does write and delete,
+which is worth knowing before aiming it at anything you care about.
+
 ## 2. Protection, before the first deploy — not after
 
 The sign-in code has to reach a person out of band, and on Vercel neither
