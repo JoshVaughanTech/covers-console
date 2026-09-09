@@ -1,6 +1,6 @@
 # When the checks are wrong about the tree
 
-**Date:** 2026-09-04 – 05 · **Status:** living note
+**Date:** 2026-09-04 – 09 · **Status:** living note
 
 The numbered entries below were found the ordinary way: something went red and
 somebody read the message.
@@ -13,8 +13,9 @@ been reported and accepted — and asked what it actually said. That is the
 shortest true summary of the second half of this document, and it is the half
 that was expensive.
 
-Three different failures. The first two are opposites; the third is neither,
-and is the one that took longest to see.
+Four different failures. The first two are opposites; the third is neither,
+and is the one that took longest to see. The fourth is not about a check being
+wrong at all.
 
 **Nine disagreements.** A check says sound, another says broken, and only one
 of them is right. In five of these a passing test suite — usually with a clean
@@ -34,7 +35,12 @@ was ever looking. A defect sat under 714 green tests that no test touched.
 Nothing disagreed and nothing lied — the suite simply had nothing to say, and
 had nothing to say in a way that is indistinguishable from having checked.
 
-Both of those are sections at the bottom rather than numbered cases; numbering
+**One misattribution.** The check ran and its answer was true. It was true
+about a different branch than the one it was reported for, because `HEAD` had
+been read in another worktree. Nothing here is wrong except which thing the
+answer was about.
+
+Those three are sections at the bottom rather than numbered cases; numbering
 them would flatten the difference.
 
 Everything below was hit for real in this repo, not imagined.
@@ -684,6 +690,88 @@ and this document has enough sentences of that kind in its history already.
 The affordable habit, then, is narrow: **when you fix a bug, look at what was
 guarding it.** That is exactly the set of tests that just went quiet, and it is
 small enough to check by hand every time.
+
+---
+
+## A fourth failure: a correct answer about the wrong thing
+
+The nine disagreements are checks that contradict each other. The evidence cases
+are checks that agree and are wrong together. The silence is a check that was
+never looking. This one is none of those. **The check ran, asked its own
+question, and answered it correctly — and the answer was bound to the wrong
+subject on the way out.**
+
+Two sessions had independently implemented the same change on two branches,
+`self-host-fonts` and `local-fonts`, neither able to see the other's work. To
+compare them, one session ran:
+
+```bash
+git merge-base --is-ancestor 40fe86e HEAD
+```
+
+in the `fairshift-fonts` worktree. That is a true statement about
+`local-fonts`, which is what `HEAD` resolves to there. It was then reported as
+a property of `self-host-fonts` — in the same sentence comparing the two — and
+offered as the tiebreaker for which branch should be held. On that axis the
+answer was backwards: the branch it was claimed for was the one behind.
+
+Nothing failed. `merge-base` is not approximate, and it did not disagree with
+anything, because nothing else was asked.
+
+### Why it read as verified
+
+The ordinary version of this mistake is asserting something unmeasured, and
+that one at least feels like a guess while you are making it. This did not,
+and the reason is worth stating exactly:
+
+> **It looked verified because something HAD been verified, a moment earlier,
+> about something else.**
+
+A recent true measurement is the most convincing thing available, and nothing
+about the result carries its own subject. `yes` does not say what it was
+`yes` about.
+
+### `HEAD` is the whole mechanism
+
+`HEAD` is relative. It resolves against the working directory, and the working
+directory is the one variable that never appears in the sentence reporting the
+result. So do `.`, a bare `git status`, `npm test`, and `npx tsc --noEmit`:
+every one takes its subject from where the shell happens to be standing.
+
+This was a footnote when a repo was one checkout. It is not one now. The
+listing at the moment of the mistake held **four** — main, a Postgres worktree,
+and two separate fonts worktrees belonging to two different sessions — and one
+session was moving between several of them inside a single task. Half an hour
+later the same command returned three, because a session had finished and
+removed one. The count is not a property of the repo; it is a property of who
+is working, right now, and it changes without announcement.
+
+That is what makes `HEAD` worse here than it would be in a shared checkout with
+a stable layout: the set of things it could mean is not merely large, it is
+moving.
+
+(The first draft of this paragraph said five. It was corrected by running the
+command, which is the countermeasure below being applied to the section
+describing it.)
+
+### The countermeasure
+
+> **In a repo with multiple worktrees, name the ref.**
+> `git merge-base --is-ancestor 40fe86e self-host-fonts` cannot be wrong about
+> its subject. The version with `HEAD` can only be wrong about its subject.
+
+It costs one word, and unlike most of this document it needs no judgement to
+apply: the named form is never worse. The same holds for `--git-dir`/`-C` over
+`cd`, and for naming the file rather than `.` when a linter's scope is the
+thing in question.
+
+Worth recording how it was caught, because it was not caught by the person who
+made it. The claim favoured one branch; the session whose branch it favoured
+checked it anyway and found it false. **A claim that flatters you is the one
+you are least likely to audit and the one where auditing pays most** — and the
+report of that check was itself careful to say it had become a habit from being
+contradicted repeatedly, not a disposition. That is the thinner claim and the
+truer one.
 
 ---
 
