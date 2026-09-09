@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { NotComputedBanner } from "@/components/screen/not-computed";
 import {
   Card,
   Bar,
@@ -397,6 +398,7 @@ export default function CommsPage() {
   return (
     <div>
       <PageHead title="Communications" sub="Event and venue communication, real-time updates and accountability." />
+      <NotComputedBanner source="Covers records no messages: there is no worker-to-manager thread and no channel behind these conversations." />
       <div style={{ display: "grid", gridTemplateColumns: "300px 1fr 318px", gap: 16, alignItems: "start" }}>
         {/* LEFT */}
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>

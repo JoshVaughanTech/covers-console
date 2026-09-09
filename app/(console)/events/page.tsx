@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { NotComputedBanner } from "@/components/screen/not-computed";
 import {
   Card,
   Bar,
@@ -161,6 +162,7 @@ export default function JobsPage() {
 
   return (
     <div>
+      <NotComputedBanner source="Events here are lib/events seed rows. A posting on the board carries a function name, but no function record exists that coverage or progress could be computed against." />
       <PageHead
         title="Events"
         sub="Events and catering engagements across your venues and off-premise sites — coverage, staffing and progress at a glance."
