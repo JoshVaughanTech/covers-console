@@ -85,9 +85,9 @@ jobs:
           --health-retries 5
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           # Matches the development environment. A CI runtime that differs from
           # the one people actually use produces failures nobody can reproduce,
@@ -109,9 +109,10 @@ jobs:
       # promise rules that catch `if (!workerOf(req))` — a guard that never
       # fires, which tsc compiles in silence.
       #
-      # `next lint` is deprecated and goes away in Next 16. When it does, these
-      # rules stop being invoked and nothing fails — they simply stop running.
-      # Migrate with: npx @next/codemod@canary next-lint-to-eslint-cli .
+      # Runs `eslint .` directly. It went through `next lint` until that was
+      # deprecated for Next 16, and the hazard there was the quiet kind: the
+      # runner would have gone away and these rules would have stopped being
+      # invoked without anything failing.
       - name: Lint
         run: npm run lint
 
