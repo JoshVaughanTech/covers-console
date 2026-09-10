@@ -1,8 +1,11 @@
 "use client";
 
+import { useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { Card, Badge, Icon, Button } from "@/components/ui";
 import { CardHead, LinkBtn, PageHead } from "@/components/screen/page-head";
+import { useIdara, shortHash } from "@/lib/idara";
+import { deliveredReports } from "@/lib/reports/delivered";
 
 /* ============================================================
    Reports — an index of the reports this system can produce.
@@ -92,6 +95,9 @@ const ELSEWHERE: [string, string, string, string][] = [
 
 export default function ReportsPage() {
   const router = useRouter();
+  const { auditLog } = useIdara();
+
+  const delivered = useMemo(() => deliveredReports(auditLog), [auditLog]);
 
   return (
     <div>
@@ -136,6 +142,73 @@ export default function ReportsPage() {
             </Button>
           </div>
         </div>
+      </Card>
+
+      {/* What this venue has actually produced. */}
+      <Card style={{ marginBottom: 16 }}>
+        <CardHead
+          title="Delivered reports"
+          right={
+            <span style={{ fontSize: 12, color: "var(--fg-4)" }}>
+              {delivered.length === 0
+                ? "from the audit chain"
+                : `${delivered.length} on the chain`}
+            </span>
+          }
+        />
+        {delivered.length === 0 ? (
+          <p style={{ margin: 0, fontSize: 12.5, lineHeight: 1.6, color: "var(--fg-3)" }}>
+            None yet. Delivery is scheduled outside the app — whatever already runs on a timer
+            posts to <code>/api/reports/weekly/run</code>, which builds last week&rsquo;s break
+            loading, writes it, and appends a <code>report.delivered</code> event. This table
+            folds those events, so it fills in on its own the first time the schedule fires.
+            An empty table here means no report has been delivered, which is worth knowing;
+            the five rows that used to sit here meant nothing at all.
+          </p>
+        ) : (
+          <div style={{ overflowX: "auto" }}>
+            <table className="fs-tnum" style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+              <thead>
+                <tr>
+                  {["Week", "Breaches", "Loading hrs", "File", "Content", ""].map((h, i) => (
+                    <th
+                      key={h || "trigger"}
+                      style={{
+                        textAlign: i === 1 || i === 2 ? "right" : "left",
+                        fontSize: 11,
+                        fontWeight: 700,
+                        letterSpacing: ".04em",
+                        textTransform: "uppercase",
+                        color: "var(--fg-4)",
+                        padding: "8px 12px",
+                      }}
+                    >
+                      {h}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {delivered.map((r) => (
+                  <tr key={r.seq} style={{ borderTop: "1px solid var(--border)" }}>
+                    <td style={{ padding: "10px 12px", fontWeight: 600, color: "var(--fg-1)" }}>{r.weekLabel}</td>
+                    <td style={{ padding: "10px 12px", textAlign: "right", color: r.breaches > 0 ? "var(--danger-fg)" : "var(--fg-2)" }}>{r.breaches}</td>
+                    <td style={{ padding: "10px 12px", textAlign: "right", color: "var(--fg-2)" }}>{r.loadingHours.toFixed(2)}</td>
+                    <td style={{ padding: "10px 12px", color: "var(--fg-3)", maxWidth: 260, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={`${r.target} · ${r.bytes} bytes`}>{r.filename}</td>
+                    {/* the hash is the point: a row here is checkable against the file it names */}
+                    <td style={{ padding: "10px 12px", color: "var(--fg-4)", fontSize: 11.5 }}>{r.contentHash ? shortHash(r.contentHash) : "—"}</td>
+                    <td style={{ padding: "10px 12px", textAlign: "right" }}>
+                      <Badge tone={r.trigger === "schedule" ? "neutral" : "info"}>{r.trigger}</Badge>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            <div style={{ marginTop: 12 }}>
+              <LinkBtn href="/audit">Find these on the chain</LinkBtn>
+            </div>
+          </div>
+        )}
       </Card>
 
       {/* Real data that already has a home. */}
