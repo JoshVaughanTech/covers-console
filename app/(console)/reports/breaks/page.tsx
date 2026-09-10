@@ -97,7 +97,7 @@ export default function BreakLoadingPage() {
     a.click();
     a.remove();
     URL.revokeObjectURL(url);
-    toast(`Exported ${report.totals.breaches} rows`, { tone: "success", icon: "download" });
+    toast(`Exported ${report.totals.breaches} row${report.totals.breaches === 1 ? "" : "s"}`, { tone: "success", icon: "download" });
   }
 
   const modeBadge = unavailable ? (
@@ -182,7 +182,7 @@ export default function BreakLoadingPage() {
                 <div style={{ fontSize: 12.5, color: "var(--fg-2)", lineHeight: 1.6 }}>
                   {report.totals.unpricedRows > 0 && (
                     <div>
-                      <strong>{report.totals.unpricedRows} of {report.totals.breaches} rows have no hourly rate</strong>{" "}
+                      <strong>{report.totals.unpricedRows} of {report.totals.breaches} row{report.totals.breaches === 1 ? "" : "s"} {report.totals.unpricedRows === 1 ? "has" : "have"} no hourly rate</strong>{" "}
                       and are excluded from the priced total. Their {report.totals.unpricedHours.toFixed(2)} loading hours are still owed —
                       the rate is unknown, not zero.
                     </div>
