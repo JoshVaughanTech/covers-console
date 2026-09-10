@@ -293,10 +293,13 @@ export default function CredentialsPage() {
     setEditOpen(true);
   }
 
+  /* Held for the session, not stored. Nothing persists a job description, so
+     the toast says so rather than "updated" — found while sweeping the console
+     for buttons that report an act that did not happen. */
   function saveJob() {
     setJob(draft);
     setEditOpen(false);
-    toast("Job details updated", { tone: "success", icon: "check" });
+    toast("Job details changed for this session — not stored yet", { tone: "info", icon: "pencil" });
   }
 
   const verifiedIdentity = selected?.state !== "Action needed";

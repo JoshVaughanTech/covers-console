@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   Avatar,
   Badge,
@@ -74,11 +75,6 @@ const STANDING_TONE: Record<StandingState, Tone> = {
   action_needed: "danger",
 };
 
-const RECENT_SHIFTS: [string, string, string][] = [
-  ["Mon 2 Jun", "Brightwater Hotel", "7:00am – 3:30pm"],
-  ["Fri 30 May", "Brightwater Hotel", "6:30am – 3:00pm"],
-  ["Thu 29 May", "Northside Tavern", "7:00am – 4:00pm"],
-];
 
 const PAGE_SIZE = 8;
 
@@ -94,6 +90,7 @@ const TH: React.CSSProperties = {
 
 export default function PeoplePage() {
   const toast = useToast();
+  const router = useRouter();
   const { workers, credentials, sites, today } = useIdara();
   const verifier = useMemo(() => new LocalCredentialVerifier(), []);
 
@@ -375,31 +372,17 @@ export default function PeoplePage() {
         size="lg"
         footer={
           selected && (
-            <>
-              <Button
-                variant="sec"
-                icon="shield-check"
-                onClick={() =>
-                  toast(`Opened ${selected.name.split(" ")[0]}'s credential record.`, {
-                    tone: "info",
-                    icon: "shield-check",
-                  })
-                }
-              >
-                View credentials
-              </Button>
-              <Button
-                icon="message-square"
-                onClick={() =>
-                  toast(`Message sent to ${selected.name.split(" ")[0]}.`, {
-                    tone: "success",
-                    icon: "send",
-                  })
-                }
-              >
-                Message
-              </Button>
-            </>
+            /* Message used to sit beside this and raise "Message sent to Darie."
+               Nothing sent anything; it was the same button as the one on the
+               Communications screen, which came out in #52 — this one would have
+               been left behind, still reporting a delivery.
+
+               View credentials stays because it has somewhere real to go: it
+               raised "Opened Darie's credential record" and opened nothing, and
+               /credentials is a screen that exists. */
+            <Button variant="sec" icon="shield-check" onClick={() => router.push("/credentials")}>
+              View credentials
+            </Button>
           )
         }
       >
@@ -522,33 +505,6 @@ export default function PeoplePage() {
               </div>
             </div>
 
-            {/* Recent shifts */}
-            <div>
-              <div style={{ fontSize: 13, fontWeight: 700, color: "var(--fg-1)", marginBottom: 8 }}>
-                Recent shifts
-              </div>
-              <div style={{ border: "1px solid var(--border)", borderRadius: 12, overflow: "hidden" }}>
-                {RECENT_SHIFTS.map(([date, site, hours], i) => (
-                  <div
-                    key={date}
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 10,
-                      padding: "10px 14px",
-                      borderTop: i ? "1px solid var(--border)" : 0,
-                    }}
-                  >
-                    <Icon name="calendar" size={15} color="var(--fg-4)" />
-                    <span style={{ fontSize: 13, fontWeight: 600, color: "var(--fg-1)", width: 96 }}>{date}</span>
-                    <span style={{ fontSize: 13, color: "var(--fg-2)", flex: 1 }}>{site}</span>
-                    <span className="fs-tnum" style={{ fontSize: 12.5, color: "var(--fg-3)" }}>
-                      {hours}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </div>
           </div>
         )}
       </Modal>
