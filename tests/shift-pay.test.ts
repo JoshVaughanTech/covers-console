@@ -46,6 +46,28 @@ describe("the publish gate", () => {
     expect(reason).toContain("at least $40.62/h");
   });
 
+  it("names the DEAREST underpaid band, not merely an underpaid one", async () => {
+    /* Found by mutation: pointing `worst` at the cheapest short segment instead
+       of the dearest left every existing assertion green. $40.62 appears twice
+       in this message — once as the dearest band's rate and once as the
+       independent "raise to at least" figure — so a test matching that string
+       alone is satisfied by the second occurrence and says nothing about the
+       first.
+
+       The band NAME is what separates them. This shift is weekday evening hours
+       plus one Saturday hour past midnight. At $30.00 BOTH are underpaid, which
+       is what the mutation needs to be visible: at $37.00 only the Saturday band
+       is short, so first and last are the same segment and the swap is a no-op.
+
+       Only the Saturday band is binding. A manager told to fix the evening rate
+       would raise it and be refused again. */
+    const reason = payBlockReason(posting(fridayNight(3000))) ?? "";
+    expect(reason).toContain("Saturday");
+    expect(reason).not.toContain("Evening");
+    // and the two figures are still distinct claims, in the right order
+    expect(reason.indexOf("must be paid")).toBeLessThan(reason.indexOf("at least"));
+  });
+
   it("lets through a rate that clears every hour", async () => {
     expect(payBlockReason(posting(fridayNight(4150)))).toBeNull();
     expect(payBlockReason(posting(fridayNight(4062)))).toBeNull();
