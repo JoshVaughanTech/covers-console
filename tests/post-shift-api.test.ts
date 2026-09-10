@@ -161,6 +161,23 @@ describe("what it will not take from the caller", () => {
     expect(res.status).toBe(422);
   });
 
+  it("answers 422 on a classification the award does not have", async () => {
+    /* The rate table throws Unknown MA000009 classification rather than
+       returning a zero floor, so nothing publishes — the compliance direction is
+       safe. What escaped was the error: buildPosting() was called unguarded, so
+       the throw left the route as a 500 with no reason a caller could act on,
+       from the same phone-on-an-untrusted-network the 422 case above is written
+       for. A level is content, not shape. */
+    const { res, body } = await send(venue, shift({ level: "banana", clientRef: "lvl-1" }));
+    expect(res.status).toBe(422);
+    expect(String(body.errors ?? body.error)).toMatch(/classification/i);
+  });
+
+  it("does the same for a level that looks numeric but is not one", async () => {
+    const { res } = await send(venue, shift({ level: "99", clientRef: "lvl-2" }));
+    expect(res.status).toBe(422);
+  });
+
   it("takes the actor from the session, not the body", async () => {
     const { body } = await send(venue, shift({ actor: "Somebody Else", functionName: "Actor", clientRef: "actor-1" }));
     expect(body.posted).toBe(true);
