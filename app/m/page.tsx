@@ -174,6 +174,27 @@ export default function MobileBreaksPage() {
           <h1 style={{ margin: 0, fontSize: 21, letterSpacing: "-.02em" }}>Breaks</h1>
           <p style={{ margin: "2px 0 0", fontSize: 12, color: "var(--fg-4)" }}>
             {HIGA.awardId} cl 16 · {fmtClock(now, TZ)}
+            {/* Where these hours came from, next to what time it is, because
+                the two are read together and one is useless without the
+                other. The console has carried this since it was built; the
+                phone showed seeded people and real people identically. */}
+            {payload && (
+              <>
+                {" · "}
+                <span
+                  style={{
+                    fontWeight: 600,
+                    color: payload.mode === "live" ? "var(--success-fg)" : "var(--fg-3)",
+                  }}
+                >
+                  {payload.mode === "live"
+                    ? "Live · Connecteam"
+                    : payload.mode === "demo"
+                      ? "Demo data"
+                      : "Clock unavailable"}
+                </span>
+              </>
+            )}
           </p>
         </div>
         <button
@@ -193,6 +214,21 @@ export default function MobileBreaksPage() {
 
       {payload?.mode === "error" && (
         <Banner tone="danger">Time-clock data unavailable — this list may be out of date.</Banner>
+      )}
+
+      {/* Seeded hours and worked hours render identically, which is the one
+          thing this screen must not let happen: every name, clock and countdown
+          below is as convincing on demo data as on real. Said once, at the top,
+          rather than trusted to the badge in the header being noticed. */}
+      {payload?.mode === "demo" && (
+        <Banner tone="warn">
+          <strong>Demo data — nobody below is really on shift.</strong>
+          <span style={{ display: "block", marginTop: 4 }}>
+            No time clock is configured, so these are seeded sessions. A break sent from
+            here is still recorded in the audit chain and still reaches nobody&apos;s
+            timesheet.
+          </span>
+        </Banner>
       )}
 
       {/* A check that is off for want of a permission looks exactly like one
