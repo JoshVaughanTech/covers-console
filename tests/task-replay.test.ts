@@ -58,6 +58,21 @@ describe("folding task events over the seed", () => {
     expect(where(replayTasks([second, first]), "t3")).toBe("In Progress");
   });
 
+  it("does nothing when the move names the column the card is already in", () => {
+    /* Found by scripts/mutate.mjs: dropping the `from === to` half of the guard
+       left every case green. Without it the card is filtered out of its column
+       and prepended back, so a no-op move silently reorders the board — and for
+       Completed it also rewrites the card through cardInColumn(), turning a due
+       date of null into "Completed today".
+
+       A stale tab re-sending a move it already sent is the ordinary way this
+       happens, and the board it produces is wrong in a way nobody would look
+       for, because nothing on screen says a move was applied twice. */
+    const before = replayTasks([]);
+    const after = replayTasks([ev("task.moved", { taskId: "t7", from: "Completed", to: "Completed" })]);
+    expect(after).toEqual(before);
+  });
+
   it("strips the priority when a card lands in Completed", () => {
     const b = replayTasks([ev("task.moved", { taskId: "t1", from: "To Do", to: "Completed" })]);
     const card = b.Completed.find((c) => c.id === "t1");

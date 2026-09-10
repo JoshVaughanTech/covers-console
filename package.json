@@ -11,7 +11,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "report:weekly": "node scripts/deliver-weekly-report.mjs",
-    "confirm:hours": "node scripts/auto-confirm-hours.mjs"
+    "confirm:hours": "node scripts/auto-confirm-hours.mjs",
+    "mutate": "node scripts/mutate.mjs"
   },
   "dependencies": {
     "lucide-react": "^0.469.0",

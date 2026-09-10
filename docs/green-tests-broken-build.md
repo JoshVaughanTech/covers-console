@@ -901,7 +901,15 @@ Not more checks. Two habits, both cheap:
 
 **Ask what would make it fail.** Before believing a pass, name an input that
 would produce a fail. If you cannot, the check has no discriminating power and
-its pass means nothing. `slice(200, 340)` has no such input; that is decidable
+its pass means nothing.
+
+For code rather than a one-liner, `npm run mutate` does this by breaking the
+guard and watching what goes red. It earned its place immediately: the award
+floor had six tests over it and a mutation pointing the refusal at the CHEAPEST
+underpaid band survived all of them, because the figure they matched on appears
+twice in that sentence and the second occurrence is computed separately. Then
+the first test written to close it survived too — on that fixture only one band
+was underpaid, so the swap had nothing to swap. Neither was visible by reading. `slice(200, 340)` has no such input; that is decidable
 by looking at it, before running it. This is mutation testing, done in your
 head, on a one-liner — the same standard `task-replay.test.ts` and
 `publish-receipt.test.ts` were held to, and there is no principled reason a
