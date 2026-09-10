@@ -23,9 +23,9 @@ export interface EventBooking {
   status: EventStatus;
   start: string;
   end: string;
+  /** how many of the roles this engagement needs are filled. */
   filled: number;
   required: number;
-  progress: number;
   crew: string[];
   requirements: string[];
 }

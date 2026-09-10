@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { NotComputedBanner } from "@/components/screen/not-computed";
+import { NotComputedNote } from "@/components/screen/not-computed";
 import {
   Card,
   Bar,
@@ -147,7 +147,6 @@ export default function JobsPage() {
       end: draft.end.trim() || "TBC",
       filled: 0,
       required,
-      progress: draft.status === "Completed" ? 100 : 0,
       crew: [],
       requirements: [],
     };
@@ -162,10 +161,16 @@ export default function JobsPage() {
 
   return (
     <div>
-      <NotComputedBanner source="Events here are lib/events seed rows. A posting on the board carries a function name, but no function record exists that coverage or progress could be computed against." />
+      <NotComputedNote>
+        These engagements are seed rows in lib/events, shared with the schedule so the two
+        screens cannot disagree about a catering week. The staffing figures below are counted
+        off those rows rather than estimated — what is missing is anything that MOVES them:
+        a posting on the board carries a function name, but no function record exists to bind
+        a booking to the shifts worked against it.
+      </NotComputedNote>
       <PageHead
         title="Events"
-        sub="Events and catering engagements across your venues and off-premise sites — coverage, staffing and progress at a glance."
+        sub="Events and catering engagements across your venues and off-premise sites."
         right={
           <Button size="sm" icon="plus" onClick={() => setCreateOpen(true)}>
             New Event
@@ -286,8 +291,7 @@ export default function JobsPage() {
                 <th style={TH}>Client</th>
                 <th style={TH}>Status</th>
                 <th style={TH}>Dates</th>
-                <th style={{ ...TH, width: 200 }}>Fill</th>
-                <th style={{ ...TH, width: 160 }}>Progress</th>
+                <th style={{ ...TH, width: 240 }}>Crew filled</th>
                 <th style={{ ...TH, textAlign: "right" }} />
               </tr>
             </thead>
@@ -329,13 +333,7 @@ export default function JobsPage() {
                       </div>
                       <Bar value={fill} color={fillTone(j.filled, j.required)} />
                     </td>
-                    <td style={{ padding: "11px 14px" }}>
-                      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 5 }}>
-                        <span className="fs-tnum" style={{ fontSize: 11.5, color: "var(--fg-4)" }}>Delivery</span>
-                        <span className="fs-tnum" style={{ fontSize: 12, fontWeight: 700, color: "var(--fg-1)" }}>{j.progress}%</span>
-                      </div>
-                      <Bar value={j.progress} color="var(--fs-teal)" />
-                    </td>
+
                     <td style={{ padding: "11px 14px", textAlign: "right" }}>
                       <Icon name="chevron-right" size={16} color="var(--fg-4)" />
                     </td>
@@ -403,10 +401,10 @@ export default function JobsPage() {
                   onClick={() => {
                     setEvents((prev) =>
                       prev.map((j) =>
-                        j.id === active.id ? { ...j, status: "Completed", progress: 100 } : j
+                        j.id === active.id ? { ...j, status: "Completed" } : j
                       )
                     );
-                    setActive((cur) => (cur ? { ...cur, status: "Completed", progress: 100 } : cur));
+                    setActive((cur) => (cur ? { ...cur, status: "Completed" } : cur));
                     toast(`${active.id} marked complete`, { tone: "success", icon: "circle-check" });
                   }}
                 >
@@ -430,7 +428,7 @@ export default function JobsPage() {
               <DetailChip icon="calendar" label="Dates" value={`${active.start} → ${active.end}`} mono />
             </div>
 
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 14 }}>
               <Card pad={16}>
                 <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
                   <span style={{ fontSize: 12.5, fontWeight: 600, color: "var(--fg-2)" }}>Headcount</span>
@@ -441,18 +439,6 @@ export default function JobsPage() {
                 <Bar value={pct(active.filled, active.required)} color={fillTone(active.filled, active.required)} height={8} />
                 <div className="fs-tnum" style={{ fontSize: 11.5, color: "var(--fg-4)", marginTop: 6 }}>
                   {Math.max(0, active.required - active.filled)} roles still open
-                </div>
-              </Card>
-              <Card pad={16}>
-                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
-                  <span style={{ fontSize: 12.5, fontWeight: 600, color: "var(--fg-2)" }}>Delivery progress</span>
-                  <span className="fs-tnum" style={{ fontSize: 12.5, fontWeight: 700, color: "var(--fg-1)" }}>
-                    {active.progress}%
-                  </span>
-                </div>
-                <Bar value={active.progress} color="var(--fs-teal)" height={8} />
-                <div style={{ fontSize: 11.5, color: "var(--fg-4)", marginTop: 6 }}>
-                  Schedule completion to date
                 </div>
               </Card>
             </div>

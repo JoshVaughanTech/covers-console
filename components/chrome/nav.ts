@@ -19,7 +19,6 @@ export const NAV: NavItem[] = [
   { id: "breaks", label: "Break Compliance", icon: "coffee", href: "/breaks" },
   { id: "projects", label: "Run Sheets", icon: "clipboard-list", href: "/projects" },
   { id: "people", label: "People", icon: "users", href: "/people" },
-  { id: "comms", label: "Communications", icon: "message-square", href: "/comms" },
   { id: "credentials", label: "Credentials", icon: "badge-check", href: "/credentials", idara: true },
   { id: "sign-in-codes", label: "Phone Sign-in", icon: "key-round", href: "/sign-in-codes", idara: true },
   { id: "audit", label: "Audit Log", icon: "scroll-text", href: "/audit", idara: true },
@@ -34,6 +33,5 @@ export const DATE_LABELS: Record<string, string> = {
   attendance: "Fri 16 May, 2024",
   breaks: "Live · today",
   credentials: "Thu 16 May, 2024",
-  comms: "Fri 16 May, 2024",
   projects: "Thu 16 May, 2024",
 };
