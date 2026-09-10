@@ -110,6 +110,19 @@ const MUTATIONS = [
     guards: ["tests/publish-receipt.test.ts"],
   },
   {
+    id: "M9",
+    what: "the rate preview quotes the smallest shortfall, not the binding one",
+    file: "lib/awards/rates.ts",
+    from: "  const worst = shortSegments[0];",
+    to: "  const worst = shortSegments[shortSegments.length - 1];",
+    guards: ["tests/rates.test.ts", "tests/shift-pay.test.ts", "tests/engagement.test.ts"],
+    /* M4's twin, and the more consequential of the two. M4 left the "raise to
+       at least" figure correct because it is computed separately; here the whole
+       sentence comes from `worst`, including "short by $X/h". A manager typing a
+       rate on /open-shifts reads this live, so understating the gap tells them
+       to raise by an amount that will still be refused. */
+  },
+  {
     id: "M8",
     what: "the task fold re-adds a card already in the column it moved to",
     file: "lib/tasks/replay.ts",

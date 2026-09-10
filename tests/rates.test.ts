@@ -231,6 +231,30 @@ describe("an offer is tested against every hour, not the average", () => {
     expect(a.summary).toContain("Saturday");
   });
 
+  it("quotes the BINDING shortfall when several bands are short", async () => {
+    /* Found by scripts/mutate.mjs (M9). The summary is built from
+       shortSegments[0], which is the dearest because the list is sorted
+       descending. Pointing it at the last element instead survived every test
+       above — the $37.00 case has exactly ONE short segment, so first and last
+       are the same element and there is nothing for the swap to change.
+
+       A manager typing a rate on /open-shifts reads this sentence live. Quoting
+       the smallest shortfall tells them to raise by an amount that will still
+       be refused. */
+    const a = assessOffer(3000, fridayNight); // $30.00/h — under every band
+
+    // the precondition that makes this test able to fail at all
+    expect(a.shortSegments.length).toBeGreaterThan(1);
+
+    const binding = a.shortSegments[0];
+    const smallest = a.shortSegments[a.shortSegments.length - 1];
+    expect(binding.effectiveHourlyCents).toBeGreaterThan(smallest.effectiveHourlyCents);
+
+    expect(a.summary).toContain(fmtAud(binding.effectiveHourlyCents));
+    expect(a.summary).toContain(`short by ${fmtAud(binding.effectiveHourlyCents - 3000)}`);
+    expect(a.summary).not.toContain(`short by ${fmtAud(smallest.effectiveHourlyCents - 3000)}`);
+  });
+
   it("accepts a rate that clears the dearest hour", async () => {
     const a = assessOffer(4150, fridayNight); // $41.50/h
     expect(a.atOrAboveFloor).toBe(true);
