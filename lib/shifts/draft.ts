@@ -22,7 +22,7 @@
    ============================================================ */
 
 import { functionsForRole, checkDuties, type WorkFunction } from "@/lib/idara";
-import type { EmploymentType } from "@/lib/awards";
+import { LEVELS, type EmploymentType } from "@/lib/awards";
 import { payBlockReason } from "./pay";
 import type { ShiftPay, ShiftPosting, SkillRequirement } from "./types";
 
@@ -98,6 +98,17 @@ function venueEpoch(date: string, time: string, tz: string): number {
  * rate and no date meant to publish a rate, and dropping it quietly would put
  * the shift on the board paying nothing anyone agreed to.
  */
+/**
+ * "2" is level 2; "introductory" is itself.
+ *
+ * One reading, used by both the check and the value it validates, so the two
+ * cannot disagree about what the string meant.
+ */
+function levelFrom(level: string): string | number {
+  const t = level.trim();
+  return /^\d+$/.test(t) ? Number(t) : t;
+}
+
 export function payFromDraft(d: PostingDraft, timezone = "Australia/Melbourne"): PayDraftResult {
   const parts = [d.date, d.startTime, d.endTime, d.level, d.rate];
   if (parts.every((p) => !p.trim())) return { ok: true };
@@ -106,7 +117,23 @@ export function payFromDraft(d: PostingDraft, timezone = "Australia/Melbourne"):
   if (!DATE.test(d.date)) errors.push("Give the shift a date");
   if (!TIME.test(d.startTime)) errors.push("Give a start time, as HH:MM");
   if (!TIME.test(d.endTime)) errors.push("Give an end time, as HH:MM");
-  if (!d.level.trim()) errors.push("Pick the award classification this role sits at");
+  /* Validated here, not merely required.
+
+     The rate table THROWS on a classification it does not have. That is safe in
+     the direction that matters — nothing prices, so nothing publishes — but it
+     threw out of buildPosting() and out of POST /api/shifts/post, which then
+     answered 500 with no reason a caller could act on. This function's contract
+     is to return errors rather than raise them, and a level is content in
+     exactly the sense the route's own 422 comment means.
+
+     A form built from LEVELS cannot send a bad one. A phone on a network the
+     venue does not control can, and so can a client built against a table that
+     has since been superseded. */
+  if (!d.level.trim()) {
+    errors.push("Pick the award classification this role sits at");
+  } else if (!(LEVELS as readonly unknown[]).includes(levelFrom(d.level))) {
+    errors.push(`${d.level.trim()} is not an MA000009 classification`);
+  }
 
   const dollars = Number(d.rate);
   if (!d.rate.trim() || !Number.isFinite(dollars) || dollars <= 0) errors.push("Give an hourly rate");
@@ -125,7 +152,7 @@ export function payFromDraft(d: PostingDraft, timezone = "Australia/Melbourne"):
   return {
     ok: true,
     pay: {
-      level: (/^\d+$/.test(d.level) ? Number(d.level) : d.level) as ShiftPay["level"],
+      level: levelFrom(d.level) as ShiftPay["level"],
       employment: d.employment,
       offeredHourlyCents: Math.round(dollars * 100),
       startsAt,
