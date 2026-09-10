@@ -7,7 +7,7 @@
    cannot disagree: they are the same data read twice.
    ============================================================ */
 
-import type { ColName, TaskBoard } from "./types";
+import type { TaskBoard } from "./types";
 
 export const TASK_SEED: TaskBoard = {
   "To Do": [
@@ -27,21 +27,6 @@ export const TASK_SEED: TaskBoard = {
     { id: "t8", title: "Menu tasting with client", sub: "Completed on May 13", prio: null, due: null, names: [] },
     { id: "t9", title: "Staff briefing & rosters issued", sub: "Completed on May 14", prio: null, due: null, names: [] },
   ],
-};
-
-/**
- * The backlog the board does not draw.
- *
- * Column headers count these too, so the numbers describe a real run sheet
- * rather than the handful of cards that fit on screen. Kept beside the seed
- * because it is the same fiction: change one without the other and the
- * headers stop matching the cards under them.
- */
-export const BASE_EXTRA: Record<ColName, number> = {
-  "To Do": 9,
-  "In Progress": 6,
-  Review: 4,
-  Completed: 23,
 };
 
 /** A fresh copy, so a caller folding events cannot mutate the seed itself. */
