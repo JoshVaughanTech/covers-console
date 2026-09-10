@@ -3,8 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Card, Avatar, Badge, Icon, SearchInput, Tabs } from "@/components/ui";
 import type { Tone } from "@/lib/status";
-import { CardHead, PageHead } from "@/components/screen/page-head";
-import { NotComputed, NotComputedNote } from "@/components/screen/not-computed";
+import { PageHead } from "@/components/screen/page-head";
 import { assessAll, type BreakAssessment, type ShiftSession } from "@/lib/awards";
 
 /* ============================================================
@@ -17,6 +16,15 @@ import { assessAll, type BreakAssessment, type ShiftSession } from "@/lib/awards
    clock, and looked exactly as authoritative.
 
    So it reads the clock now — /api/breaks, the same endpoint and
+   A panel here showed budgeted hours and a dollar variance per
+   function. Nothing records a planned-hours budget and nothing
+   prices a variance against one, so it went. What replaced it was
+   a card explaining that it had gone, which is a note to a reader
+   of this repo rather than to somebody running a floor — they do
+   not need to be told daily about a panel they never saw. The
+   hours side becomes real when a function carries a budget; the
+   money side also needs payroll, which Covers does not process.
+
    the same assessAll() the break board runs, because two readings
    of one clock is how they come to disagree about who is at work.
 
@@ -208,23 +216,6 @@ export default function AttendancePage() {
         </div>
       </Card>
 
-      <Card style={{ padding: "16px 18px" }}>
-        <CardHead
-          title={
-            <span style={{ display: "inline-flex", alignItems: "center", gap: 9 }}>
-              Planned vs actual hours by function
-              <NotComputed title="No planned-hours budget exists to compare against" />
-            </span>
-          }
-        />
-        <NotComputedNote>
-          This panel showed budgeted hours and a dollar variance for each function. Nothing in
-          Covers records a planned-hours budget, and nothing prices a variance against one, so
-          the figures were illustrative and have been taken out rather than left looking
-          measured. The hours side becomes real once a function carries a budget; the money side
-          also needs payroll, which Covers does not process.
-        </NotComputedNote>
-      </Card>
     </div>
   );
 }

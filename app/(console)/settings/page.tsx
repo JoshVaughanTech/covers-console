@@ -17,12 +17,40 @@ import {
   type SelectOption,
 } from "@/components/ui";
 import { CardHead, PageHead } from "@/components/screen/page-head";
+import { NotComputedNote } from "@/components/screen/not-computed";
 import { useCompany } from "@/lib/store/shell";
 
 /* ============================================================
-   Settings — multi-section module. Each section is local-state
-   backed; "Save changes" surfaces a toast. Integrations &
-   security toggles flip session state + toast.
+   Settings — preference forms, and one thing that had to go.
+
+   A Security section offered Change password, Two-factor
+   authentication, and a list of active sessions with a Revoke
+   button beside each. None of them did anything. Change password
+   validated the two new fields matched and raised "Password
+   updated"; the sessions were a literal array and Revoke removed a
+   row from it.
+
+   Every other invented thing in this console reported a state.
+   These reported an ACT, on the controls where believing it
+   matters most — somebody seeing a session they did not recognise
+   would click Revoke and be told it was gone.
+
+   Doubly wrong on the password: Covers has no password to change.
+   Sign-in is a one-time code, written to a file for operators and
+   delivered to the worker's phone, and lib/store/auth.ts holds no
+   password column at all. The form was asking for a secret the
+   system has never had.
+
+   The sessions half is the one worth building: the store already
+   has sessionsOf() and revokeAllFor(), and DELETE
+   /api/auth/session already revokes the caller's own. What is
+   missing is an endpoint that lists an operator's sessions, which
+   is why this says so rather than showing an empty list.
+
+   The rest of the screen is preference forms. They hold local
+   state and store nothing, so the Save buttons went too — a
+   button whose only effect is a toast saying it worked is the
+   same failure in a smaller place.
    ============================================================ */
 
 const SECTIONS = [
@@ -31,7 +59,6 @@ const SECTIONS = [
   "Notifications",
   "Scheduling",
   "Integrations",
-  "Security",
 ] as const;
 type Section = (typeof SECTIONS)[number];
 
@@ -126,21 +153,6 @@ const INTEGRATIONS: IntegrationDef[] = [
 
 /* ---------- active sessions ---------- */
 
-interface SessionRow {
-  id: string;
-  device: string;
-  browser: string;
-  location: string;
-  lastActive: string;
-  current: boolean;
-}
-
-const INITIAL_SESSIONS: SessionRow[] = [
-  { id: "s-1", device: "MacBook Pro", browser: "Chrome 124", location: "Melbourne, AU", lastActive: "Active now", current: true },
-  { id: "s-2", device: "iPhone 15", browser: "Safari", location: "Melbourne, AU", lastActive: "2h ago", current: false },
-  { id: "s-3", device: "Windows PC", browser: "Edge 124", location: "Sydney, AU", lastActive: "Yesterday", current: false },
-];
-
 /* ---------- shared row helpers ---------- */
 
 const grid2: CSSProperties = {
@@ -196,29 +208,10 @@ function ToggleRow({
   );
 }
 
-function SaveBar({ onSave }: { onSave: () => void }) {
-  return (
-    <div
-      style={{
-        display: "flex",
-        justifyContent: "flex-end",
-        marginTop: 20,
-        paddingTop: 16,
-        borderTop: "1px solid var(--border)",
-      }}
-    >
-      <Button icon="check" onClick={onSave}>
-        Save changes
-      </Button>
-    </div>
-  );
-}
-
 export default function SettingsPage() {
   const toast = useToast();
   const { company, setCompany } = useCompany();
   const [section, setSection] = useState<Section>("Profile");
-  const saved = () => toast("Settings saved", { tone: "success", icon: "check" });
 
   /* ---- Profile ---- */
   const [profile, setProfile] = useState({
@@ -274,28 +267,6 @@ export default function SettingsPage() {
     });
   };
 
-  /* ---- Security ---- */
-  const [pw, setPw] = useState({ current: "", next: "", confirm: "" });
-  const [twoFa, setTwoFa] = useState(true);
-  const [sessions, setSessions] = useState<SessionRow[]>(INITIAL_SESSIONS);
-
-  const savePassword = () => {
-    if (!pw.current || !pw.next || !pw.confirm) {
-      toast("Fill in all password fields", { tone: "warning", icon: "alert-triangle" });
-      return;
-    }
-    if (pw.next !== pw.confirm) {
-      toast("New passwords do not match", { tone: "danger", icon: "x" });
-      return;
-    }
-    setPw({ current: "", next: "", confirm: "" });
-    toast("Password updated", { tone: "success", icon: "check" });
-  };
-
-  const revokeSession = (id: string, device: string) => {
-    setSessions((prev) => prev.filter((s) => s.id !== id));
-    toast(`Signed out of ${device}`, { tone: "neutral", icon: "log-out" });
-  };
 
   let body: ReactNode = null;
 
@@ -324,7 +295,6 @@ export default function SettingsPage() {
             <Select value={profile.timezone} onChange={(v) => setProfile({ ...profile, timezone: v })} options={TIMEZONES} />
           </Field>
         </div>
-        <SaveBar onSave={saved} />
       </Card>
     );
   } else if (section === "Company") {
@@ -352,7 +322,6 @@ export default function SettingsPage() {
             <TextArea value={companyForm.address} onChange={(v) => setCompanyForm({ ...companyForm, address: v })} rows={3} placeholder="Street, suburb, state, postcode" />
           </Field>
         </div>
-        <SaveBar onSave={saved} />
       </Card>
     );
   } else if (section === "Notifications") {
@@ -371,7 +340,6 @@ export default function SettingsPage() {
             />
           ))}
         </div>
-        <SaveBar onSave={saved} />
       </Card>
     );
   } else if (section === "Scheduling") {
@@ -413,7 +381,6 @@ export default function SettingsPage() {
             <Switch checked={sched.autoPublish} onChange={(v) => setSched({ ...sched, autoPublish: v })} />
           </div>
         </div>
-        <SaveBar onSave={saved} />
       </Card>
     );
   } else if (section === "Integrations") {
@@ -513,132 +480,20 @@ export default function SettingsPage() {
         </div>
       </Card>
     );
-  } else {
-    body = (
-      <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-        <Card>
-          <CardHead title="Change password" right={<Badge tone="neutral" icon="lock">Credentials</Badge>} />
-          <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-            <Field label="Current password">
-              <TextField value={pw.current} onChange={(v) => setPw({ ...pw, current: v })} type="password" icon="lock" placeholder="Enter current password" />
-            </Field>
-            <div style={grid2}>
-              <Field label="New password">
-                <TextField value={pw.next} onChange={(v) => setPw({ ...pw, next: v })} type="password" placeholder="New password" />
-              </Field>
-              <Field label="Confirm new password">
-                <TextField value={pw.confirm} onChange={(v) => setPw({ ...pw, confirm: v })} type="password" placeholder="Confirm password" />
-              </Field>
-            </div>
-          </div>
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "flex-end",
-              marginTop: 20,
-              paddingTop: 16,
-              borderTop: "1px solid var(--border)",
-            }}
-          >
-            <Button icon="check" onClick={savePassword}>
-              Update password
-            </Button>
-          </div>
-        </Card>
-
-        <Card>
-          <CardHead title="Two-factor authentication" />
-          <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-            <span
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                justifyContent: "center",
-                width: 36,
-                height: 36,
-                flexShrink: 0,
-                borderRadius: 10,
-                background: "var(--fs-teal-tint)",
-                color: "var(--fs-teal-700)",
-              }}
-            >
-              <Icon name="shield-check" size={18} />
-            </span>
-            <div style={{ flex: 1 }}>
-              <div style={{ fontSize: 14, fontWeight: 600, color: "var(--fg-1)" }}>Authenticator app</div>
-              <div style={{ fontSize: 12.5, color: "var(--fg-3)", marginTop: 2 }}>
-                Require a time-based code at sign-in.
-              </div>
-            </div>
-            <Switch
-              checked={twoFa}
-              onChange={(v) => {
-                setTwoFa(v);
-                toast(v ? "Two-factor enabled" : "Two-factor disabled", {
-                  tone: v ? "success" : "warning",
-                  icon: v ? "shield-check" : "shield-off",
-                });
-              }}
-            />
-          </div>
-        </Card>
-
-        <Card>
-          <CardHead title="Active sessions" right={<Badge tone="info">{sessions.length} active</Badge>} />
-          <div>
-            {sessions.map((s) => (
-              <div
-                key={s.id}
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 14,
-                  padding: "13px 0",
-                  borderBottom: "1px solid var(--border)",
-                }}
-              >
-                <span
-                  style={{
-                    display: "inline-flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    width: 36,
-                    height: 36,
-                    flexShrink: 0,
-                    borderRadius: 10,
-                    background: "var(--bg-2)",
-                    color: "var(--fg-2)",
-                  }}
-                >
-                  <Icon name={s.device.includes("iPhone") ? "smartphone" : "monitor"} size={18} />
-                </span>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                    <span style={{ fontSize: 14, fontWeight: 600, color: "var(--fg-1)" }}>
-                      {s.device} · {s.browser}
-                    </span>
-                    {s.current && <Badge tone="success" dot>This device</Badge>}
-                  </div>
-                  <div className="fs-tnum" style={{ fontSize: 12.5, color: "var(--fg-3)", marginTop: 2 }}>
-                    {s.location} · {s.lastActive}
-                  </div>
-                </div>
-                {!s.current && (
-                  <Button variant="danger" size="sm" icon="log-out" onClick={() => revokeSession(s.id, s.device)}>
-                    Revoke
-                  </Button>
-                )}
-              </div>
-            ))}
-          </div>
-        </Card>
-      </div>
-    );
   }
 
   return (
     <div>
-      <PageHead title="Settings" sub="Manage your profile, company, notifications and integrations." />
+      <PageHead title="Settings" sub="Profile, company, notifications, scheduling and connections." />
+      <NotComputedNote>
+        These preferences are held for the session and are not stored yet — reloading returns
+        them to their defaults, so there is no Save. Two things that WERE on this screen have
+        been removed rather than left: a change-password form, for a system whose sign-in is a
+        one-time code and which holds no password at all, and a list of active sessions with a
+        Revoke button that removed a row and nothing else. Session revocation is real in
+        lib/store/auth.ts and wants an endpoint listing an operator&rsquo;s own sessions before it
+        can be shown here.
+      </NotComputedNote>
       <div style={{ display: "flex", gap: 24, alignItems: "flex-start" }}>
         <div style={{ flexShrink: 0 }}>
           <Card pad={8} style={{ width: 200 }}>
@@ -696,5 +551,4 @@ const SECTION_ICONS: Record<Section, string> = {
   Notifications: "bell",
   Scheduling: "calendar-range",
   Integrations: "blocks",
-  Security: "shield",
 };
