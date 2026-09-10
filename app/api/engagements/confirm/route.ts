@@ -82,6 +82,29 @@ interface ConfirmBody {
 }
 
 export async function POST(req: Request) {
+  /* Who is asking, before anything is read.
+
+     This used to fold the chain and call completedSessions() first, and refuse
+     afterwards. completedSessions() is not local when a venue has a clock
+     configured — it is a request to Connecteam — so an unauthenticated POST
+     spent the venue's rate limit against a third party and then answered 401.
+     Nothing leaked; the cost was the point. /api is deliberately outside the
+     middleware matcher, so this endpoint is reachable by anybody who can
+     resolve the host.
+
+     Both paths are decided here so neither can drift back: a run token, or an
+     operator session, or nothing to do. */
+  const viaToken = tokenOk(req.headers.get("x-run-token"));
+  const caller = viaToken ? null : await operatorOf(req);
+  if (!viaToken && !caller) {
+    // 404 for a bad token, 401 for no session: an unauthenticated caller with
+    // a wrong token learns nothing about whether this endpoint exists
+    return NextResponse.json(
+      { error: req.headers.get("x-run-token") ? "not found" : "not signed in" },
+      { status: req.headers.get("x-run-token") ? 404 : 401 },
+    );
+  }
+
   const store = await eventStore();
   const now = Math.floor(Date.now() / 1000);
   const at = new Date().toISOString();
@@ -92,7 +115,7 @@ export async function POST(req: Request) {
 
   /* ---------- the scheduled sweep ---------- */
 
-  if (tokenOk(req.headers.get("x-run-token"))) {
+  if (viaToken) {
     const due = dueForAutoConfirm(sheet);
 
     /* One at a time, not Promise.all. Every append takes the chain lock, so
@@ -120,15 +143,9 @@ export async function POST(req: Request) {
 
   /* ---------- a venue confirming one shift ---------- */
 
-  const caller = await operatorOf(req);
-  if (!caller) {
-    // 404 for a bad token, 401 for no session: an unauthenticated caller with
-    // a wrong token learns nothing about whether this endpoint exists
-    return NextResponse.json(
-      { error: req.headers.get("x-run-token") ? "not found" : "not signed in" },
-      { status: req.headers.get("x-run-token") ? 404 : 401 },
-    );
-  }
+  /* Settled at the top: the guard there returned for every case but this one,
+     and the sweep above returns rather than falling through. */
+  if (!caller) return NextResponse.json({ error: "not signed in" }, { status: 401 });
 
   const body = (await req.json().catch(() => null)) as ConfirmBody | null;
   const engagementId = typeof body?.engagementId === "string" ? body.engagementId : null;
