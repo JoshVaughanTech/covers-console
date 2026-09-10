@@ -251,6 +251,10 @@ export default function SchedulePage() {
   const [openShiftsOpen, setOpenShiftsOpen] = useState(false);
   const [fairnessOpen, setFairnessOpen] = useState(false);
   const [gate, setGate] = useState<PublishResult | null>(null);
+  /* Whether the refusal on screen actually reached the chain. The modal
+     asserts it did, and an assertion the code cannot check is the thing this
+     console keeps finding. */
+  const [gateRecorded, setGateRecorded] = useState(true);
 
   // cell editor target: [rowIndex, dayIndex] or null
   const [editCell, setEditCell] = useState<{ row: number; day: number } | null>(null);
@@ -289,12 +293,20 @@ export default function SchedulePage() {
 
     // Idara gate: a non-compliant roster cannot be published.
     if (!result.published) {
-      recordPublish(siteId, result); // the blocked attempt is itself audited
+      /* The refusal goes on the chain before the modal claims it did. The
+         modal's own words are "This attempt has been written to the audit
+         log", and for a while that was said by a screen that had appended
+         to a React state variable. Awaited, so kept says whether the chain
+         took it. */
+      const kept = await recordPublish(siteId, result);
       setGate(result);
-      toast(`Publish blocked — ${blockReasons(result)}`, {
-        tone: "danger",
-        icon: "shield-alert",
-      });
+      setGateRecorded(kept);
+      toast(
+        kept
+          ? `Publish blocked — ${blockReasons(result)}`
+          : `Publish blocked — ${blockReasons(result)}. The attempt could NOT be written to the audit log.`,
+        { tone: "danger", icon: "shield-alert" },
+      );
       return;
     }
 
@@ -305,7 +317,7 @@ export default function SchedulePage() {
       tone: "teal",
     });
     if (!ok) return;
-    recordPublish(siteId, result);
+    await recordPublish(siteId, result);
     setPublished(nowLabel());
     toast(
       result.warnings.length
@@ -318,7 +330,7 @@ export default function SchedulePage() {
   // resolve the gate by publishing only the eligible staff. This can only
   // ever fix individual ineligibility — a roster-level gap survives dropping
   // people, so the result is re-checked rather than assumed published.
-  const publishEligibleOnly = () => {
+  const publishEligibleOnly = async () => {
     if (!gate) return;
     const eligibleNames = new Set(gate.eligible.map((d) => d.context.subjectName));
     const removed = gate.blocked.length;
@@ -327,6 +339,7 @@ export default function SchedulePage() {
 
     if (!result.published) {
       setGate(result);
+      setGateRecorded(await recordPublish(siteId, result));
       toast(`Still blocked — ${blockReasons(result)}`, {
         tone: "danger",
         icon: "shield-alert",
@@ -335,7 +348,7 @@ export default function SchedulePage() {
     }
 
     setCrew(remaining);
-    recordPublish(siteId, result);
+    await recordPublish(siteId, result);
     setPublished(nowLabel());
     setGate(null);
     toast(
@@ -640,7 +653,7 @@ export default function SchedulePage() {
             </Button>
             {/* dropping people cannot satisfy a roster-level requirement */}
             {(gate?.uncovered.length ?? 0) === 0 && (
-              <Button variant="pri" size="sm" icon="shield-check" onClick={publishEligibleOnly}>
+              <Button variant="pri" size="sm" icon="shield-check" onClick={() => void publishEligibleOnly()}>
                 Publish {gate?.eligible.length ?? 0} verified
               </Button>
             )}
@@ -664,7 +677,14 @@ export default function SchedulePage() {
                     on shift. That is required of the venue rather than of any one person, so removing staff won&apos;t resolve it.{" "}
                   </>
                 )}
-                This attempt has been written to the audit log.
+                {gateRecorded ? (
+                  "This attempt has been written to the audit log."
+                ) : (
+                  <b style={{ color: "var(--danger-fg)" }}>
+                    This attempt could NOT be written to the audit log — the chain refused it or is
+                    unreachable. The refusal above stands, but nothing recorded it.
+                  </b>
+                )}
               </div>
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
