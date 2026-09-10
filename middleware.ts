@@ -64,7 +64,6 @@ export const config = {
     "/breaks/:path*",
     "/projects/:path*",
     "/people/:path*",
-    "/comms/:path*",
     "/credentials/:path*",
     "/audit/:path*",
     "/reports/:path*",

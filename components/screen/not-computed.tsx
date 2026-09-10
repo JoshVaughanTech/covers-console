@@ -77,10 +77,16 @@ export function NotComputedNote({ children }: { children: ReactNode }) {
  * A page-level banner, for a whole screen nothing stands behind.
  *
  * Four console screens were built from the design kit before there was
- * anything to fill them: Run Sheets, Communications, Events and Reports. They
- * are not broken and not placeholders — they are complete screens showing
- * invented records, which is a worse thing to leave unmarked than an empty
- * one, because an empty screen announces itself and these do not.
+ * anything to fill them. Three have since been dealt with rather than
+ * marked: Reports became an index of what it can actually report, Run
+ * Sheets collapsed onto the one panel that folds the chain, and
+ * Communications was removed — its Send button appended to component state,
+ * which is a worse thing than a wrong number, because it looks like an act
+ * that happened.
+ *
+ * A marking is the weakest of the three answers and the right one only while
+ * the screen is still going somewhere. Prefer NotComputedNote, which says
+ * what IS backed as well as what is not.
  *
  * `source` names what would have to exist first, so a reader learns whether
  * this is waiting on a feature or on a decision.
