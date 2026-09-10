@@ -68,6 +68,9 @@ const DECLARED: Record<AuditEventType, true> = {
   "pack.item_verified": true,
   "pack.item_revoked": true,
   "conversion.flagged": true,
+  "employer.payroll_connected": true,
+  "employer.payroll_disconnected": true,
+  "employer.packs_set": true,
 };
 
 /**

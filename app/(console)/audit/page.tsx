@@ -107,6 +107,10 @@ function matchesTab(e: AuditEvent, tab: TabKey): boolean {
     return (
       e.type.startsWith("engagement.") ||
       e.type.startsWith("pack.") ||
+      /* The venue's own switches belong in this trail rather than beside the
+         roster publishes: one-tap employment being off is the reason a pack
+         that should have employed somebody did not. */
+      e.type.startsWith("employer.") ||
       e.type === "conversion.flagged"
     );
   }

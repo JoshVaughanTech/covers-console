@@ -19,6 +19,8 @@ import { eventStore } from "@/lib/store/events";
 import { EMPLOYERS } from "@/lib/idara/employer-seed";
 import { employerProfileHash, profileGaps } from "@/lib/idara/employer";
 import { replayEngagements } from "@/lib/idara/engagement";
+import { replayEmployer } from "@/lib/idara/employer-replay";
+import type { NewAuditEvent } from "@/lib/idara/audit";
 import { SITES, TODAY } from "@/lib/idara/seed";
 import { PAYROLL_CONNECTORS, type PayrollConnectorId } from "@/lib/payroll/types";
 import { mockPayroll } from "@/lib/payroll/mock";
@@ -36,10 +38,11 @@ function profile() {
 export async function GET(req: Request) {
   if (!(await operatorOf(req))) return NextResponse.json({ error: "not signed in" }, { status: 401 });
 
-  const p = profile();
+  const log = await (await eventStore()).all(ORG);
+  const p = replayEmployer(profile(), log);
   const at = TODAY;
   const gaps = profileGaps(p, at);
-  const engagements = replayEngagements((await (await eventStore()).all(ORG))).filter((e) => e.employerDid === p.did);
+  const engagements = replayEngagements(log).filter((e) => e.employerDid === p.did);
 
   return NextResponse.json({
     at,
@@ -106,13 +109,33 @@ export async function POST(req: Request) {
   const body = (await req.json().catch(() => null)) as EmployerBody | null;
   if (!body) return NextResponse.json({ error: "expected a JSON body" }, { status: 400 });
 
-  const p = profile();
+  const store = await eventStore();
+  /* Read before deciding, so a change that changes nothing writes nothing. A
+     settings screen that POSTs on every render would otherwise fill the chain
+     with a venue repeatedly agreeing with itself. */
+  const before = replayEmployer(profile(), await store.all(ORG));
+
+  const at = new Date().toISOString();
+  const actor = caller.operator.name;
+  const actorDid = caller.operator.did;
+  const pending: NewAuditEvent[] = [];
 
   if (body.payroll === null) {
-    delete p.payroll;
+    if (before.payroll) {
+      pending.push({
+        type: "employer.payroll_disconnected",
+        at,
+        actor,
+        actorDid,
+        summary: `${before.tradingName} disconnected ${PAYROLL_CONNECTORS[before.payroll.connector]?.label ?? before.payroll.connector} — it cannot employ anybody until a payroll is connected`,
+        data: { connector: before.payroll.connector, tenantRef: before.payroll.tenantRef },
+      });
+    }
   } else if (body.payroll) {
     const connector = body.payroll.connector;
     const tenantRef = body.payroll.tenantRef;
+    /* Both refusals happen BEFORE anything is appended. A chain that records a
+       rejected connector as a fact is worse than one that never heard of it. */
     if (typeof connector !== "string" || !(connector in PAYROLL_CONNECTORS)) {
       return NextResponse.json({ error: "unknown payroll connector" }, { status: 400 });
     }
@@ -124,20 +147,48 @@ export async function POST(req: Request) {
         { status: 400 },
       );
     }
-    p.payroll = {
-      connector: connector as PayrollConnectorId,
-      tenantRef: typeof tenantRef === "string" && tenantRef ? tenantRef : "brightwater-demo",
-      connectedAt: new Date().toISOString().slice(0, 10),
-    };
+    const ref = typeof tenantRef === "string" && tenantRef ? tenantRef : "brightwater-demo";
+    if (before.payroll?.connector !== connector || before.payroll?.tenantRef !== ref) {
+      pending.push({
+        type: "employer.payroll_connected",
+        at,
+        actor,
+        actorDid,
+        summary: `${before.tradingName} connected ${PAYROLL_CONNECTORS[connector as PayrollConnectorId].label} payroll`,
+        data: { connector, tenantRef: ref, connectedAt: at.slice(0, 10) },
+      });
+    }
   }
 
-  if (typeof body.acceptsPacks === "boolean") p.acceptsPacks = body.acceptsPacks;
+  if (typeof body.acceptsPacks === "boolean" && body.acceptsPacks !== before.acceptsPacks) {
+    pending.push({
+      type: "employer.packs_set",
+      at,
+      actor,
+      actorDid,
+      summary: body.acceptsPacks
+        ? `${before.tradingName} turned one-tap employment on`
+        : `${before.tradingName} turned one-tap employment off — a completed pack no longer employs anybody here`,
+      data: { accepts: body.acceptsPacks },
+    });
+  }
 
+  /* One at a time and awaited, like the confirm sweep: every append takes the
+     chain lock, and issuing them together would only mean a failure halfway
+     leaving the rest in flight with nothing saying which had landed. */
+  for (const ev of pending) {
+    await store.append(ORG, ev);
+  }
+
+  const p = replayEmployer(profile(), await store.all(ORG));
   const gaps = profileGaps(p, TODAY);
   return NextResponse.json({
     payroll: p.payroll ?? null,
     acceptsPacks: p.acceptsPacks,
     profileHash: employerProfileHash(p),
+    /* So a caller can tell "saved" from "was already that". The old route
+       could not: it answered the same whether or not anything happened. */
+    changed: pending.length,
     gaps,
     ready: gaps.length === 0,
   });

@@ -390,7 +390,28 @@ export type AuditEventType =
    * hard half, because a signal that re-fires daily is thirty events saying
    * the same thing.
    */
-  | "conversion.flagged";
+  | "conversion.flagged"
+  /**
+   * The venue's own record changing — its payroll connection, and whether it
+   * will employ through Idara packs at all.
+   *
+   * On the chain because these are the settings with consequences for other
+   * people. acceptsPacks is one-tap employment: turned off, a worker who has
+   * completed a pack cannot be employed here, and nothing else in the product
+   * would say when that changed or who decided it. Disconnecting payroll has
+   * the same shape — the venue stops being able to employ anybody, and
+   * profileGaps() reports it as a gap without being able to say since when.
+   *
+   * Folded rather than stored, for the reason every other piece of state here
+   * is: a settings row beside the chain is a second answer that can disagree
+   * with it. The profile in employer-seed.ts is the seed this is folded over,
+   * and replayEmployer() never mutates it — which the previous version of
+   * POST /api/employer did, in the process's memory, writing nothing.
+   */
+  | "employer.payroll_connected"
+  | "employer.payroll_disconnected"
+  /** one-tap employment turned on or off; `accepts` carries which. */
+  | "employer.packs_set";
 
 export interface AuditEvent {
   /** monotonic sequence number, 0-based. */
