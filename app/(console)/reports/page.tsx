@@ -58,14 +58,16 @@ const MISSING: Missing[] = [
     where: "lib/matching/matcher.ts",
   },
   {
-    name: "Labour cost",
+    name: "Labour cost against budget",
     blocker:
-      "Shifts can already be priced against the award properly — but pricing needs " +
-      "each person's classification Level, and that module refuses to infer one " +
-      "from a job title, because a wrong default would be indistinguishable from a " +
-      "confirmed one. No Level is recorded against anybody yet. Separately, no " +
-      "budget figure exists anywhere in the system to compare a cost against.",
-    where: "lib/awards/rates.ts",
+      "The cost half is already computed and is not waiting on anything: every " +
+      "worker carries a recorded award classification, and clocked hours are priced " +
+      "against MA000009 band by band — the worker's own Earnings screen shows the " +
+      "working, including the cl 16.6 loading. What is missing is the BUDGET. " +
+      "Nothing in Covers records what a venue planned to spend, so there is nothing " +
+      "to compare a cost against, and the chart that used to sit here plotted two " +
+      "figures of which only one could ever have been real.",
+    where: "app/api/earnings/route.ts",
   },
   {
     name: "Attendance rate",
