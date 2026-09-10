@@ -42,5 +42,7 @@ export { standingOf, daysBetween } from "./standing";
 export type { Standing, StandingState, HeldCredential, HeldState } from "./standing";
 export type { NewAuditEvent } from "./audit";
 export { IdaraProvider, useIdara } from "./provider";
-export type { PublishResult, RosterAssignment } from "./provider";
+export type { RosterAssignment } from "./provider";
+export { publishEvents, blockedSummary } from "./publish";
+export type { PublishResult } from "./publish";
 export { TODAY, SITES, WORKERS, CREDENTIALS, ISSUERS, CONSOLE_OPERATOR } from "./seed";

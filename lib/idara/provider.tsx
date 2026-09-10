@@ -24,20 +24,13 @@ import {
   type ReactNode,
 } from "react";
 import { LocalCredentialVerifier } from "./verifier";
-import { CREDENTIAL_TYPES } from "./hospitality";
-import {
-  decideMember,
-  decideRoster,
-  summarise,
-  summariseCoverage,
-  type ShiftAssignment,
-} from "./engine";
+import { decideMember, decideRoster, type ShiftAssignment } from "./engine";
+import { publishEvents, type PublishResult } from "./publish";
 import { appendEvent, type NewAuditEvent } from "./audit";
 import { CREDENTIALS, SITES, WORKERS, TODAY, SEED_AUDIT } from "./seed";
 import type {
   Action,
   AuditEvent,
-  CoverageCheck,
   Credential,
   Decision,
   DID,
@@ -56,17 +49,7 @@ export interface RosterAssignment {
   shifts?: ShiftAssignment[];
 }
 
-export interface PublishResult {
-  decisions: Decision[];
-  eligible: Decision[];
-  blocked: Decision[];
-  warnings: Decision[];
-  /** roster-level requirements — a venue's nominated FSS and the like. */
-  coverage: CoverageCheck[];
-  /** collective requirements the roster fails to cover. */
-  uncovered: CoverageCheck[];
-  published: boolean;
-}
+export type { PublishResult } from "./publish";
 
 interface IdaraState {
   today: string;
@@ -87,29 +70,18 @@ interface IdaraState {
   ) => Decision | null;
   /** pure pass over a roster — eligible / blocked / warnings. No audit. */
   evaluateRoster: (siteId: string, roster: RosterAssignment[]) => PublishResult;
-  /** write the publish outcome (clean OR blocked attempt) to the audit log. */
-  recordPublish: (siteId: string, result: PublishResult, actor?: string) => void;
+  /**
+   * Write the publish outcome (clean OR blocked attempt) to the chain.
+   *
+   * Resolves false when the chain refused it, so a screen does not tell an
+   * operator the refusal was recorded when it was not.
+   */
+  recordPublish: (siteId: string, result: PublishResult, actor?: string) => Promise<boolean>;
   revokeCredential: (credId: string, actor?: string) => void;
   /** append any consequential event from a module (e.g. a break sent under cl 16). */
   recordEvent: (ev: NewAuditEvent) => void;
 }
 
-/**
- * A publish can now be blocked by individuals, by the roster as a whole, or
- * by both at once — the audit summary has to say which.
- */
-function blockedSummary(siteName: string, r: PublishResult): string {
-  const parts: string[] = [];
-  if (r.blocked.length > 0) {
-    parts.push(
-      `${r.blocked.length} ineligible staff member${r.blocked.length === 1 ? "" : "s"}`,
-    );
-  }
-  for (const c of r.uncovered) {
-    parts.push(`no ${CREDENTIAL_TYPES[c.type].shortLabel} on shift`);
-  }
-  return `Publish blocked for ${siteName} — ${parts.join(" and ")}`;
-}
 
 const IdaraContext = createContext<IdaraState | null>(null);
 
@@ -196,30 +168,54 @@ export function IdaraProvider({ children }: { children: ReactNode }) {
    * Without a backend it appends locally, which is what keeps the console
    * usable as a demo with no server behind it.
    */
-  const record = useCallback(
-    (ev: NewAuditEvent) => {
+  const append = useCallback(
+    async (ev: NewAuditEvent): Promise<boolean> => {
       if (!durable) {
         setAuditLog((log) => appendEvent(log, ev));
-        return;
+        return true;
       }
-      void (async () => {
-        try {
-          const res = await fetch("/api/events", {
-            method: "POST",
-            headers: { "content-type": "application/json" },
-            body: JSON.stringify({ ...ev, clientRef: crypto.randomUUID() }),
-          });
-          if (!res.ok) throw new Error(String(res.status));
-          const { event } = (await res.json()) as { event: AuditEvent };
-          fold([event]);
-        } catch {
-          // the server refused or is unreachable. Recording locally would put
-          // an event in the log that no chain contains, so the log stays as it
-          // is and the next read reconciles from the server.
-        }
-      })();
+      try {
+        const res = await fetch("/api/events", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ ...ev, clientRef: crypto.randomUUID() }),
+        });
+        if (!res.ok) throw new Error(String(res.status));
+        const { event } = (await res.json()) as { event: AuditEvent };
+        fold([event]);
+        return true;
+      } catch {
+        // the server refused or is unreachable. Recording locally would put
+        // an event in the log that no chain contains, so the log stays as it
+        // is and the next read reconciles from the server.
+        return false;
+      }
     },
     [durable, fold],
+  );
+
+  const record = useCallback((ev: NewAuditEvent) => { void append(ev); }, [append]);
+
+  /**
+   * Append several events as one act, in order.
+   *
+   * Sequential and awaited rather than fired together. The server assigns seq
+   * in arrival order, so posting a receipt's events in parallel would let the
+   * summary land before the reasons it summarises — and the chain records the
+   * order it received, not the order intended.
+   *
+   * Stops at the first refusal. Everything after it belongs to an act that did
+   * not complete, and since the summary is written last, a stopped run leaves
+   * reasons without a conclusion rather than a conclusion without reasons.
+   */
+  const recordAll = useCallback(
+    async (evs: NewAuditEvent[]): Promise<boolean> => {
+      for (const ev of evs) {
+        if (!(await append(ev))) return false;
+      }
+      return true;
+    },
+    [append],
   );
 
   const decideFor = useCallback(
@@ -278,81 +274,47 @@ export function IdaraProvider({ children }: { children: ReactNode }) {
     [workerIndex, siteIndex, credentials, verifier],
   );
 
+  /**
+   * Write what a publish attempt decided.
+   *
+   * Returns whether the chain took it, so a caller that told the operator the
+   * attempt was recorded can find out it was not. This used to build the
+   * events inside a setAuditLog() updater and append them locally, which meant
+   * a blocked publish existed in one browser tab until it was reloaded —
+   * underneath a modal reading "This attempt has been written to the audit
+   * log." See lib/idara/publish.ts.
+   */
   const recordPublish = useCallback(
-    (siteId: string, result: PublishResult, actor = "Emma Taylor") => {
+    (siteId: string, result: PublishResult, actor = "Emma Taylor"): Promise<boolean> => {
       const site = siteIndex.get(siteId);
-      setAuditLog((log) => {
-        let next = log;
-        if (!result.published) {
-          // the receipts: one decision record per blocked worker…
-          for (const d of result.blocked) {
-            next = appendEvent(next, {
-              type: "decision",
-              at: TODAY,
-              actor,
-              subject: d.context.subject,
-              summary: `${d.context.subjectName}: ${summarise(d)}`,
-              data: { siteId, reasons: d.reasons.filter((r) => r.outcome === "fail") },
-            });
-          }
-          // …a record of any collective gap…
-          const coverageGap = summariseCoverage(result.coverage);
-          if (coverageGap) {
-            next = appendEvent(next, {
-              type: "decision",
-              at: TODAY,
-              actor,
-              summary: `${site?.name ?? siteId}: ${coverageGap}`,
-              data: { siteId, uncovered: result.uncovered },
-            });
-          }
-          // …then the blocked publish attempt itself
-          next = appendEvent(next, {
-            type: "roster.published",
-            at: TODAY,
-            actor,
-            summary: blockedSummary(site?.name ?? siteId, result),
-            data: {
-              siteId,
-              attempted: result.decisions.length,
-              blocked: result.blocked.length,
-              uncovered: result.uncovered.map((c) => c.type),
-              published: false,
-            },
-          });
-        } else {
-          next = appendEvent(next, {
-            type: "roster.published",
-            at: TODAY,
-            actor,
-            summary: `Roster published for ${site?.name ?? siteId} — ${result.eligible.length} staff, all eligible`,
-            data: { siteId, eligible: result.eligible.length, warnings: result.warnings.length, published: true },
-          });
-        }
-        return next;
-      });
+      return recordAll(publishEvents(site?.name ?? siteId, siteId, result, actor, TODAY));
     },
-    [siteIndex],
+    [siteIndex, recordAll],
   );
 
+  /* The append is deliberately outside setCredentials().
+
+     It used to run inside one. A state updater is a function React is free to
+     call more than once — StrictMode does so deliberately in development to
+     surface impure ones — so a POST in there is a request that may be sent
+     twice, and each carries a freshly minted clientRef, which is the one thing
+     the idempotency key cannot collapse. The updater was only reading the list
+     to find the credential, which it can do outside. */
   const revokeCredential = useCallback(
     (credId: string, actor = "Emma Taylor") => {
-      setCredentials((list) => {
-        const target = list.find((c) => c.id === credId);
-        if (target) {
-          record({
-            type: "credential.revoked",
-            at: TODAY,
-            actor,
-            subject: target.subject,
-            summary: `${target.type} revoked`,
-            data: { credId, type: target.type },
-          });
-        }
-        return list.map((c) => (c.id === credId ? { ...c, status: "revoked" } : c));
+      const target = credentials.find((c) => c.id === credId);
+      if (!target) return;
+      record({
+        type: "credential.revoked",
+        at: TODAY,
+        actor,
+        subject: target.subject,
+        summary: `${target.type} revoked`,
+        data: { credId, type: target.type },
       });
+      setCredentials((list) => list.map((c) => (c.id === credId ? { ...c, status: "revoked" } : c)));
     },
-    [record],
+    [credentials, record],
   );
 
   const value = useMemo<IdaraState>(
