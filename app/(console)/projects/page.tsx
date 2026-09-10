@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { NotComputedNote } from "@/components/screen/not-computed";
 import {
   Card,
+  Avatar,
   AvatarStack,
   Badge,
   Icon,
@@ -17,47 +18,42 @@ import {
   useToast,
 } from "@/components/ui";
 import type { Tone } from "@/lib/status";
-import { CardHead } from "@/components/screen/page-head";
+import { CardHead, LinkBtn } from "@/components/screen/page-head";
 
 /* The card shape, the columns and the seed all live in lib/tasks now, because
    the API route folds the same types out of the audit chain. Two definitions
    of what a task is would be two things that can disagree about a board. */
 import { COLS, cardInColumn, seedBoard, type ColName, type TaskBoard } from "@/lib/tasks";
 
-/**
- * Who a task can be assigned to.
- *
- * Names, not DIDs. A run sheet task is not gated on anything, so this is a
- * label on a card rather than a claim about who is permitted to do the work.
- * The shift is where that question gets asked, and Idara answers it there.
- */
-const ASSIGNEES = ["Priya Sharma", "Hassan Ali", "Darie Roberts", "Sophie Nguyen", "Ben Cole", "Ana Reed", "Cara Vu", "Eve Ho", "Gus Ray"];
+const TABS = ["Dashboard", "Tasks", "Timeline", "Documents", "Team"];
 
 /**
  * What on this screen is folded, and what is staging.
  *
- * This replaces a page-level ILLUSTRATIVE banner that read "Covers records no
- * run sheets… nothing holds the tasks". True when #42 wrote it, false from #45,
- * when the board started folding task.moved and task.created off the chain —
- * and a banner cannot notice that about itself. It sat there through a whole
- * feature landing underneath it, telling readers not to trust the one panel on
- * the screen that had become trustworthy.
+ * Replaces a page-level banner reading "Covers records no run sheets… nothing
+ * holds the tasks, timings or courses a service is run to". True when it was
+ * written, false from #45, when the task board started folding task.moved and
+ * task.created off the chain — and a banner cannot notice that about itself.
  *
- * Which is the argument for saying less: a shorter claim has fewer ways to go
- * quietly out of date.
+ * The distinction it needs to draw is not screen-wide, which is why it is a
+ * note and not a banner: one panel here is live and the rest are staging for
+ * an event nothing yet records.
  */
-function BoardNote() {
+function RunSheetNote() {
   return (
     <NotComputedNote>
-      The board below is folded from the audit chain — every move and every new task is an
-      event you can find in the log, and it survives a reload. The event it hangs under is a
-      seed row: Covers records no engagements yet.
+      The task board is folded from the audit chain — every move and every new task is an
+      event you can find in the log, and it survives a reload. The timeline, documents and
+      team allocation are the shape of a run sheet with example content behind them: Covers
+      records no engagement documents, and nothing binds a booking to the shifts worked
+      against it.
     </NotComputedNote>
   );
 }
 
 export default function ProjectsPage() {
   const toast = useToast();
+  const [tab, setTab] = useState("Dashboard");
 
   /* ---- The board, as the chain says it stands ----
 
@@ -97,7 +93,36 @@ export default function ProjectsPage() {
   const colTone: Record<ColName, Tone> = { "To Do": "neutral", "In Progress": "info", Review: "warning", Completed: "success" };
   const prio: Record<"High" | "Medium" | "Low", Tone> = { High: "danger", Medium: "warning", Low: "neutral" };
 
-  const assigneeOptions = ASSIGNEES.map((n) => ({ label: n, value: n }));
+  const timeline: [string, string, boolean | "active"][] = [
+    ["Enquiry & Quote", "May 1", true],
+    ["Site Inspection", "May 5", true],
+    ["Menu Tasting", "May 10", true],
+    ["Prep & Staffing", "May 12 – May 28", "active"],
+    ["Event Day — Service", "May 30", false],
+    ["Bump-out & Debrief", "May 31", false],
+  ];
+  const docs: [string, string][] = [
+    ["Run Sheet – Werribee Wedding.pdf", "PDF · May 15, 2024 · v2.1"],
+    ["Floor Plan & Table Layout.pdf", "PDF · May 14, 2024 · v1.3"],
+    ["Dietary Requirements Schedule.xlsx", "XLSX · May 13, 2024 · v1.0"],
+    ["Beverage Order – Confirmed.pdf", "PDF · May 12, 2024 · v1.0"],
+  ];
+  const team: [string, string, string][] = [
+    ["Priya Sharma", "Events Coordinator", "32 hrs"],
+    ["Hassan Ali", "Head Chef", "28 hrs"],
+    ["Darie Roberts", "Bar Lead", "24 hrs"],
+    ["Sophie Nguyen", "Venue Manager", "20 hrs"],
+  ];
+  const assigneeOptions = useMemo(
+    () =>
+      [...new Set(team.map((t) => t[0]).concat(["Ben Cole", "Ana Reed", "Cara Vu", "Eve Ho", "Gus Ray"]))].map((n) => ({
+        label: n,
+        value: n,
+      })),
+    // team is a stable literal; safe to compute once
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    []
+  );
 
   /* ---- Add task modal ---- */
   const [addCol, setAddCol] = useState<ColName | null>(null);
@@ -207,9 +232,11 @@ export default function ProjectsPage() {
   const [drag, setDrag] = useState<{ from: ColName; id: string } | null>(null);
   const [overCol, setOverCol] = useState<ColName | null>(null);
 
+  const tabIsBoard = tab === "Tasks";
+
   /* ---- Reusable board renderer (compact in Dashboard, full-width in Tasks) ---- */
   const renderBoard = (cardCols = 4) => (
-    <div style={{ display: "grid", gridTemplateColumns: `repeat(${cardCols},1fr)`, gap: 14 }}>
+    <div style={{ display: "grid", gridTemplateColumns: `repeat(${cardCols},1fr)`, gap: tabIsBoard ? 14 : 10 }}>
       {COLS.map((col) => {
         const [bg, fg] = STATUS[colTone[col]];
         // only a drop target if a card is in flight and it did not start here
@@ -334,7 +361,7 @@ export default function ProjectsPage() {
 
   return (
     <div>
-      <BoardNote />
+      <RunSheetNote />
       <div style={{ display: "flex", alignItems: "flex-start", gap: 16, marginBottom: 18 }}>
         <div style={{ flex: 1 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
@@ -343,18 +370,128 @@ export default function ProjectsPage() {
             <Icon name="star" size={17} color="var(--warning)" />
           </div>
           <p style={{ margin: "4px 0 0", fontSize: 14 }}>180 guests · Saturday service · Nguyen &amp; Cole</p>
-
+          <div style={{ display: "flex", gap: 18, marginTop: 12, fontSize: 13 }}>
+            {TABS.map((t) => {
+              const active = t === tab;
+              return (
+                <button
+                  key={t}
+                  type="button"
+                  onClick={() => setTab(t)}
+                  style={{
+                    border: 0,
+                    background: "transparent",
+                    font: "inherit",
+                    cursor: "pointer",
+                    fontWeight: active ? 700 : 600,
+                    color: active ? "var(--fs-teal)" : "var(--fg-4)",
+                    paddingBottom: 6,
+                    borderBottom: active ? "2px solid var(--fs-teal)" : "2px solid transparent",
+                  }}
+                >
+                  {t}
+                </button>
+              );
+            })}
+          </div>
         </div>
       </div>
 
+      {/* ===================== DASHBOARD ===================== */}
+      {tab === "Dashboard" && (
+        <>
+          {/* metric row */}
+          {/* main row */}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 320px", gap: 16, marginBottom: 16 }}>
+            {/* task board */}
+            <Card pad={16}>
+              <CardHead title="Task Board" right={<LinkBtn onClick={() => setTab("Tasks")}>Open full board</LinkBtn>} />
+              {renderBoard(4)}
+            </Card>
+            {/* timeline */}
+            <Card pad={16}>
+              <CardHead title="Event Timeline" right={<LinkBtn onClick={() => setTab("Timeline")}>View</LinkBtn>} />
+              {renderTimeline(timeline)}
+            </Card>
+          </div>
+
+          {/* bottom row */}
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(2,1fr)", gap: 16 }}>
+            <Card pad={16}>
+              <CardHead title="Run Sheet & Documents" right={<LinkBtn onClick={() => setTab("Documents")}>View all</LinkBtn>} />
+              {docs.map((d, i) => (
+                <button
+                  key={i}
+                  type="button"
+                  onClick={() => toast(`Opening file: ${d[0]}`, { tone: "info", icon: "file-text" })}
+                  style={{ display: "flex", alignItems: "center", gap: 9, padding: "8px 0", borderTop: i ? "1px solid var(--border)" : 0, width: "100%", border: 0, borderRadius: 0, background: "transparent", cursor: "pointer", textAlign: "left", font: "inherit" }}
+                >
+                  <span style={{ width: 28, height: 28, borderRadius: 7, background: "var(--danger-bg)", display: "inline-flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><Icon name="file-text" size={14} color="var(--danger-fg)" /></span>
+                  <div style={{ flex: 1, minWidth: 0 }}><div style={{ fontSize: 11.5, fontWeight: 600, color: "var(--fg-1)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{d[0]}</div><div style={{ fontSize: 10, color: "var(--fg-4)" }}>{d[1]}</div></div>
+                </button>
+              ))}
+            </Card>
+            <Card pad={16}><CardHead title="Team Allocation" right={<LinkBtn onClick={() => setTab("Team")}>View full team</LinkBtn>} />{team.map((t, i) => (<div key={i} style={{ display: "flex", alignItems: "center", gap: 9, padding: "8px 0", borderTop: i ? "1px solid var(--border)" : 0 }}><Avatar name={t[0]} size={28} /><div style={{ flex: 1 }}><div style={{ fontSize: 12, fontWeight: 600, color: "var(--fg-1)" }}>{t[0]}</div><div style={{ fontSize: 10, color: "var(--fg-4)" }}>{t[1]}</div></div><span className="fs-tnum" style={{ fontSize: 11.5, fontWeight: 700, color: "var(--fg-2)" }}>{t[2]}</span></div>))}<div style={{ fontSize: 11, color: "var(--fg-4)", marginTop: 8 }}>+1 team members</div></Card>
+          </div>
+        </>
+      )}
+
       {/* ===================== TASKS (full board) ===================== */}
-      <Card pad={18}>
-        <CardHead
-          title="Task Board"
-          right={<Button size="sm" icon="plus" onClick={() => openAdd("To Do")}>Add task</Button>}
-        />
-        {renderBoard(4)}
-      </Card>
+      {tab === "Tasks" && (
+        <Card pad={18}>
+          <CardHead
+            title="Task Board"
+            right={<Button size="sm" icon="plus" onClick={() => openAdd("To Do")}>Add task</Button>}
+          />
+          {renderBoard(4)}
+        </Card>
+      )}
+
+      {/* ===================== TIMELINE ===================== */}
+      {tab === "Timeline" && (
+        <Card pad={18}>
+          <CardHead title="Event Timeline" />
+          <div style={{ maxWidth: 460 }}>{renderTimeline(timeline)}</div>
+        </Card>
+      )}
+
+      {/* ===================== DOCUMENTS ===================== */}
+      {tab === "Documents" && (
+        <Card pad={18}>
+          <CardHead title="Run Sheet & Documents" right={<Button size="sm" variant="sec" icon="upload" onClick={() => toast("Upload coming soon", { tone: "info", icon: "upload" })}>Upload</Button>} />
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(2,1fr)", gap: 10 }}>
+            {docs.map((d, i) => (
+              <button
+                key={i}
+                type="button"
+                onClick={() => toast(`Opening file: ${d[0]}`, { tone: "info", icon: "file-text" })}
+                className="hov-row"
+                style={{ display: "flex", alignItems: "center", gap: 11, padding: 12, border: "1px solid var(--border)", borderRadius: 12, background: "#fff", cursor: "pointer", textAlign: "left", font: "inherit", width: "100%" }}
+              >
+                <span style={{ width: 34, height: 34, borderRadius: 9, background: "var(--danger-bg)", display: "inline-flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><Icon name="file-text" size={16} color="var(--danger-fg)" /></span>
+                <div style={{ flex: 1, minWidth: 0 }}><div style={{ fontSize: 13, fontWeight: 600, color: "var(--fg-1)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{d[0]}</div><div style={{ fontSize: 11, color: "var(--fg-4)" }}>{d[1]}</div></div>
+                <Icon name="download" size={15} color="var(--fg-4)" />
+              </button>
+            ))}
+          </div>
+        </Card>
+      )}
+
+      {/* ===================== TEAM ===================== */}
+      {tab === "Team" && (
+        <Card pad={18}>
+          <CardHead title="Team Allocation" right={<LinkBtn onClick={() => toast("Manage team coming soon", { tone: "info", icon: "users" })}>Manage</LinkBtn>} />
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(2,1fr)", gap: 10 }}>
+            {team.map((t, i) => (
+              <div key={i} style={{ display: "flex", alignItems: "center", gap: 11, padding: 12, border: "1px solid var(--border)", borderRadius: 12 }}>
+                <Avatar name={t[0]} size={34} />
+                <div style={{ flex: 1 }}><div style={{ fontSize: 13, fontWeight: 600, color: "var(--fg-1)" }}>{t[0]}</div><div style={{ fontSize: 11, color: "var(--fg-4)" }}>{t[1]}</div></div>
+                <span className="fs-tnum" style={{ fontSize: 12.5, fontWeight: 700, color: "var(--fg-2)" }}>{t[2]}</span>
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
 
       {/* ===================== Add task modal ===================== */}
       <Modal
@@ -398,6 +535,23 @@ export default function ProjectsPage() {
         </div>
       </Modal>
 
+    </div>
+  );
+}
+
+/* ---- Shared sub-renderers (pure, no hooks) ---- */
+function renderTimeline(timeline: [string, string, boolean | "active"][]) {
+  return (
+    <div style={{ display: "flex", flexDirection: "column" }}>
+      {timeline.map((t, i) => (
+        <div key={i} style={{ display: "flex", gap: 11 }}>
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
+            <span style={{ width: 20, height: 20, borderRadius: 999, background: t[2] === true ? "var(--success)" : t[2] === "active" ? "var(--fs-teal)" : "#fff", border: t[2] === false ? "2px solid var(--border-2)" : 0, display: "inline-flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>{t[2] === true && <Icon name="check" size={12} color="#fff" />}{t[2] === "active" && <span style={{ width: 7, height: 7, borderRadius: 999, background: "#fff" }} />}</span>
+            {i < timeline.length - 1 && <span style={{ width: 2, flex: 1, minHeight: 22, background: t[2] === true ? "var(--success)" : "var(--border-2)" }} />}
+          </div>
+          <div style={{ paddingBottom: 14 }}><div style={{ fontSize: 12.5, fontWeight: 700, color: t[2] === false ? "var(--fg-4)" : "var(--fg-1)" }}>{t[0]}</div><div style={{ fontSize: 11, color: "var(--fg-4)" }}>{t[1]}</div></div>
+        </div>
+      ))}
     </div>
   );
 }
