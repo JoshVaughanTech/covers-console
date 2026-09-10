@@ -282,7 +282,7 @@ export default function CredentialsPage() {
       const held = workers.reduce((n, w) => n + w.creds.length, 0);
       const wrong = counts["Action needed"] + counts.Expiring;
       toast(
-        `${held} credentials verified across ${workers.length} staff · ${wrong} need attention`,
+        `${held} credential${held === 1 ? "" : "s"} verified across ${workers.length} staff · ${wrong} need${wrong === 1 ? "s" : ""} attention`,
         { tone: wrong ? "warning" : "success", icon: "scan-search" },
       );
     }, 400);

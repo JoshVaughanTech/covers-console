@@ -249,7 +249,7 @@ export default function ReportsPage() {
           title="Not built yet"
           right={
             <span style={{ fontSize: 12, color: "var(--fg-4)" }}>
-              {MISSING.length} reports this screen used to draw
+              {MISSING.length} report{MISSING.length === 1 ? "" : "s"} this screen used to draw
             </span>
           }
         />

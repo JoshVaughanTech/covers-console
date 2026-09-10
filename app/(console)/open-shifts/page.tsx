@@ -472,7 +472,7 @@ export default function OpenShiftsPage() {
       {view === "Manage" ? (
         <>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 14, marginBottom: 16 }}>
-            <MetricCard label="Open Shifts" value={String(openCount)} status={`${seatsToFill} seats to fill`} />
+            <MetricCard label="Open Shifts" value={String(openCount)} status={`${seatsToFill} seat${seatsToFill === 1 ? "" : "s"} to fill`} />
             <MetricCard
               label="Claims to Review"
               value={String(claimCount)}
@@ -717,7 +717,7 @@ export default function OpenShiftsPage() {
             <p style={{ margin: "0 0 14px", fontSize: 12.5, color: "var(--fg-3)", lineHeight: 1.5 }}>
               Ranked by skill fit ({WEIGHTS.skill}), role ({WEIGHTS.role}), client preference ({WEIGHTS.client}),
               rating ({WEIGHTS.rating}), fairness ({WEIGHTS.fairness}) and locality ({WEIGHTS.locality}).{" "}
-              <strong>Idara eligibility is a gate, not a score.</strong> {seatsLeft(matching)} seats left.
+              <strong>Idara eligibility is a gate, not a score.</strong> {seatsLeft(matching)} seat{seatsLeft(matching) === 1 ? "" : "s"} left.
             </p>
 
             {reviewOf(matching).length > 0 && (

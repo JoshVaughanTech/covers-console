@@ -155,7 +155,7 @@ export default function AuditPage() {
   const runVerify = () => {
     const r = verifyChain(auditLog);
     if (r.ok) {
-      toast(`${HASH_ALGORITHM} chain verified — ${auditLog.length} events intact, no tampering`, {
+      toast(`${HASH_ALGORITHM} chain verified — ${auditLog.length} event${auditLog.length === 1 ? "" : "s"} intact, no tampering`, {
         tone: "success",
         icon: "shield-check",
       });
@@ -335,7 +335,7 @@ export default function AuditPage() {
           </div>
           <div style={{ fontSize: 12, color: "var(--fg-3)" }}>
             {chain.ok
-              ? `All ${auditLog.length} events link to the previous ${HASH_ALGORITHM} hash. Any edit, reorder or deletion would break the chain.`
+              ? `All ${auditLog.length} event${auditLog.length === 1 ? "" : "s"} link to the previous ${HASH_ALGORITHM} hash. Any edit, reorder or deletion would break the chain.`
               : "An event has been altered or removed — the recomputed hash no longer matches."}
           </div>
         </div>
