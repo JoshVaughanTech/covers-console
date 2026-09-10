@@ -3,14 +3,10 @@
 import { useMemo, useState } from "react";
 import {
   Card,
-  Ring,
-  Bar,
-  MetricCard,
   Badge,
   Avatar,
   Button,
   Icon,
-  STATUS,
   Modal,
   Field,
   useToast,
@@ -27,42 +23,42 @@ import {
   type PublishResult,
   type RosterAssignment,
 } from "@/lib/idara";
-import { PageHead, CardHead, LinkBtn } from "@/components/screen/page-head";
+import { PageHead, CardHead } from "@/components/screen/page-head";
+
+/* ============================================================
+   Schedule — the roster, and the gate in front of publishing it.
+
+   Four headline metrics used to sit above this: a fairness score,
+   a labour cost against a budget, a coverage percentage and an
+   open-shift count. All four were useState literals — 87, 128450,
+   96, and an array of seven — and the panels underneath existed to
+   move them. AI Suggestions offered four recommendations with
+   costed benefits ("Improves fairness by 5 pts", "Potential
+   savings $2,140") and clicking one added 3 to the fairness
+   literal. Compare Scenarios offered three rosters and Apply
+   assigned their numbers straight to the same three variables.
+
+   So the numbers responded to input, which is the thing that made
+   them convincing and the reason they were worse than static. A
+   figure that never moves invites the question of where it comes
+   from. One that moves when you press a button has already
+   answered it, wrongly.
+
+   Cut together, because they were one mechanism: the metrics were
+   the sink, the panels were the taps. Nothing generated the
+   roster either, so the page no longer claims anything did.
+
+   What stays is the part that was always real — evaluateRoster()
+   deciding per person against their credentials, the publish gate
+   that refuses a non-compliant roster, and the blocked attempt
+   being written to the chain whether it succeeds or not.
+   ============================================================ */
 
 /* ---- types ---- */
 interface RosterRow {
   role: string;
   req: string;
   vals: number[];
-}
-interface Suggestion {
-  id: number;
-  title: string;
-  sub: string;
-  tone: Tone;
-  metric: string; // which headline metric this nudges (for the toast)
-}
-interface FairnessRow {
-  name: string;
-  req: string;
-  sch: string;
-  label: string;
-  tone: Tone;
-}
-interface OpenShift {
-  id: number;
-  role: string;
-  day: string;
-  time: string;
-  tone: Tone;
-}
-interface Scenario {
-  key: string;
-  name: string;
-  fairness: number;
-  cost: string;
-  coverage: number;
-  overtime: string;
 }
 /* the week the roster grid displays, used to place catering engagements */
 const WEEK_START = new Date("May 12, 2026");
@@ -119,59 +115,6 @@ export default function SchedulePage() {
     { role: "Events", req: "Req. 36h / day", vals: [36, 34, 36, 33, 36, 24, 18] },
     { role: "Gaming", req: "Req. 24h / day", vals: [24, 22, 24, 24, 20, 14, 12] },
   ]);
-
-  const fairness: FairnessRow[] = [
-    { name: "Sophie Nguyen", req: "32h", sch: "31h", label: "Excellent", tone: "success" },
-    { name: "Darie Roberts", req: "32h", sch: "29h", label: "Good", tone: "success" },
-    { name: "Leanne Vidal", req: "24h", sch: "22h", label: "Fair", tone: "warning" },
-    { name: "Jake Morrison", req: "24h", sch: "18h", label: "Needs Attention", tone: "danger" },
-  ];
-
-  const [suggestions, setSuggestions] = useState<Suggestion[]>([
-    {
-      id: 1,
-      title: "Fill 7 open shifts to reach 100% coverage",
-      sub: "High priority · Improves coverage by 4%",
-      tone: "danger",
-      metric: "coverage",
-    },
-    {
-      id: 2,
-      title: "Balance weekend load for fairer distribution",
-      sub: "Reassign 6 shifts · Improves fairness by 5 pts",
-      tone: "warning",
-      metric: "fairness",
-    },
-    {
-      id: 3,
-      title: "Reduce overtime on Sat, May 17",
-      sub: "Swap 3 shifts · Potential savings $2,140",
-      tone: "info",
-      metric: "cost",
-    },
-    {
-      id: 4,
-      title: "Consider staff shift preferences",
-      sub: "7 matches available · Higher acceptance likely",
-      tone: "teal",
-      metric: "fairness",
-    },
-  ]);
-
-  const [openShifts, setOpenShifts] = useState<OpenShift[]>([
-    { id: 1, role: "Bar", day: "Sat, May 17", time: "4p – 12a", tone: "danger" },
-    { id: 2, role: "Bar", day: "Sun, May 18", time: "11a – 7p", tone: "danger" },
-    { id: 3, role: "Wait Staff", day: "Sat, May 17", time: "4p – 12a", tone: "warning" },
-    { id: 4, role: "Gaming", day: "Sat, May 17", time: "4p – 12a", tone: "warning" },
-    { id: 5, role: "Kitchen", day: "Sun, May 18", time: "7a – 3p", tone: "warning" },
-    { id: 6, role: "Wait Staff", day: "Sun, May 18", time: "11a – 7p", tone: "info" },
-    { id: 7, role: "Events", day: "Sat, May 17", time: "11a – 7p", tone: "info" },
-  ]);
-
-  // headline metrics held in state so suggestions / scenarios can nudge them
-  const [fairnessScore, setFairnessScore] = useState(87);
-  const [labourCost, setLabourCost] = useState(128450);
-  const [coverage, setCoverage] = useState(96);
 
   const [published, setPublished] = useState<string | null>(null);
 
@@ -240,16 +183,7 @@ export default function SchedulePage() {
   );
   const blockedCount = crew.length - eligibleCount;
 
-  const scenarios: Scenario[] = [
-    { key: "balanced", name: "Balanced", fairness: 87, cost: "$128,450", coverage: 96, overtime: "42h" },
-    { key: "cost", name: "Lowest cost", fairness: 81, cost: "$121,900", coverage: 93, overtime: "28h" },
-    { key: "coverage", name: "Max coverage", fairness: 84, cost: "$134,200", coverage: 100, overtime: "61h" },
-  ];
-
   /* ---- modal open flags ---- */
-  const [compareOpen, setCompareOpen] = useState(false);
-  const [openShiftsOpen, setOpenShiftsOpen] = useState(false);
-  const [fairnessOpen, setFairnessOpen] = useState(false);
   const [gate, setGate] = useState<PublishResult | null>(null);
   /* Whether the refusal on screen actually reached the chain. The modal
      asserts it did, and an assertion the code cannot check is the thing this
@@ -259,14 +193,6 @@ export default function SchedulePage() {
   // cell editor target: [rowIndex, dayIndex] or null
   const [editCell, setEditCell] = useState<{ row: number; day: number } | null>(null);
   const [editValue, setEditValue] = useState("");
-
-  /* ---- derived display values ---- */
-  const labourCostLabel = useMemo(
-    () => "$" + labourCost.toLocaleString("en-US"),
-    [labourCost]
-  );
-  const budgetPct = useMemo(() => Math.min(100, Math.round((labourCost / 135000) * 100)), [labourCost]);
-  const fairnessLabel = fairnessScore >= 90 ? "Excellent" : fairnessScore >= 80 ? "Very Good" : "Fair";
 
   /* one line naming why a publish was refused — individuals, the roster, or both */
   const blockReasons = (r: PublishResult) => {
@@ -357,28 +283,6 @@ export default function SchedulePage() {
     );
   };
 
-  const applySuggestion = (s: Suggestion) => {
-    setSuggestions((list) => list.filter((x) => x.id !== s.id));
-    if (s.metric === "coverage") setCoverage((c) => Math.min(100, c + 2));
-    else if (s.metric === "fairness") setFairnessScore((f) => Math.min(100, f + 3));
-    else if (s.metric === "cost") setLabourCost((c) => Math.max(0, c - 2140));
-    toast(`Applied: ${s.title}`, { tone: "success", icon: "sparkles" });
-  };
-
-  const fillShift = (shift: OpenShift) => {
-    setOpenShifts((list) => list.filter((x) => x.id !== shift.id));
-    setCoverage((c) => Math.min(100, c + 1));
-    toast(`Filled ${shift.role} · ${shift.day}`, { tone: "success", icon: "user-check" });
-  };
-
-  const applyScenario = (s: Scenario) => {
-    setFairnessScore(s.fairness);
-    setLabourCost(Number(s.cost.replace(/[$,]/g, "")));
-    setCoverage(s.coverage);
-    setCompareOpen(false);
-    toast(`Applied "${s.name}" scenario`, { tone: "success", icon: "git-compare" });
-  };
-
   const openCellEditor = (row: number, day: number) => {
     setEditValue(String(roster[row].vals[day]));
     setEditCell({ row, day });
@@ -429,17 +333,12 @@ export default function SchedulePage() {
         sub={
           allCatering
             ? "Engagement staffing across your catering operations — credential-checked by Idara before every publish."
-            : "AI rostering balanced for fairness, coverage and cost — and credential-checked by Idara before every publish."
+            : "The week's roster, credential-checked by Idara before every publish."
         }
         right={
-          <div style={{ display: "flex", gap: 10 }}>
-            <Button variant="sec" size="sm" icon="git-compare" onClick={() => setCompareOpen(true)}>
-              Compare Scenarios
-            </Button>
-            <Button size="sm" icon="send" onClick={() => void handlePublish()}>
-              Publish Roster
-            </Button>
-          </div>
+          <Button size="sm" icon="send" onClick={() => void handlePublish()}>
+            Publish Roster
+          </Button>
         }
       />
 
@@ -455,29 +354,6 @@ export default function SchedulePage() {
         <CateringWeek siteName={siteName} events={weekEvents} />
       ) : (
       <>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 16, marginBottom: 16 }}>
-        <Card pad={18}>
-          <div style={{ fontSize: 13, color: "var(--fg-3)", fontWeight: 600, marginBottom: 8 }}>Roster Fairness Score</div>
-          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-            <Ring value={fairnessScore} label={`${fairnessScore}%`} size={76} />
-            <div><div style={{ fontSize: 13.5, fontWeight: 700, color: "var(--success-fg)" }}>{fairnessLabel}</div><div style={{ fontSize: 11.5, color: "var(--success-fg)", marginTop: 3 }}>↑ 6 pts vs last 7 days</div></div>
-          </div>
-        </Card>
-        <MetricCard label="Labour Cost" value={labourCostLabel} trend="↓ 4.3% vs last 7 days" trendTone="var(--success-fg)">
-          <div style={{ marginTop: 10 }}><Bar value={budgetPct} /></div>
-          <div style={{ fontSize: 11, color: "var(--fg-4)", marginTop: 5 }}>Budget $135,000</div>
-        </MetricCard>
-        <Card pad={18}>
-          <div style={{ fontSize: 13, color: "var(--fg-3)", fontWeight: 600, marginBottom: 8 }}>Coverage</div>
-          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-            <Ring value={coverage} label={`${coverage}%`} size={76} color="var(--success)" />
-            <div><div style={{ fontSize: 13.5, fontWeight: 700, color: "var(--fg-1)" }}>{coverage >= 100 ? "Fully Covered" : "On Track"}</div><div style={{ fontSize: 11.5, color: "var(--success-fg)", marginTop: 3 }}>↑ 3% vs last 7 days</div></div>
-          </div>
-        </Card>
-        <MetricCard label="Open Shifts" value={String(openShifts.length)} status={openShifts.length ? "Needs Fill" : "All Filled"} statusTone={openShifts.length ? "var(--warning-fg)" : "var(--success-fg)"}>
-          <div style={{ marginTop: 8 }}><LinkBtn onClick={() => setOpenShiftsOpen(true)}>View open shifts</LinkBtn></div>
-        </MetricCard>
-      </div>
       {/* roster grid */}
       <Card style={{ marginBottom: 16 }}>
         <CardHead
@@ -522,11 +398,11 @@ export default function SchedulePage() {
           </tbody>
         </table>
       </Card>
-      <div style={{ display: "grid", gridTemplateColumns: "1.6fr 1fr", gap: 16 }}>
-        {/* AI roster preview — Idara-verified */}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 16 }}>
+        {/* the rostered crew, with real Idara eligibility per person */}
         <Card pad={0}>
           <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "16px 20px", borderBottom: "1px solid var(--border)" }}>
-            <h4 style={{ margin: 0, fontSize: 15.5, flex: 1 }}>AI Roster Preview <span style={{ fontSize: 12.5, fontWeight: 500, color: "var(--fg-4)" }}>({siteName} · May 12 – 18)</span></h4>
+            <h4 style={{ margin: 0, fontSize: 15.5, flex: 1 }}>Rostered crew <span style={{ fontSize: 12.5, fontWeight: 500, color: "var(--fg-4)" }}>({siteName} · May 12 – 18)</span></h4>
             <span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 11.5, color: "var(--fg-3)", background: "var(--idara-tint)", padding: "4px 9px", borderRadius: 999 }}>
               <img src="/assets/idara-icon-t.png" alt="" style={{ width: 13, height: 13, objectFit: "contain" }} />
               {eligibleCount}/{crew.length} verified
@@ -587,54 +463,6 @@ export default function SchedulePage() {
             </div>
           )}
         </Card>
-        {/* AI suggestions + fairness */}
-        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-          <Card>
-            <CardHead
-              title={<span style={{ display: "inline-flex", alignItems: "center", gap: 7 }}><Icon name="sparkles" size={16} color="var(--fs-teal)" />AI Suggestions</span>}
-              right={<span style={{ fontSize: 11.5, color: "var(--fg-4)" }}>{suggestions.length} recommendation{suggestions.length === 1 ? "" : "s"}</span>}
-            />
-            <div style={{ display: "flex", flexDirection: "column", gap: 9 }}>
-              {suggestions.length === 0 ? (
-                <div style={{ display: "flex", alignItems: "center", gap: 9, padding: "14px 12px", border: "1px dashed var(--border-2)", borderRadius: 10, color: "var(--fg-3)", fontSize: 12.5 }}>
-                  <Icon name="check-circle" size={16} color="var(--success-fg)" />
-                  All suggestions applied — roster optimised.
-                </div>
-              ) : (
-                suggestions.map((s) => {
-                  const [, , dc] = STATUS[s.tone];
-                  return (
-                    <button
-                      key={s.id}
-                      type="button"
-                      onClick={() => applySuggestion(s)}
-                      aria-label={`Apply suggestion: ${s.title}`}
-                      style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", border: "1px solid var(--border)", borderRadius: 10, cursor: "pointer", background: "#fff", font: "inherit", textAlign: "left", width: "100%" }}
-                      className="hov-row"
-                    >
-                      <span style={{ width: 8, height: 8, borderRadius: 999, background: dc, flexShrink: 0 }} />
-                      <div style={{ flex: 1 }}><div style={{ fontSize: 12.5, fontWeight: 600, color: "var(--fg-1)" }}>{s.title}</div><div style={{ fontSize: 11, color: "var(--fg-4)" }}>{s.sub}</div></div>
-                      <Icon name="chevron-right" size={16} color="var(--fg-4)" />
-                    </button>
-                  );
-                })
-              )}
-            </div>
-          </Card>
-          <Card>
-            <CardHead title="Fairness Overview" right={<LinkBtn onClick={() => setFairnessOpen(true)}>View all</LinkBtn>} />
-            <div style={{ display: "flex", flexDirection: "column", gap: 9 }}>
-              {fairness.map((f, i) => (
-                <div key={i} style={{ display: "flex", alignItems: "center", gap: 9 }}>
-                  <Avatar name={f.name} size={26} />
-                  <span style={{ flex: 1, fontSize: 12.5, fontWeight: 600, color: "var(--fg-1)" }}>{f.name}</span>
-                  <span className="fs-tnum" style={{ fontSize: 11.5, color: "var(--fg-4)" }}>{f.sch}/{f.req}</span>
-                  <Badge tone={f.tone}>{f.label}</Badge>
-                </div>
-              ))}
-            </div>
-          </Card>
-        </div>
       </div>
 
       </>
@@ -731,86 +559,6 @@ export default function SchedulePage() {
             </div>
           </div>
         )}
-      </Modal>
-
-      {/* ---- Compare Scenarios modal ---- */}
-      <Modal open={compareOpen} onClose={() => setCompareOpen(false)} title="Compare Scenarios" size="lg">
-        <p style={{ margin: "0 0 16px", fontSize: 13.5, color: "var(--fg-3)" }}>
-          Three AI-generated rosters for May 12 – May 18. Apply one to update the headline metrics.
-        </p>
-        <div style={{ display: "grid", gridTemplateColumns: `repeat(${scenarios.length}, 1fr)`, gap: 14 }}>
-          {scenarios.map((s) => (
-            <div key={s.key} style={{ border: "1px solid var(--border)", borderRadius: 12, padding: 16, display: "flex", flexDirection: "column", gap: 12 }}>
-              <div style={{ fontSize: 14.5, fontWeight: 700, color: "var(--fg-1)" }}>{s.name}</div>
-              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                {[
-                  ["Fairness", `${s.fairness}%`],
-                  ["Labour cost", s.cost],
-                  ["Coverage", `${s.coverage}%`],
-                  ["Overtime", s.overtime],
-                ].map(([k, v]) => (
-                  <div key={k} style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                    <span style={{ fontSize: 12, color: "var(--fg-4)" }}>{k}</span>
-                    <span className="fs-tnum" style={{ fontSize: 14, fontWeight: 700, color: "var(--fg-1)" }}>{v}</span>
-                  </div>
-                ))}
-              </div>
-              <Button variant="pri" size="sm" icon="check" onClick={() => applyScenario(s)} style={{ width: "100%" }}>
-                Apply
-              </Button>
-            </div>
-          ))}
-        </div>
-      </Modal>
-
-      {/* ---- Open shifts modal ---- */}
-      <Modal
-        open={openShiftsOpen}
-        onClose={() => setOpenShiftsOpen(false)}
-        title={`Open Shifts (${openShifts.length})`}
-        size="md"
-      >
-        {openShifts.length === 0 ? (
-          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 10, padding: "28px 0", textAlign: "center" }}>
-            <Icon name="check-circle" size={28} color="var(--success-fg)" />
-            <div style={{ fontSize: 14.5, fontWeight: 700, color: "var(--fg-1)" }}>All shifts filled</div>
-            <div style={{ fontSize: 13, color: "var(--fg-3)" }}>Coverage is at full strength for this week.</div>
-          </div>
-        ) : (
-          <div style={{ display: "flex", flexDirection: "column", gap: 9 }}>
-            {openShifts.map((sh) => {
-              const [, , dc] = STATUS[sh.tone];
-              return (
-                <div key={sh.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", border: "1px solid var(--border)", borderRadius: 10 }}>
-                  <span style={{ width: 8, height: 8, borderRadius: 999, background: dc, flexShrink: 0 }} />
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: "var(--fg-1)" }}>{sh.role}</div>
-                    <div style={{ fontSize: 11.5, color: "var(--fg-4)" }}>{sh.day} · {sh.time}</div>
-                  </div>
-                  <Button variant="sec" size="sm" icon="user-plus" onClick={() => fillShift(sh)}>
-                    Fill
-                  </Button>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </Modal>
-
-      {/* ---- Fairness "View all" modal ---- */}
-      <Modal open={fairnessOpen} onClose={() => setFairnessOpen(false)} title="Fairness Overview" size="md">
-        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-          {fairness.map((f, i) => (
-            <div key={i} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", border: "1px solid var(--border)", borderRadius: 10 }}>
-              <Avatar name={f.name} size={30} />
-              <div style={{ flex: 1 }}>
-                <div style={{ fontSize: 13.5, fontWeight: 600, color: "var(--fg-1)" }}>{f.name}</div>
-                <div style={{ fontSize: 11.5, color: "var(--fg-4)" }}>Scheduled {f.sch} of requested {f.req}</div>
-              </div>
-              <Badge tone={f.tone}>{f.label}</Badge>
-            </div>
-          ))}
-        </div>
       </Modal>
 
       {/* ---- Roster cell editor modal ---- */}
