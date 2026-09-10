@@ -1,6 +1,6 @@
 # When the checks are wrong about the tree
 
-**Date:** 2026-09-04 – 09 · **Status:** living note
+**Date:** 2026-09-04 – 10 · **Status:** living note
 
 The numbered entries below were found the ordinary way: something went red and
 somebody read the message.
@@ -13,9 +13,11 @@ been reported and accepted — and asked what it actually said. That is the
 shortest true summary of the second half of this document, and it is the half
 that was expensive.
 
-Four different failures. The first two are opposites; the third is neither,
+Five different failures. The first two are opposites; the third is neither,
 and is the one that took longest to see. The fourth is not about a check being
-wrong at all.
+wrong at all. The fifth is about the checks you write yourself, in the moment,
+to settle a question — and it is the only one where the faulty instrument was
+built by the person relying on it.
 
 **Nine disagreements.** A check says sound, another says broken, and only one
 of them is right. In five of these a passing test suite — usually with a clean
@@ -40,7 +42,12 @@ about a different branch than the one it was reported for, because `HEAD` had
 been read in another worktree. Nothing here is wrong except which thing the
 answer was about.
 
-Those three are sections at the bottom rather than numbered cases; numbering
+**One faulty instrument.** Three checks written on the spot to verify
+something, each with a passing condition that was not the property being
+asked about. Two raised false alarms and were caught in seconds. The third
+said pass, and would have said pass whatever the code did.
+
+Those four are sections at the bottom rather than numbered cases; numbering
 them would flatten the difference.
 
 Everything below was hit for real in this repo, not imagined.
@@ -583,11 +590,53 @@ Applied to the numbers above, so this entry does not commit its own error:
     490.18s     vitest's cumulative tests figure from the second of those,
                 961 of 961 passing
 
-All eight are the same failure: **an artefact carrying the authority of
+**A button that reports an act.** Every case above is an artefact that
+misreports a STATE — a number, a name, a result. A page-by-page audit of the
+console turned up the sibling class, and it is worse: an artefact that
+misreports an ACT.
+
+Communications had a Send button. `send()` appended the message to component
+state. An operator could type "change of plan, don't come in tomorrow", watch
+it appear in the thread with a timestamp beside their own name, and nobody
+would receive it. Settings had a list of active sessions with a Revoke button
+beside each; the sessions were a literal array and Revoke removed a row from
+it — so somebody seeing a session they did not recognise would click it and be
+told the session was gone. The run sheet carried a completed allergen sign-off
+for 38 flagged guests, attributed to a named person with "ID: 9647 · Idara
+Verified", six evidence photographs and two further named approvals, none of
+which came from anywhere.
+
+And the one that was not cosmetic: `recordPublish()` built the receipt for a
+blocked roster publish inside a `setAuditLog()` updater and appended it with
+`appendEvent()` — into the React replica, never to the server — underneath a
+modal reading *"This attempt has been written to the audit log."* `record()`,
+thirty lines above it in the same file, does the opposite and says why: the
+server holds the lock that decides `seq` and `prevHash`, so the server is the
+only writer. Both paths existed. The wrong one was load-bearing for the one
+event most worth keeping — a venue tried to roster somebody ineligible and was
+stopped, which is the entire argument for having a gate.
+
+The distinction that matters is in what the reader does next. A wrong number
+is consulted and can be doubted later; the reader is still holding the
+question. A reported act is *finished* — they stop thinking about it, because
+the system has told them it is done. Nobody re-checks whether the message they
+watched send actually sent. That is why these are worth separating from the
+eight above rather than filed with them: the same falsehood, told about the
+past tense, closes the loop it should have opened.
+
+A useful smell, and it is mechanical enough to grep for: **a success toast
+whose handler touches no store and no endpoint.** Sweeping the console for
+toasts claiming a completed act found six, of which three were real (a break
+push that writes `break.decision` to the chain first, a CSV export, an honest
+failure path) and three were not. One of the three was found only because
+deleting the Communications screen would have stranded the same button on the
+People drawer — accident, not method, which is the argument for sweeping.
+
+All nine are the same failure: **an artefact carrying the authority of
 evidence without the substance of it.** A passing assertion, a familiar
 identifier, a rendered page, an absent name, a present one, a red result, a
-one-row-per-file list and a cited number are all things we read as
-confirmation, and none of them was confirming anything.
+one-row-per-file list, a cited number and a confirmation message are all
+things we read as confirmation, and none of them was confirming anything.
 
 The screen adds a wrinkle worth keeping separate, because it is the one that
 generalises furthest. The test and the mock were *wrong about this tree*. The
@@ -609,7 +658,8 @@ from, rather than does the name match. Which server is answering, rather than
 does the page load. Whether the barrel re-exports it, rather than whether the
 barrel mentions it. What the commit changed, rather than whose name is on it.
 How many rows the command returned, rather than whether it returned one. What a
-number measured, rather than who measured it.
+number measured, rather than who measured it. What the handler behind a
+success message actually wrote, rather than what the message says it did.
 
 Every instance here was found by someone who had a reason to look at the thing
 rather than at its result.
@@ -775,6 +825,103 @@ truer one.
 
 ---
 
+## A fifth failure: the check you wrote to check with
+
+Everything above is about checks somebody else built — `tsc`, the build, a test
+in `tests/`, a comment, a command's output. Those have been read by more than
+one person and have usually been wrong at least once in public.
+
+This is about the other kind: the check you type into a console to settle a
+question you have right now. A one-line `includes()`. A slice of page text. A
+`fetch` and a substring. They are written in ten seconds, run once, and
+believed — and nothing guards them, because nobody writes a test for the thing
+they are using as a test.
+
+Three from one afternoon of verifying UI changes in a browser.
+
+**A case-sensitive check against a CSS-transformed page.** Confirming a table
+had survived an edit:
+
+```js
+t.includes('Rostered end')   // → false
+```
+
+The table was there. The header is `<th>Rostered end</th>` styled
+`text-transform: uppercase`, and `innerText` returns text as *rendered*, so the
+page says `ROSTERED END`. The check reported a screen that had lost its table.
+A screenshot showed the table immediately.
+
+**A fixed slice that was the same for every case.** Confirming that five
+restored tabs each rendered their own content:
+
+```js
+out[tab] = document.body.innerText.replace(/\s+/g,' ').slice(200, 340)
+```
+
+Character 200 to 340 landed inside a note that sits above the tab strip and is
+identical on every tab. All five came back the same string. **The check would
+have returned that same string if every tab had rendered nothing at all** —
+there is no input on which it fails. Redone against a distinct marker per tab,
+it passed for real.
+
+**A substring that is present on every page.** Confirming thirteen routes still
+resolved after a screen was deleted:
+
+```js
+const html = await (await fetch(r)).text();
+out[r] = { status: res.status, is404: html.includes('This page could not be found') };
+```
+
+All thirteen came back `status: 200, is404: true` — a console with every route
+broken, reported while its screens were visibly rendering in the next pane. The
+Next.js app-router payload carries the not-found template regardless of which
+route answered. Navigating to one route settled it in a second.
+
+### The asymmetry is the whole lesson
+
+Two of those three screamed. They contradicted something visible, so they were
+caught in seconds and cost nothing — a false alarm is self-limiting, because
+investigating it is how you find out.
+
+The slice did not scream. It said pass, agreed with what was hoped for, and was
+caught only on a re-read. **An ad-hoc check that raises a false alarm gets
+investigated; one that returns a false pass gets believed and closes the
+question.** They are the same defect and they are not the same cost, and the
+cheap one is the one that announces itself.
+
+Which is the same asymmetry as the section above, arriving from the other side.
+There, a screen reported an act that never happened and the reader stopped
+asking. Here, a check reported a pass that meant nothing and the writer stopped
+asking. In both, the failure is not the wrong answer — it is that the wrong
+answer ends the enquiry.
+
+### The countermeasure
+
+Not more checks. Two habits, both cheap:
+
+**Ask what would make it fail.** Before believing a pass, name an input that
+would produce a fail. If you cannot, the check has no discriminating power and
+its pass means nothing. `slice(200, 340)` has no such input; that is decidable
+by looking at it, before running it. This is mutation testing, done in your
+head, on a one-liner — the same standard `task-replay.test.ts` and
+`publish-receipt.test.ts` were held to, and there is no principled reason a
+check gets exempted for being short.
+
+**Prefer the instrument you did not write.** A screenshot has no passing
+condition to get wrong. All three of these were settled by looking at the page,
+faster than the check took to write. Reach for the derived check when the
+question is genuinely repetitive; reach for the direct one when it is not.
+
+A related trap, from the same afternoon: `grep -c 'progress:' file | head`
+reported ten matches. There were seventeen; `head` had truncated the listing
+before the count was read. An assertion in the edit script — one `progress`
+line per seeded event, so the two counts must agree — caught it before anything
+was written. **A script that changes files should assert what it expects to
+find**, because the alternative is discovering the miscount in the diff, or
+not at all.
+
+---
+
 ## The shape underneath
 
 Most of these share a shape with the worst bugs we found this quarter:
@@ -804,7 +951,22 @@ thing, which is the one assumption none of them check.
 And one more, which the 714 earned: **when you fix something, ask what was
 guarding it.** A green suite is not a claim that anybody looked.
 
-Which returns to the top. The numbered entries arrived on their own — a check
-went red and somebody read it. Nothing in the second half did. Every one of
-those came from going back to something already agreed and asking what it
-actually said, in a repo that was green the entire time.
+And one from the audit: **ask what would make it fail.** That applies to the
+one-liner you just typed as much as to the suite — a check nobody can fail is
+not weaker evidence than a check nobody ran, it is the same evidence.
+
+Which returns to the top, with one correction the fifth failure forced. The
+numbered entries arrived on their own — a check went red and somebody read it.
+Almost nothing in the second half did: those came from going back to something
+already agreed and asking what it actually said, in a repo that was green the
+entire time.
+
+The exception is instructive. Two of the three faulty ad-hoc checks announced
+themselves exactly like a numbered entry — they went red, loudly, about a
+screen that was plainly fine. That is why they cost nothing. The third agreed
+with what was hoped for and had to be gone back to, like everything else down
+here.
+
+So the dividing line is not which half of the document a failure belongs to.
+It is whether the wrong answer was disagreeable enough to be investigated.
+Everything expensive in this repo has been something that agreed.
