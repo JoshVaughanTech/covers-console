@@ -26,7 +26,7 @@ import { CardHead, LinkBtn } from "@/components/screen/page-head";
 /* The card shape, the columns and the seed all live in lib/tasks now, because
    the API route folds the same types out of the audit chain. Two definitions
    of what a task is would be two things that can disagree about a board. */
-import { BASE_EXTRA, COLS, cardInColumn, seedBoard, type ColName, type TaskBoard } from "@/lib/tasks";
+import { COLS, cardInColumn, seedBoard, type ColName, type TaskBoard } from "@/lib/tasks";
 
 const TABS = ["Dashboard", "Tasks", "Timeline", "Documents", "Team", "Issues", "Reports", "Settings"];
 
@@ -60,10 +60,14 @@ export default function ProjectsPage() {
     };
   }, []);
 
-  /* Base counts reflect the larger backlog beyond the few cards shown.
-     We track the "extra" (non-card) tally per column so totals stay
-     consistent when a card is added or moved. */
-  const count = (c: ColName) => BASE_EXTRA[c] + board[c].length;
+  /* What the column actually holds.
+
+     These headers used to add a BASE_EXTRA padding per column, so "To Do"
+     read 12 above three cards. It made the board look like a real week and
+     made the header disagree with everything under it — including the
+     overview tile, which now folds this same board. A count nobody can
+     check against the thing it counts is not a count. */
+  const count = (c: ColName) => board[c].length;
   const totalDone = count("Completed");
   const totalAll = COLS.reduce((s, c) => s + count(c), 0);
 
