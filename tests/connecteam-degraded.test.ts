@@ -2,16 +2,20 @@ import { describe, it, expect, vi, afterEach } from "vitest";
 import { ConnecteamClient } from "../lib/integrations/connecteam";
 
 /* ============================================================
-   Reading several clocks, and admitting what could not be read.
+   Several clocks: reading all of them, writing to one of them, and
+   admitting what could not be read.
 
-   Two failures this pins, both of the same kind: doing less than
+   Three failures this pins, all of the same kind: doing less than
    claimed without saying so.
 
    Reading one clock when three are configured shows a third of the
-   floor as though it were the whole floor. And without users.read
-   there is no employmentType, so the casual 12h cap (cl 11.2/11.4)
-   cannot be evaluated — an unevaluated check renders identically to
-   a passing one, which is worse than an error.
+   floor as though it were the whole floor. Writing to "1,2,3" as
+   though it were a clock id fails every push — the mirror of the
+   first, and it survived because reading and writing were correct
+   and incorrect at the same time with nothing connecting them. And
+   without users.read there is no employmentType, so the casual 12h
+   cap (cl 11.2/11.4) cannot be evaluated — an unevaluated check
+   renders identically to a passing one, which is worse than an error.
    ============================================================ */
 
 const TOKEN_URL = "https://api.connecteam.com/oauth/v1/token";
@@ -89,6 +93,47 @@ describe("reading every configured clock", () => {
     const breakCalls = hits.filter((h) => h.includes("manual-breaks"));
     // a clock whose types were never loaded would classify its breaks by default
     expect(breakCalls).toHaveLength(3);
+  });
+});
+
+describe("writing to the clock that owns the break", () => {
+  /* CONNECTEAM_TIME_CLOCK_ID is a list because reading merges clocks. A URL
+     is not: a manual break starts on exactly one. Which one is decided by
+     the break type, since break types are configured per clock. */
+  it("starts the break on the clock the break type belongs to", async () => {
+    const hits = stub({ clocks: { "1": [11], "2": [21], "3": [31] } });
+    const c = new ConnecteamClient({ timeClockId: "1,2,3", clientId: "i", clientSecret: "s" });
+
+    await c.startBreak("mb-2", "ct:21", "2026-09-11T03:00:00.000Z");
+
+    const clockIn = hits.filter((u) => u.includes("/clock-in"));
+    expect(clockIn).toHaveLength(1);
+    expect(clockIn[0]).toContain("/time-clocks/2/manual-breaks/mb-2/clock-in");
+    // the bug: the raw setting interpolated into the path
+    expect(clockIn[0]).not.toContain("1,2,3");
+  });
+
+  it("needs no lookup when one clock is configured", async () => {
+    const hits = stub({ clocks: { "42": [1] } });
+    const c = new ConnecteamClient({ timeClockId: "42", clientId: "i", clientSecret: "s" });
+
+    await c.startBreak("mb-42", "ct:1", "2026-09-11T03:00:00.000Z");
+
+    expect(hits.filter((u) => u.includes("/clock-in"))[0]).toContain("/time-clocks/42/");
+    // there is nowhere else it could go, so the break list is never fetched
+    expect(hits.some((u) => u.includes("manual-breaks") && !u.includes("clock-in"))).toBe(false);
+  });
+
+  it("refuses rather than guessing when the break type is on no configured clock", async () => {
+    stub({ clocks: { "1": [11], "2": [21] } });
+    const c = new ConnecteamClient({ timeClockId: "1,2", clientId: "i", clientSecret: "s" });
+
+    /* Writing it to whichever clock came first would put a real break on the
+       wrong person's timesheet. sendOnBreak records the throw as a failed
+       push, which is recoverable; a break on the wrong clock is not. */
+    await expect(c.startBreak("mb-elsewhere", "ct:11", "2026-09-11T03:00:00.000Z")).rejects.toThrow(
+      /mb-elsewhere/,
+    );
   });
 });
 
