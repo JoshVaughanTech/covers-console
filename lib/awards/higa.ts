@@ -181,6 +181,27 @@ export function fmtDuration(sec: number): string {
   return `${h}:${String(m).padStart(2, "0")}`;
 }
 
+/**
+ * The same duration, for a counter somebody is watching.
+ *
+ * Screens re-assess every second, so an elapsed figure is already correct to
+ * the second — but rendered as h:mm it only CHANGES once a minute, and a
+ * number that sits still for sixty seconds reads as a screen that has frozen
+ * or data that has stopped arriving. Both are things this screen exists to
+ * rule out, so on the one figure that is genuinely live it is worth the two
+ * extra characters to show that it is moving.
+ *
+ * Only for a shift still running. A finished one has a fixed length, and
+ * seconds on a number that will never change again is just noise — fmtDuration
+ * stays the default everywhere else for that reason.
+ */
+export function fmtDurationLive(sec: number): string {
+  const s = Math.max(0, Math.floor(sec));
+  const h = Math.floor(s / H);
+  const m = Math.floor((s % H) / M);
+  return `${h}:${String(m).padStart(2, "0")}:${String(s % M).padStart(2, "0")}`;
+}
+
 /** Roster wins; otherwise the shift is "at least as long as it's been". */
 export function expectedShiftLength(session: ShiftSession, now: number): number {
   const end = session.clockOut ?? now;

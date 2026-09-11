@@ -6,6 +6,7 @@ import {
   assessAll,
   fmtClock,
   fmtDuration,
+  fmtDurationLive,
   type BreakAssessment,
   type BreakKind,
   type ShiftSession,
@@ -316,8 +317,10 @@ function PersonRow({
         </span>
       </span>
       <span style={{ textAlign: "right", flexShrink: 0 }}>
+        {/* Ticking while the shift runs, fixed once it has ended. fs-tnum
+            keeps the digits from jittering as the seconds turn over. */}
         <span className="fs-tnum" style={{ display: "block", fontSize: 15, fontWeight: 700, color: "var(--fg-1)" }}>
-          {fmtDuration(elapsed)}
+          {p.onShift ? fmtDurationLive(elapsed) : fmtDuration(elapsed)}
         </span>
         <span
           style={{
@@ -361,7 +364,10 @@ function Sheet({
 
         <h3 style={{ margin: "0 0 2px", fontSize: 19 }}>{p.name}</h3>
         <p style={{ margin: "0 0 14px", fontSize: 12.5, color: "var(--fg-4)" }}>
-          {p.role} · {p.siteName} · on shift {fmtDuration(p.onShift ? now - p.clockIn : p.elapsedSec)}
+          {p.role} · {p.siteName} · on shift{" "}
+          <span className="fs-tnum">
+            {p.onShift ? fmtDurationLive(now - p.clockIn) : fmtDuration(p.elapsedSec)}
+          </span>
         </p>
 
         <p style={{ margin: "0 0 14px", fontSize: 13.5, lineHeight: 1.55, color: p.severity === 3 ? "var(--danger-fg)" : "var(--fg-2)", fontWeight: p.severity === 3 ? 600 : 400 }}>
