@@ -272,8 +272,98 @@ export async function freshDb(): Promise<Db> {
   }
 
   const { PGlite } = await import("@electric-sql/pglite");
-  const dir = pgliteDir();
-  return new PgliteDb((await (dir ? PGlite.create(dir) : PGlite.create())) as unknown as PgliteInstance);
+  return new PgliteDb((await openPglite(PGlite, pgliteDir())) as unknown as PgliteInstance);
+}
+
+/* ---------- a data directory that will not open ---------- */
+
+export interface StorageDegradation {
+  /** the directory that would not open. */
+  dir: string;
+  /** what it threw, for somebody deciding whether to keep the directory. */
+  cause: string;
+}
+
+let degradation: StorageDegradation | null = null;
+
+/**
+ * Why local storage is not being used, or null when it is.
+ *
+ * A flag as well as a log line, because a log line scrolls away and this repo
+ * has a document about things that look like they worked. Falling back to
+ * memory silently would mean the board stops surviving a restart with nothing
+ * saying so — which is the failure `.data/pg` was added to fix, returning by
+ * a quieter door.
+ */
+export function storageDegraded(): StorageDegradation | null {
+  return degradation;
+}
+
+/** Tests set this back; a process only ever degrades once. */
+export function clearStorageDegraded(): void {
+  degradation = null;
+}
+
+/**
+ * Open PGlite on `dir`, or carry on in memory and say so.
+ *
+ * A dev server killed mid-write leaves the directory unopenable — Postgres
+ * removes postmaster.pid on a clean shutdown and an abrupt one does not — and
+ * PGlite answers with `RuntimeError: Aborted()`, which names neither the
+ * directory nor the remedy. Before this, that aborted freshDb(), so every
+ * route touching the store returned 500 and the console was unusable until
+ * somebody recognised a WASM stack trace as "delete .data/pg".
+ *
+ * Losing the local database is a nuisance. Losing the app because the local
+ * database is unreadable is a worse one, and the data is already gone either
+ * way: nothing here can read it.
+ *
+ * It does NOT delete or move the directory. Two reasons. It is somebody's,
+ * and they may want to look at it or try another PGlite against it. And the
+ * catch is deliberately broad — any failure, not a matched message, because
+ * the real corruption threw `Aborted()` while a malformed directory throws
+ * "PGlite failed to initialize properly" and a third cause would throw a
+ * third thing. Broad enough to catch a transient failure too, and quarantining
+ * a working directory on one of those would throw away the persistence this
+ * is meant to protect.
+ *
+ * Production never reaches here: DATABASE_URL is required and returns a PgDb
+ * above. The fallback is memory, which is what tests and a first run already
+ * use, so nothing downstream needs to know about it.
+ */
+export async function openPglite(
+  PGlite: { create: (dir?: string) => Promise<unknown> },
+  dir: string | undefined,
+): Promise<unknown> {
+  if (!dir) return PGlite.create();
+
+  try {
+    return await PGlite.create(dir);
+  } catch (e) {
+    const cause = e instanceof Error ? `${e.name}: ${e.message}` : String(e);
+    degradation = { dir, cause };
+    /* Addressed to somebody who has just watched the console stop working, so
+       it names the path, the likely cause and the one command — not the
+       exception, which is what they already have and cannot act on. */
+    console.error(
+      [
+        "",
+        `  Covers: could not open the local database at ${dir}`,
+        `  ${cause}`,
+        "",
+        "  Most often this is a dev server killed mid-write — a closed terminal,",
+        "  an ended session, a machine that slept. The directory cannot be read",
+        "  by anything now, so the events in it are gone whatever happens next.",
+        "",
+        "  Running from memory instead: the app works, and nothing will survive",
+        "  a restart until the directory is replaced.",
+        "",
+        `  To start clean:  rm -rf ${dir}`,
+        "",
+      ].join("\n"),
+    );
+    return PGlite.create();
+  }
 }
 
 /**
