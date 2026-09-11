@@ -101,6 +101,10 @@ export function classifyBreak(b: CtManualBreak): BreakKind {
 export class ConnecteamClient {
   private users: Map<number, CtUser> | null = null;
   private breakKinds: Map<string, BreakKind> | null = null;
+  /* Which clock each break type belongs to. Reading does not need this —
+     ids are unique across clocks, so one kind map serves all — but writing
+     does, because a break is started on a URL naming one clock. */
+  private breakClocks: Map<string, string> | null = null;
   /**
    * Scopes this integration turned out not to hold, discovered by being
    * refused. Surfaced rather than swallowed: a compliance check that is off
@@ -204,10 +208,43 @@ export class ConnecteamClient {
     if (!Number.isFinite(userId)) throw new Error(`cannot map "${userRef}" to a Connecteam userId`);
 
     const r = await this.post<{ id?: string; manualBreakId?: string }>(
-      `/time-clock/v1/time-clocks/${this.cfg.timeClockId}/manual-breaks/${manualBreakId}/clock-in`,
+      `/time-clock/v1/time-clocks/${await this.clockForBreak(manualBreakId)}/manual-breaks/${manualBreakId}/clock-in`,
       { userId, timestamp: Math.floor(Date.parse(at) / 1000) },
     );
     return { ctBreakId: r?.id ?? r?.manualBreakId ?? manualBreakId };
+  }
+
+  /**
+   * The clock to start this break on.
+   *
+   * Reading merges every configured clock, so CONNECTEAM_TIME_CLOCK_ID is a
+   * list. Writing cannot be: a manual break is started at a URL naming one
+   * clock, and this used to interpolate the raw setting — so a venue reading
+   * two clocks built ".../time-clocks/2421453,7573651/manual-breaks/..." and
+   * every push failed. Reading worked, writing did not, and nothing connected
+   * the two until somebody sent a break.
+   *
+   * Resolved from the break type rather than guessed, because that is the
+   * fact that decides it: break types are configured per clock, and
+   * loadBreakKinds() already fetches them per clock.
+   *
+   * One clock configured needs no lookup — there is nowhere else it could go.
+   * Several and an unrecognised break type throws, which sendOnBreak records
+   * as a failed push. Writing a break to whichever clock happened to be first
+   * would put a real break on the wrong timesheet.
+   */
+  private async clockForBreak(manualBreakId: string): Promise<string> {
+    const ids = this.clockIds();
+    if (ids.length === 1) return ids[0];
+
+    await this.loadBreakKinds();
+    const found = this.breakClocks?.get(manualBreakId);
+    if (found) return found;
+
+    throw new Error(
+      `break type "${manualBreakId}" is not configured on any clock this integration ` +
+        `reads (${ids.join(", ")}), so there is no clock to start it on`,
+    );
   }
 
   private localDate(ts: number, offsetDays = 0): string {
@@ -242,13 +279,20 @@ export class ConnecteamClient {
       /* Each clock configures its own break types, and they genuinely differ:
          one account has "Break" (unpaid 30m) on two clocks and "Lunch break"
          on a third. Ids are unique across clocks, so one map serves all. */
+      const ids = this.clockIds();
       const perClock = await Promise.all(
-        this.clockIds().map((id) =>
+        ids.map((id) =>
           this.get<{ manualBreaks?: CtManualBreak[] }>(`/time-clock/v1/time-clocks/${id}/manual-breaks`),
         ),
       );
       this.breakKinds = new Map(
         perClock.flatMap((d) => (d.manualBreaks ?? []).map((b) => [b.id, classifyBreak(b)] as const)),
+      );
+      /* Same responses, second index. Free here and impossible later: the
+         clock a break belongs to is known only while the per-clock replies
+         are still separate, and the flatMap above is where that is lost. */
+      this.breakClocks = new Map(
+        perClock.flatMap((d, i) => (d.manualBreaks ?? []).map((b) => [b.id, ids[i]] as const)),
       );
     }
     return this.breakKinds;
